@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
 
 function CandidateModal({ candidate, isOpen, onClose, onSave }) {
@@ -261,27 +261,58 @@ function CandidateModal({ candidate, isOpen, onClose, onSave }) {
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        padding: '5px',
+                        padding: '8px',
                         background: '#f5f5f5',
                         borderRadius: '4px',
                         marginBottom: '5px'
                       }}
                     >
-                      <span>{file.name || `File ${idx + 1}`}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeFile(idx)}
-                        style={{
-                          background: 'var(--danger)',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '4px',
-                          padding: '2px 6px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        ×
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                        <i className={`fas ${file.type?.includes('pdf') ? 'fa-file-pdf' :
+                          file.type?.includes('word') || file.type?.includes('document') ? 'fa-file-word' :
+                            'fa-file'
+                          }`} style={{ color: file.type?.includes('pdf') ? '#d32f2f' : '#2196f3' }}></i>
+                        <span style={{ flex: 1 }}>{file.name || `File ${idx + 1}`}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '5px' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const link = document.createElement('a')
+                            link.href = file.data
+                            link.download = file.name || `CV_${idx + 1}`
+                            link.click()
+                          }}
+                          style={{
+                            background: '#4caf50',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '4px 8px',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                          title="Tải xuống"
+                        >
+                          <i className="fas fa-download"></i>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeFile(idx)}
+                          style={{
+                            background: 'var(--danger)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '4px 8px',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                          title="Xóa"
+                        >
+                          <i className="fas fa-trash"></i>
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -290,6 +321,7 @@ function CandidateModal({ candidate, isOpen, onClose, onSave }) {
                 type="file"
                 multiple
                 onChange={handleFilesChange}
+                accept=".pdf,.doc,.docx"
               />
             </div>
 

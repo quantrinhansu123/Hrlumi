@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
 
 function CompetencyEvaluationModal({ evaluation, employees, competencyFramework, isOpen, onClose, onSave }) {
@@ -60,27 +60,36 @@ function CompetencyEvaluationModal({ evaluation, employees, competencyFramework,
 
   const loadCompetencyItems = (employee) => {
     if (!employee) return
-    
-    const position = employee.vi_tri || employee.position || ''
-    const dept = employee.bo_phan || employee.department || ''
-    
-    // Lấy các năng lực theo vị trí và bộ phận
-    const items = competencyFramework.filter(c => 
-      c.position === position && 
-      c.department === dept &&
-      c.status === 'Áp dụng'
-    )
+
+    // Normalize for robust matching
+    const empPosition = String(employee.vi_tri || employee.position || '').trim().toLowerCase()
+    const empDept = String(employee.bo_phan || employee.department || '').trim().toLowerCase()
+
+    // Lấy các năng lực theo vị trí và bộ phận (hoặc chỉ vị trí nếu framework không chia dept)
+    const items = competencyFramework.filter(c => {
+      const framePosition = String(c.position || '').trim().toLowerCase()
+      const frameDept = String(c.department || '').trim().toLowerCase()
+
+      const posMatch = framePosition === empPosition
+      const deptMatch = !c.department || frameDept === empDept || empDept === ''
+
+      return posMatch && deptMatch && c.status === 'Áp dụng'
+    })
 
     // Tạo items với level yêu cầu và level đạt được
     const evaluationItems = items.map(item => {
       const existingItem = formData.items.find(i => i.competencyId === item.id)
+      const requiredLevel = Number(item.level || 0)
+      const achievedLevel = existingItem ? Number(existingItem.achievedLevel || 0) : requiredLevel
+
       return {
         competencyId: item.id,
+        competencyCode: item.code || item.id,
         competencyName: item.name,
         group: item.group,
-        requiredLevel: Number(item.level || 0),
-        achievedLevel: existingItem ? Number(existingItem.achievedLevel || item.level || 0) : Number(item.level || 0),
-        difference: existingItem ? (Number(existingItem.achievedLevel || 0) - Number(item.level || 0)) : 0,
+        requiredLevel: requiredLevel,
+        achievedLevel: achievedLevel,
+        difference: achievedLevel - requiredLevel,
         comment: existingItem ? existingItem.comment : ''
       }
     })
@@ -94,21 +103,23 @@ function CompetencyEvaluationModal({ evaluation, employees, competencyFramework,
 
   const handleChange = (e) => {
     const value = e.target.value
-    setFormData({
-      ...formData,
-      [e.target.name]: value
-    })
+    const name = e.target.name
 
-    if (e.target.name === 'employeeId') {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
+
+    if (name === 'employeeId') {
       const emp = employees.find(e => e.id === value)
       setSelectedEmployee(emp)
       if (emp) {
         setFormData(prev => ({
           ...prev,
-          employeeCode: emp.ma_nhan_vien || emp.employeeCode || emp.code || '',
+          employeeId: value,
+          employeeCode: emp.ma_nhan_vien || emp.employeeCode || emp.code || emp.id || '',
           position: emp.vi_tri || emp.position || '',
-          department: emp.bo_phan || emp.department || '',
-          [e.target.name]: value
+          department: emp.bo_phan || emp.department || ''
         }))
       }
     }
@@ -116,29 +127,32 @@ function CompetencyEvaluationModal({ evaluation, employees, competencyFramework,
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items]
-    newItems[index] = {
-      ...newItems[index],
-      [field]: field === 'achievedLevel' ? parseInt(value) || 0 : value
-    }
-    
+    const item = { ...newItems[index] }
+
+    item[field] = field === 'achievedLevel' ? parseInt(value) || 0 : value
+
     // Tính điểm chênh lệch
     if (field === 'achievedLevel') {
-      newItems[index].difference = parseInt(value) - newItems[index].requiredLevel
+      item.difference = (parseInt(value) || 0) - item.requiredLevel
     }
 
-    setFormData({
-      ...formData,
+    newItems[index] = item
+    setFormData(prev => ({
+      ...prev,
       items: newItems
-    })
+    }))
   }
 
   const calculateAverages = () => {
     if (formData.items.length === 0) return { avgRequired: 0, avgAchieved: 0 }
-    
-    const avgRequired = formData.items.reduce((sum, item) => sum + item.requiredLevel, 0) / formData.items.length
-    const avgAchieved = formData.items.reduce((sum, item) => sum + item.achievedLevel, 0) / formData.items.length
-    
-    return { avgRequired, avgAchieved }
+
+    const totalRequired = formData.items.reduce((sum, item) => sum + item.requiredLevel, 0)
+    const totalAchieved = formData.items.reduce((sum, item) => sum + item.achievedLevel, 0)
+
+    return {
+      avgRequired: totalRequired / formData.items.length,
+      avgAchieved: totalAchieved / formData.items.length
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -148,33 +162,41 @@ function CompetencyEvaluationModal({ evaluation, employees, competencyFramework,
         alert('Vui lòng chọn Nhân viên, Kỳ đánh giá và Ngày đánh giá')
         return
       }
+
       if (!formData.items || formData.items.length === 0) {
-        alert('Chưa có danh sách năng lực để đánh giá (thiếu mã năng lực hoặc khung vị trí).')
+        alert('Chưa có danh sách năng lực để đánh giá cho vị trí này. Vui lòng kiểm tra lại Khung năng lực.')
         return
       }
 
-      // Validate từng item: bắt buộc competencyId và achievedLevel
+      // Validate: achievedLevel must be present
       const invalidItem = formData.items.find(
-        (it) => !it.competencyId || it.achievedLevel === undefined || it.achievedLevel === null
+        (it) => it.achievedLevel === undefined || it.achievedLevel === null
       )
       if (invalidItem) {
-        alert('Thiếu mã năng lực hoặc Level đạt được cho một số dòng. Vui lòng kiểm tra lại.')
+        alert('Vui lòng nhập đầy đủ Level đạt được cho tất cả năng lực.')
         return
       }
 
       const { avgRequired, avgAchieved } = calculateAverages()
-      const data = {
+
+      // Mapping field names for backend consistency and user requirements
+      const dataToSave = {
         ...formData,
+        diemYC: avgRequired,
+        diemKQ: avgAchieved,
         avgRequired,
         avgAchieved,
-        result: avgAchieved > avgRequired ? 'Đạt' : 'Cần cải thiện'
+        result: avgAchieved >= avgRequired ? 'Đạt' : 'Cần cải thiện',
+        updatedAt: new Date().toISOString()
       }
 
       if (evaluation && evaluation.id) {
-        await fbUpdate(`hr/employee_competency_assessment/${evaluation.id}`, data)
+        await fbUpdate(`hr/employee_competency_assessment/${evaluation.id}`, dataToSave)
       } else {
-        await fbPush('hr/employee_competency_assessment', data)
+        await fbPush('hr/employee_competency_assessment', dataToSave)
       }
+
+      alert('Đã lưu kết quả đánh giá thành công.')
       onSave()
       onClose()
       resetForm()
@@ -225,7 +247,7 @@ function CompetencyEvaluationModal({ evaluation, employees, competencyFramework,
                       <option key={emp.id} value={emp.id}>
                         {emp.ho_va_ten || emp.name || 'N/A'} - {emp.vi_tri || '-'}
                       </option>
-                  ))}
+                    ))}
                 </select>
               </div>
               <div className="form-group">
@@ -298,9 +320,9 @@ function CompetencyEvaluationModal({ evaluation, employees, competencyFramework,
                               ))}
                             </select>
                           </td>
-                          <td style={{ 
-                            color: item.difference > 0 ? 'var(--success)' : 
-                                   item.difference < 0 ? 'var(--danger)' : 'var(--text)',
+                          <td style={{
+                            color: item.difference > 0 ? 'var(--success)' :
+                              item.difference < 0 ? 'var(--danger)' : 'var(--text)',
                             fontWeight: 'bold'
                           }}>
                             {item.difference > 0 ? '+' : ''}{item.difference}
@@ -322,9 +344,9 @@ function CompetencyEvaluationModal({ evaluation, employees, competencyFramework,
                 <div style={{ marginTop: '15px', padding: '10px', background: '#f5f5f5', borderRadius: '4px' }}>
                   <strong>Điểm trung bình:</strong>
                   <div style={{ marginTop: '5px' }}>
-                    Điểm YC: {calculateAverages().avgRequired.toFixed(1)} | 
-                    Điểm KQ: {calculateAverages().avgAchieved.toFixed(1)} | 
-                    Kết quả: <span style={{ 
+                    Điểm YC: {calculateAverages().avgRequired.toFixed(1)} |
+                    Điểm KQ: {calculateAverages().avgAchieved.toFixed(1)} |
+                    Kết quả: <span style={{
                       color: calculateAverages().avgAchieved > calculateAverages().avgRequired ? 'var(--success)' : 'var(--warning)',
                       fontWeight: 'bold'
                     }}>
