@@ -25,11 +25,11 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
 
       // Assume header row is row 0
       // Columns detection: Look for 'Mã NV', 'Ngày', 'Giờ' or similar
-      const headers = jsonData[0].map(h => String(h).toLowerCase().trim())
-      const codeIdx = headers.findIndex(h => h.includes('mã nv') || h.includes('code') || h.includes('id'))
-      const nameIdx = headers.findIndex(h => h.includes('họ tên') || h.includes('tên') || h.includes('name'))
-      const dateIdx = headers.findIndex(h => h.includes('ngày') || h.includes('date'))
-      const timeIdx = headers.findIndex(h => h.includes('giờ') || h.includes('time') || h.includes('check'))
+      const headers = Array.from(jsonData[0] || []).map(h => String(h || '').toLowerCase().trim())
+      const codeIdx = headers.findIndex(h => h.includes('mã') || h.includes('code') || h.includes('id') || h.includes('nv'))
+      const nameIdx = headers.findIndex(h => h.includes('tên') || h.includes('name') || h.includes('họ'))
+      const dateIdx = headers.findIndex(h => h.includes('ngày') || h.includes('date') || h.includes('ngay'))
+      const timeIdx = headers.findIndex(h => h.includes('giờ') || h.includes('time') || h.includes('check') || h.includes('vao') || h.includes('ra'))
 
       if (codeIdx === -1 || nameIdx === -1 || dateIdx === -1 || timeIdx === -1) {
         throw new Error('File Excel cần có các cột: Mã NV, Họ tên, Ngày, Giờ (check-in/out)')
