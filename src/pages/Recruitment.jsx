@@ -1,0 +1,854 @@
+import { useEffect, useState } from 'react'
+import * as XLSX from 'xlsx'
+import CandidateModal from '../components/CandidateModal'
+import RecruitmentPlanModal from '../components/RecruitmentPlanModal'
+import { fbDelete, fbGet, fbPush, fbUpdate } from '../services/firebase'
+import { escapeHtml } from '../utils/helpers'
+
+function Recruitment() {
+  const [plans, setPlans] = useState([])
+  const [candidates, setCandidates] = useState([])
+  const [employees, setEmployees] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const [selectedPlan, setSelectedPlan] = useState(null)
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false)
+
+  const [selectedCandidate, setSelectedCandidate] = useState(null)
+  const [isCandidateModalOpen, setIsCandidateModalOpen] = useState(false)
+
+  const [filterPosition, setFilterPosition] = useState('')
+
+  // Excel Import/Export states for Candidates
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [importFile, setImportFile] = useState(null)
+  const [importPreviewData, setImportPreviewData] = useState([])
+  const [isImporting, setIsImporting] = useState(false)
+
+  // Excel Import/Export states for Recruitment Plans
+  const [isPlanImportModalOpen, setIsPlanImportModalOpen] = useState(false)
+  const [planImportFile, setPlanImportFile] = useState(null)
+  const [planImportPreviewData, setPlanImportPreviewData] = useState([])
+  const [isPlanImporting, setIsPlanImporting] = useState(false)
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+
+      // Load employees (để map sang khi chuyển NV thử việc)
+      const empData = await fbGet('employees')
+      let empList = []
+      if (empData) {
+        if (Array.isArray(empData)) {
+          empList = empData.filter(item => item !== null && item !== undefined)
+        } else if (typeof empData === 'object') {
+          empList = Object.entries(empData)
+            .filter(([k, v]) => v !== null && v !== undefined)
+            .map(([k, v]) => ({ ...v, id: k }))
+        }
+      }
+      setEmployees(empList)
+
+      // Load recruitment data
+      const hrData = await fbGet('hr')
+      const plansData = hrData?.recruitmentPlans
+        ? Object.entries(hrData.recruitmentPlans)
+          .filter(([k, v]) => v !== null && v !== undefined)
+          .map(([k, v]) => ({ ...v, id: k }))
+        : []
+
+      const candidatesData = hrData?.candidates
+        ? Object.entries(hrData.candidates)
+          .filter(([k, v]) => v !== null && v !== undefined)
+          .map(([k, v]) => ({ ...v, id: k }))
+        : []
+
+      setPlans(plansData)
+      setCandidates(candidatesData)
+      setLoading(false)
+    } catch (error) {
+      console.error('Error loading recruitment data:', error)
+      setLoading(false)
+    }
+  }
+
+  const handleDeletePlan = async (id) => {
+    if (!confirm('Bạn có chắc muốn xóa nhu cầu tuyển dụng này?')) return
+    try {
+      await fbDelete(`hr/recruitmentPlans/${id}`)
+      await loadData()
+      alert('Đã xóa nhu cầu tuyển dụng')
+    } catch (error) {
+      alert('Lỗi khi xóa: ' + error.message)
+    }
+  }
+
+  const handleDeleteCandidate = async (id) => {
+    if (!confirm('Bạn có chắc muốn xóa CV này?')) return
+    try {
+      await fbDelete(`hr/candidates/${id}`)
+      await loadData()
+      alert('Đã xóa CV ứng viên')
+    } catch (error) {
+      alert('Lỗi khi xóa: ' + error.message)
+    }
+  }
+
+  const handleConvertToEmployee = async (candidate) => {
+    if (!candidate) return
+    if (!confirm('Chuyển ứng viên này sang Nhân viên thử việc?')) return
+
+    try {
+      const payload = {
+        ho_va_ten: candidate.ho_ten || candidate.name || '',
+        email: candidate.email || '',
+        sđt: candidate.sdt || candidate.sđt || '',
+        chi_nhanh: candidate.chi_nhanh || '',
+        bo_phan: candidate.bo_phan || candidate.department || '',
+        // Set vị trí hiển thị là Thử việc theo yêu cầu
+        vi_tri: 'Thử việc',
+        trang_thai: 'Thử việc',
+        status: 'probation',
+        ngay_vao_lam: new Date().toISOString().split('T')[0],
+        cccd: candidate.cccd || '',
+        ngay_cap: candidate.ngay_cap || '',
+        noi_cap: candidate.noi_cap || '',
+        que_quan: candidate.que_quan || '',
+        gioi_tinh: candidate.gioi_tinh || '',
+        tinh_trang_hon_nhan: candidate.tinh_trang_hon_nhan || '',
+        avatarDataUrl: '',
+        images: [],
+        files: candidate.cv_files || []
+      }
+
+      const res = await fbPush('employees', payload)
+      const newEmpId = res?.name || ''
+
+      await fbUpdate(`hr/candidates/${candidate.id}`, {
+        da_chuyen_sang_nv: true,
+        linkedEmployeeId: newEmpId
+      })
+
+      // Log trạng thái
+      await fbPush('hr/candidateStatusLogs', {
+        candidateId: candidate.id,
+        action: 'Chuyển sang nhân viên thử việc',
+        newStatus: 'probation',
+        createdAt: new Date().toISOString()
+      })
+
+      await loadData()
+      alert('Đã chuyển ứng viên sang Nhân viên thử việc')
+    } catch (error) {
+      alert('Lỗi chuyển ứng viên: ' + error.message)
+    }
+  }
+
+  // Download Excel Template for Recruitment Plans
+  const handleDownloadPlanTemplate = () => {
+    const headers = [
+      'Bộ phận',
+      'Vị trí',
+      'Nhân sự hiện có',
+      'Định biên',
+      'Ghi chú'
+    ]
+
+    const sampleData = [
+      ['IT', 'Developer', '5', '8', 'Cần tập trung tuyển dụng'],
+      ['Kế toán', 'Kế toán viên', '3', '4', '']
+    ]
+
+    const wsData = [headers, ...sampleData]
+    const ws = XLSX.utils.aoa_to_sheet(wsData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Định biên nhân sự')
+    XLSX.writeFile(wb, 'Mau_Dinh_Bien_Nhan_Su.xlsx')
+  }
+
+  // Handle file selection for plan import
+  const handlePlanFileSelect = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    setPlanImportFile(file)
+    setIsPlanImporting(true)
+
+    try {
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data)
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+
+      if (jsonData.length < 2) {
+        alert('File Excel không có dữ liệu')
+        setIsPlanImporting(false)
+        return
+      }
+
+      const headers = jsonData[0].map(h => String(h).toLowerCase().trim())
+
+      // Find column indexes
+      const boPhanIdx = headers.findIndex(h => h.includes('bộ phận'))
+      const viTriIdx = headers.findIndex(h => h.includes('vị trí'))
+      const nhanSuHienCoIdx = headers.findIndex(h => h.includes('hiện có'))
+      const dinhBienIdx = headers.findIndex(h => h.includes('định biên'))
+      const ghiChuIdx = headers.findIndex(h => h.includes('ghi chú'))
+
+      // Validate required columns
+      if (boPhanIdx === -1 || viTriIdx === -1 || dinhBienIdx === -1) {
+        alert('File Excel cần có các cột: Bộ phận, Vị trí, Định biên')
+        setIsPlanImporting(false)
+        return
+      }
+
+      // Parse data rows
+      const parsedData = []
+      for (let i = 1; i < jsonData.length; i++) {
+        const row = jsonData[i]
+        if (!row[boPhanIdx] || !row[viTriIdx] || !row[dinhBienIdx]) continue
+
+        parsedData.push({
+          bo_phan: row[boPhanIdx] || '',
+          vi_tri: row[viTriIdx] || '',
+          nhan_su_hien_co: nhanSuHienCoIdx !== -1 ? (row[nhanSuHienCoIdx] || '0') : '0',
+          dinh_bien: row[dinhBienIdx] || '0',
+          ghi_chu: ghiChuIdx !== -1 ? (row[ghiChuIdx] || '') : ''
+        })
+      }
+
+      setPlanImportPreviewData(parsedData)
+      setIsPlanImporting(false)
+    } catch (error) {
+      alert('Lỗi khi đọc file: ' + error.message)
+      setIsPlanImporting(false)
+    }
+  }
+
+  // Confirm and import plan data to Firebase
+  const handleConfirmPlanImport = async () => {
+    if (planImportPreviewData.length === 0) {
+      alert('Không có dữ liệu để import')
+      return
+    }
+
+    setIsPlanImporting(true)
+    try {
+      let successCount = 0
+      for (const plan of planImportPreviewData) {
+        await fbPush('hr/recruitmentPlans', plan)
+        successCount++
+      }
+
+      alert(`Đã import thành công ${successCount} định biên`)
+      setIsPlanImportModalOpen(false)
+      setPlanImportFile(null)
+      setPlanImportPreviewData([])
+      await loadData()
+    } catch (error) {
+      alert('Lỗi khi import: ' + error.message)
+    } finally {
+      setIsPlanImporting(false)
+    }
+  }
+
+  // Download Excel Template for Candidates
+  const handleDownloadTemplate = () => {
+    const headers = [
+      'Họ và tên',
+      'Vị trí ứng tuyển',
+      'Bộ phận',
+      'Nguồn CV',
+      'SĐT',
+      'Email',
+      'Trạng thái hiện tại',
+      'Ngày tiếp nhận (YYYY-MM-DD)',
+      'CCCD',
+      'Ngày cấp (YYYY-MM-DD)',
+      'Nơi cấp',
+      'Quê quán',
+      'Giới tính',
+      'Tình trạng hôn nhân'
+    ]
+
+    const sampleData = [
+      [
+        'Nguyễn Văn A',
+        'Developer',
+        'IT',
+        'Website',
+        '0901234567',
+        'nguyenvana@example.com',
+        'CV mới',
+        '2025-12-23',
+        '001234567890',
+        '2020-01-15',
+        'CA Hà Nội',
+        'Hà Nội',
+        'Nam',
+        'Độc thân'
+      ]
+    ]
+
+    const wsData = [headers, ...sampleData]
+    const ws = XLSX.utils.aoa_to_sheet(wsData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Danh sách ứng viên')
+    XLSX.writeFile(wb, 'Mau_Import_Ung_Vien.xlsx')
+  }
+
+  // Handle file selection for import
+  const handleFileSelect = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    setImportFile(file)
+    setIsImporting(true)
+
+    try {
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data)
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+
+      if (jsonData.length < 2) {
+        alert('File Excel không có dữ liệu')
+        setIsImporting(false)
+        return
+      }
+
+      const headers = jsonData[0].map(h => String(h).toLowerCase().trim())
+
+      // Find column indexes
+      const hoTenIdx = headers.findIndex(h => h.includes('họ') && h.includes('tên'))
+      const viTriIdx = headers.findIndex(h => h.includes('vị trí'))
+      const boPhanIdx = headers.findIndex(h => h.includes('bộ phận'))
+      const nguonCVIdx = headers.findIndex(h => h.includes('nguồn'))
+      const sdtIdx = headers.findIndex(h => h.includes('sđt') || h.includes('số điện thoại'))
+      const emailIdx = headers.findIndex(h => h.includes('email'))
+      const trangThaiIdx = headers.findIndex(h => h.includes('trạng thái'))
+      const ngayTiepNhanIdx = headers.findIndex(h => h.includes('ngày tiếp nhận'))
+      const cccdIdx = headers.findIndex(h => h.includes('cccd'))
+      const ngayCapIdx = headers.findIndex(h => h.includes('ngày cấp'))
+      const noiCapIdx = headers.findIndex(h => h.includes('nơi cấp'))
+      const queQuanIdx = headers.findIndex(h => h.includes('quê quán'))
+      const gioiTinhIdx = headers.findIndex(h => h.includes('giới tính'))
+      const honNhanIdx = headers.findIndex(h => h.includes('hôn nhân'))
+
+      // Validate required columns
+      if (hoTenIdx === -1 || viTriIdx === -1 || emailIdx === -1) {
+        alert('File Excel cần có các cột: Họ và tên, Vị trí ứng tuyển, Email')
+        setIsImporting(false)
+        return
+      }
+
+      // Parse data rows
+      const parsedData = []
+      for (let i = 1; i < jsonData.length; i++) {
+        const row = jsonData[i]
+        if (!row[hoTenIdx] || !row[viTriIdx] || !row[emailIdx]) continue
+
+        parsedData.push({
+          ho_ten: row[hoTenIdx] || '',
+          vi_tri_ung_tuyen: row[viTriIdx] || '',
+          bo_phan: boPhanIdx !== -1 ? row[boPhanIdx] || '' : '',
+          nguon_cv: nguonCVIdx !== -1 ? row[nguonCVIdx] || '' : '',
+          sdt: sdtIdx !== -1 ? row[sdtIdx] || '' : '',
+          email: row[emailIdx] || '',
+          trang_thai: trangThaiIdx !== -1 ? row[trangThaiIdx] || 'CV mới' : 'CV mới',
+          ngay_tiep_nhan: ngayTiepNhanIdx !== -1 ? row[ngayTiepNhanIdx] || new Date().toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          cccd: cccdIdx !== -1 ? row[cccdIdx] || '' : '',
+          ngay_cap: ngayCapIdx !== -1 ? row[ngayCapIdx] || '' : '',
+          noi_cap: noiCapIdx !== -1 ? row[noiCapIdx] || '' : '',
+          que_quan: queQuanIdx !== -1 ? row[queQuanIdx] || '' : '',
+          gioi_tinh: gioiTinhIdx !== -1 ? row[gioiTinhIdx] || '' : '',
+          tinh_trang_hon_nhan: honNhanIdx !== -1 ? row[honNhanIdx] || '' : ''
+        })
+      }
+
+      setImportPreviewData(parsedData)
+      setIsImporting(false)
+    } catch (error) {
+      alert('Lỗi khi đọc file: ' + error.message)
+      setIsImporting(false)
+    }
+  }
+
+  // Confirm and import data to Firebase
+  const handleConfirmImport = async () => {
+    if (importPreviewData.length === 0) {
+      alert('Không có dữ liệu để import')
+      return
+    }
+
+    setIsImporting(true)
+    try {
+      let successCount = 0
+      for (const candidate of importPreviewData) {
+        await fbPush('hr/candidates', candidate)
+        successCount++
+      }
+
+      alert(`Đã import thành công ${successCount} ứng viên`)
+      setIsImportModalOpen(false)
+      setImportFile(null)
+      setImportPreviewData([])
+      await loadData()
+    } catch (error) {
+      alert('Lỗi khi import: ' + error.message)
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
+  const positions = [...new Set(candidates.map(c => c.vi_tri_ung_tuyen || c.vi_tri).filter(Boolean))].sort()
+
+  const filteredCandidates = candidates.filter(c => {
+    if (filterPosition && (c.vi_tri_ung_tuyen || c.vi_tri) !== filterPosition) return false
+    return true
+  })
+
+  if (loading) {
+    return <div className="loadingState">Đang tải dữ liệu...</div>
+  }
+
+  return (
+    <div>
+      <div className="page-header">
+        <h1 className="page-title">
+          <i className="fas fa-user-plus"></i>
+          Tuyển dụng
+        </h1>
+      </div>
+
+      {/* Bảng 1: Định biên nhân sự */}
+      <div className="card" style={{ marginBottom: '20px' }}>
+        <div className="card-header">
+          <h3 className="card-title">Định biên nhân sự</h3>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              className="btn btn-success"
+              onClick={handleDownloadPlanTemplate}
+              title="Tải file Excel mẫu"
+            >
+              <i className="fas fa-download"></i>
+              Tải file Excel mẫu
+            </button>
+            <button
+              className="btn btn-info"
+              onClick={() => setIsPlanImportModalOpen(true)}
+              title="Import từ Excel"
+            >
+              <i className="fas fa-file-import"></i>
+              Import từ Excel
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setSelectedPlan(null)
+                setIsPlanModalOpen(true)
+              }}
+            >
+              <i className="fas fa-plus"></i>
+              Tạo mới Nhu cầu tuyển dụng
+            </button>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Bộ phận</th>
+              <th>Vị trí</th>
+              <th>Nhân sự hiện có</th>
+              <th>Định biên</th>
+              <th>Cần tuyển</th>
+              <th>Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody>
+            {plans.length > 0 ? (
+              plans.map((plan, idx) => {
+                const current = Number(plan.nhan_su_hien_co || 0)
+                const target = Number(plan.dinh_bien || 0)
+                const need = Math.max(target - current, 0)
+                return (
+                  <tr key={plan.id || idx}>
+                    <td>{idx + 1}</td>
+                    <td>{escapeHtml(plan.bo_phan || '')}</td>
+                    <td>{escapeHtml(plan.vi_tri || '')}</td>
+                    <td>{current}</td>
+                    <td>{target}</td>
+                    <td>{need}</td>
+                    <td>{escapeHtml(plan.ghi_chu || '')}</td>
+                  </tr>
+                )
+              })
+            ) : (
+              <tr>
+                <td colSpan="7" className="empty-state">
+                  Chưa có định biên nhân sự
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Bảng 2: Quản lý CV */}
+      <div className="card">
+        <div className="card-header">
+          <h3 className="card-title">Quản lý CV ứng viên</h3>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <select
+              value={filterPosition}
+              onChange={(e) => setFilterPosition(e.target.value)}
+              style={{ padding: '6px 8px', borderRadius: '4px' }}
+            >
+              <option value="">Tất cả vị trí</option>
+              {positions.map(pos => (
+                <option key={pos} value={pos}>{pos}</option>
+              ))}
+            </select>
+            <button
+              className="btn btn-success"
+              onClick={handleDownloadTemplate}
+              title="Tải file Excel mẫu"
+            >
+              <i className="fas fa-download"></i>
+              Tải file Excel mẫu
+            </button>
+            <button
+              className="btn btn-info"
+              onClick={() => setIsImportModalOpen(true)}
+              title="Import từ Excel"
+            >
+              <i className="fas fa-file-import"></i>
+              Import từ Excel
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setSelectedCandidate(null)
+                setIsCandidateModalOpen(true)
+              }}
+            >
+              <i className="fas fa-plus"></i>
+              Tạo mới CV
+            </button>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Họ và tên</th>
+              <th>Vị trí ứng tuyển</th>
+              <th>Bộ phận</th>
+              <th>Nguồn CV</th>
+              <th>SĐT</th>
+              <th>Email</th>
+              <th>Trạng thái hiện tại</th>
+              <th>Ngày tiếp nhận</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredCandidates.length > 0 ? (
+              filteredCandidates.map((c, idx) => {
+                const status = c.trang_thai || ''
+                const showConvert =
+                  status === 'CV trúng tuyển' && !c.da_chuyen_sang_nv
+
+                return (
+                  <tr key={c.id || idx}>
+                    <td>{idx + 1}</td>
+                    <td>{escapeHtml(c.ho_ten || c.name || '')}</td>
+                    <td>{escapeHtml(c.vi_tri_ung_tuyen || c.vi_tri || '')}</td>
+                    <td>{escapeHtml(c.bo_phan || '')}</td>
+                    <td>{escapeHtml(c.nguon_cv || '')}</td>
+                    <td>{escapeHtml(c.sdt || c.sđt || '')}</td>
+                    <td>{escapeHtml(c.email || '')}</td>
+                    <td>{escapeHtml(status)}</td>
+                    <td>{c.ngay_tiep_nhan ? new Date(c.ngay_tiep_nhan).toLocaleDateString('vi-VN') : ''}</td>
+                    <td>
+                      <div className="actions">
+                        <button
+                          className="view"
+                          title="Xem / Sửa"
+                          onClick={() => {
+                            setSelectedCandidate(c)
+                            setIsCandidateModalOpen(true)
+                          }}
+                        >
+                          <i className="fas fa-eye"></i>
+                        </button>
+                        {showConvert && (
+                          <button
+                            className="btn btn-sm"
+                            style={{ background: '#28a745', color: '#fff', marginLeft: '4px' }}
+                            onClick={() => handleConvertToEmployee(c)}
+                            title="Chuyển sang Nhân viên thử việc"
+                          >
+                            + Chuyển sang Nhân viên thử việc
+                          </button>
+                        )}
+                        <button
+                          className="delete"
+                          title="Xóa"
+                          onClick={() => handleDeleteCandidate(c.id)}
+                        >
+                          <i className="fas fa-trash"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })
+            ) : (
+              <tr>
+                <td colSpan="10" className="empty-state">
+                  Chưa có CV ứng viên
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Modals */}
+      <RecruitmentPlanModal
+        plan={selectedPlan}
+        isOpen={isPlanModalOpen}
+        onClose={() => {
+          setIsPlanModalOpen(false)
+          setSelectedPlan(null)
+        }}
+        onSave={loadData}
+      />
+
+      <CandidateModal
+        candidate={selectedCandidate}
+        isOpen={isCandidateModalOpen}
+        onClose={() => {
+          setIsCandidateModalOpen(false)
+          setSelectedCandidate(null)
+        }}
+        onSave={loadData}
+      />
+
+      {/* Import Excel Modal for Candidates */}
+      {isImportModalOpen && (
+        <div className="modal show" onClick={() => setIsImportModalOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+            <div className="modal-header">
+              <h3>
+                <i className="fas fa-file-import"></i>
+                Import CV ứng viên từ Excel
+              </h3>
+              <button className="modal-close" onClick={() => setIsImportModalOpen(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Chọn file Excel</label>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleFileSelect}
+                  style={{ width: '100%', padding: '10px' }}
+                />
+              </div>
+
+              <div style={{ marginTop: '15px', padding: '10px', background: '#f0f8ff', borderRadius: '4px', fontSize: '0.9rem' }}>
+                <strong>Lưu ý:</strong>
+                <ul style={{ marginTop: '5px', paddingLeft: '20px' }}>
+                  <li>File Excel cần có các cột bắt buộc: <b>Họ và tên, Vị trí ứng tuyển, Email</b></li>
+                  <li>Các cột khác: Bộ phận, Nguồn CV, SĐT, Trạng thái, Ngày tiếp nhận, CCCD, v.v.</li>
+                  <li>Tải file Excel mẫu để xem định dạng chuẩn</li>
+                </ul>
+              </div>
+
+              {importPreviewData.length > 0 && (
+                <div style={{ marginTop: '20px' }}>
+                  <h4>Preview dữ liệu ({importPreviewData.length} ứng viên)</h4>
+                  <div style={{ maxHeight: '300px', overflow: 'auto', border: '1px solid #ddd', borderRadius: '4px' }}>
+                    <table style={{ width: '100%', fontSize: '0.85rem' }}>
+                      <thead style={{ position: 'sticky', top: 0, background: '#f5f5f5' }}>
+                        <tr>
+                          <th>STT</th>
+                          <th>Họ tên</th>
+                          <th>Vị trí</th>
+                          <th>Bộ phận</th>
+                          <th>Email</th>
+                          <th>SĐT</th>
+                          <th>Trạng thái</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importPreviewData.map((item, idx) => (
+                          <tr key={idx}>
+                            <td>{idx + 1}</td>
+                            <td>{item.ho_ten}</td>
+                            <td>{item.vi_tri_ung_tuyen}</td>
+                            <td>{item.bo_phan}</td>
+                            <td>{item.email}</td>
+                            <td>{item.sdt}</td>
+                            <td>{item.trang_thai}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    setIsImportModalOpen(false)
+                    setImportFile(null)
+                    setImportPreviewData([])
+                  }}
+                  disabled={isImporting}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleConfirmImport}
+                  disabled={isImporting || importPreviewData.length === 0}
+                >
+                  {isImporting ? (
+                    <>
+                      <i className="fas fa-spinner fa-spin"></i> Đang import...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-check"></i> Xác nhận Import ({importPreviewData.length})
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Excel Modal for Recruitment Plans */}
+      {isPlanImportModalOpen && (
+        <div className="modal show" onClick={() => setIsPlanImportModalOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px' }}>
+            <div className="modal-header">
+              <h3>
+                <i className="fas fa-file-import"></i>
+                Import Định biên nhân sự từ Excel
+              </h3>
+              <button className="modal-close" onClick={() => setIsPlanImportModalOpen(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Chọn file Excel</label>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handlePlanFileSelect}
+                  style={{ width: '100%', padding: '10px' }}
+                />
+              </div>
+
+              <div style={{ marginTop: '15px', padding: '10px', background: '#f0f8ff', borderRadius: '4px', fontSize: '0.9rem' }}>
+                <strong>Lưu ý:</strong>
+                <ul style={{ marginTop: '5px', paddingLeft: '20px' }}>
+                  <li>File Excel cần có các cột bắt buộc: <b>Bộ phận, Vị trí, Định biên</b></li>
+                  <li>Các cột khác: Nhân sự hiện có, Ghi chú</li>
+                  <li>Tải file Excel mẫu để xem định dạng chuẩn</li>
+                </ul>
+              </div>
+
+              {planImportPreviewData.length > 0 && (
+                <div style={{ marginTop: '20px' }}>
+                  <h4>Preview dữ liệu ({planImportPreviewData.length} định biên)</h4>
+                  <div style={{ maxHeight: '300px', overflow: 'auto', border: '1px solid #ddd', borderRadius: '4px' }}>
+                    <table style={{ width: '100%', fontSize: '0.85rem' }}>
+                      <thead style={{ position: 'sticky', top: 0, background: '#f5f5f5' }}>
+                        <tr>
+                          <th>STT</th>
+                          <th>Bộ phận</th>
+                          <th>Vị trí</th>
+                          <th>Nhân sự hiện có</th>
+                          <th>Định biên</th>
+                          <th>Cần tuyển</th>
+                          <th>Ghi chú</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {planImportPreviewData.map((item, idx) => {
+                          const current = Number(item.nhan_su_hien_co || 0)
+                          const target = Number(item.dinh_bien || 0)
+                          const need = Math.max(target - current, 0)
+                          return (
+                            <tr key={idx}>
+                              <td>{idx + 1}</td>
+                              <td>{item.bo_phan}</td>
+                              <td>{item.vi_tri}</td>
+                              <td>{current}</td>
+                              <td>{target}</td>
+                              <td>{need}</td>
+                              <td>{item.ghi_chu}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    setIsPlanImportModalOpen(false)
+                    setPlanImportFile(null)
+                    setPlanImportPreviewData([])
+                  }}
+                  disabled={isPlanImporting}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleConfirmPlanImport}
+                  disabled={isPlanImporting || planImportPreviewData.length === 0}
+                >
+                  {isPlanImporting ? (
+                    <>
+                      <i className="fas fa-spinner fa-spin"></i> Đang import...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-check"></i> Xác nhận Import ({planImportPreviewData.length})
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default Recruitment
+
+
