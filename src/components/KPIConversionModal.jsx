@@ -29,6 +29,7 @@ function KPIConversionModal({ kpiTemplate, conversions, isOpen, onClose, onSave 
 
     // Enforce max 100 rule only for From/To percentages
     if ((field === 'fromPercent' || field === 'toPercent') && numericValue > 100) {
+      alert('Giá trị không được lớn hơn 100')
       numericValue = 100
     }
 

@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react'
-import { fbGet, fbDelete } from '../services/firebase'
-import { escapeHtml, formatMoney } from '../utils/helpers'
-import KPITemplateModal from '../components/KPITemplateModal'
+import { useEffect, useState } from 'react'
 import EmployeeKPIModal from '../components/EmployeeKPIModal'
 import KPIConversionModal from '../components/KPIConversionModal'
-import KPIDetailModal from '../components/KPIDetailModal'
+
+import KPIResultDetailModal from '../components/KPIResultDetailModal'
+import KPIResultImportModal from '../components/KPIResultImportModal'
+import KPITemplateModal from '../components/KPITemplateModal'
 import SeedKPIDataButton from '../components/SeedKPIDataButton'
+import { fbDelete, fbGet } from '../services/firebase'
+import { escapeHtml, formatMoney } from '../utils/helpers'
 
 function KPI() {
   const [activeTab, setActiveTab] = useState('assignment')
@@ -15,26 +17,38 @@ function KPI() {
   const [kpiResults, setKpiResults] = useState([])
   const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(true)
-  
+
   // Modal states
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
   const [isEmployeeKPIModalOpen, setIsEmployeeKPIModalOpen] = useState(false)
   const [isConversionModalOpen, setIsConversionModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isAssignmentViewOpen, setIsAssignmentViewOpen] = useState(false)
-  
+  const [isResultImportModalOpen, setIsResultImportModalOpen] = useState(false)
+  const [isResultDetailModalOpen, setIsResultDetailModalOpen] = useState(false)
+
   // Selected items
   const [selectedTemplate, setSelectedTemplate] = useState(null)
   const [selectedEmployeeKPI, setSelectedEmployeeKPI] = useState(null)
   const [selectedKPIForConversion, setSelectedKPIForConversion] = useState(null)
   const [selectedResultForDetail, setSelectedResultForDetail] = useState(null)
   const [selectedEmployeeKPIView, setSelectedEmployeeKPIView] = useState(null)
-  
+
   // Filters
   const [filterDept, setFilterDept] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
   const [filterResultDept, setFilterResultDept] = useState('')
   const [filterResultMonth, setFilterResultMonth] = useState('')
+
+  // Excel Import states for KPI Templates (Bảng 1)
+  const [isTemplateImportModalOpen, setIsTemplateImportModalOpen] = useState(false)
+  const [templateImportPreviewData, setTemplateImportPreviewData] = useState([])
+  const [isTemplateImporting, setIsTemplateImporting] = useState(false)
+
+  // Excel Import states for Employee KPIs (Bảng 2)
+  const [isEmployeeKPIImportModalOpen, setIsEmployeeKPIImportModalOpen] = useState(false)
+  const [employeeKPIImportPreviewData, setEmployeeKPIImportPreviewData] = useState([])
+  const [isEmployeeKPIImporting, setIsEmployeeKPIImporting] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -43,7 +57,7 @@ function KPI() {
   const loadData = async () => {
     try {
       setLoading(true)
-      
+
       // Load employees
       const empData = await fbGet('employees')
       let empList = []
@@ -52,24 +66,24 @@ function KPI() {
           empList = empData.filter(item => item !== null && item !== undefined)
         } else if (typeof empData === "object") {
           empList = Object.entries(empData)
-            .filter(([k,v]) => v !== null && v !== undefined)
-            .map(([k,v]) => ({...v, id: k}))
+            .filter(([k, v]) => v !== null && v !== undefined)
+            .map(([k, v]) => ({ ...v, id: k }))
         }
       }
       setEmployees(empList)
 
       // Load KPI data
       const hrData = await fbGet('hr')
-      const templates = hrData?.kpiTemplates ? Object.entries(hrData.kpiTemplates).map(([k,v]) => ({...v, id: k})) : []
+      const templates = hrData?.kpiTemplates ? Object.entries(hrData.kpiTemplates).map(([k, v]) => ({ ...v, id: k })) : []
       setKpiTemplates(templates)
 
-      const empKPIs = hrData?.employeeKPIs ? Object.entries(hrData.employeeKPIs).map(([k,v]) => ({...v, id: k})) : []
+      const empKPIs = hrData?.employeeKPIs ? Object.entries(hrData.employeeKPIs).map(([k, v]) => ({ ...v, id: k })) : []
       setEmployeeKPIs(empKPIs)
 
-      const conversions = hrData?.kpiConversions ? Object.entries(hrData.kpiConversions).map(([k,v]) => ({...v, id: k})) : []
+      const conversions = hrData?.kpiConversions ? Object.entries(hrData.kpiConversions).map(([k, v]) => ({ ...v, id: k })) : []
       setKpiConversions(conversions)
 
-      const results = hrData?.kpiResults ? Object.entries(hrData.kpiResults).map(([k,v]) => ({...v, id: k})) : []
+      const results = hrData?.kpiResults ? Object.entries(hrData.kpiResults).map(([k, v]) => ({ ...v, id: k })) : []
       setKpiResults(results)
 
       setLoading(false)
@@ -100,7 +114,167 @@ function KPI() {
       alert('Lỗi khi xóa: ' + error.message)
     }
   }
-
+  const handleTemplateFileSelect = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setIsTemplateImporting(true)
+    try {
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data)
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+      if (jsonData.length < 2) {
+        alert('File Excel không có dữ liệu')
+        setIsTemplateImporting(false)
+        return
+      }
+      const headers = Array.from(jsonData[0] || []).map(h => String(h || '').toLowerCase().trim())
+      const codeIdx = headers.findIndex(h => h.includes('mã') && h.includes('kpi') || h.includes('code'))
+      const nameIdx = headers.findIndex(h => (h.includes('tên') || h.includes('ten')) && h.includes('kpi') || h === 'name')
+      const unitIdx = headers.findIndex(h => h.includes('đơn vị') || h.includes('don vi') || h === 'unit')
+      const targetIdx = headers.findIndex(h => h.includes('đối tượng') || h.includes('doi tuong') || h === 'target')
+      const weightIdx = headers.findIndex(h => h.includes('trọng số') || h.includes('trong so') || h === 'weight')
+      const monthIdx = headers.findIndex(h => h.includes('tháng') || h.includes('thang') || h === 'month')
+      const statusIdx = headers.findIndex(h => h.includes('trạng thái') || h.includes('trang thai') || h === 'status')
+      if (codeIdx === -1 || nameIdx === -1) {
+        alert('File Excel cần có các cột: Mã KPI, Tên KPI')
+        setIsTemplateImporting(false)
+        return
+      }
+      const parsedData = []
+      for (let i = 1; i < jsonData.length; i++) {
+        const row = jsonData[i]
+        if (!row[codeIdx] || !row[nameIdx]) continue
+        parsedData.push({
+          code: row[codeIdx] || '',
+          name: row[nameIdx] || '',
+          unit: unitIdx !== -1 ? (row[unitIdx] || '') : '',
+          target: targetIdx !== -1 ? (row[targetIdx] || '') : '',
+          weight: weightIdx !== -1 ? Number(row[weightIdx]) || 0 : 0,
+          month: monthIdx !== -1 ? (row[monthIdx] || '') : '',
+          status: statusIdx !== -1 ? (row[statusIdx] || 'Đang áp dụng') : 'Đang áp dụng'
+        })
+      }
+      setTemplateImportPreviewData(parsedData)
+      setIsTemplateImporting(false)
+    } catch (error) {
+      alert('Lỗi khi đọc file: ' + error.message)
+      setIsTemplateImporting(false)
+    }
+  }
+  const handleConfirmTemplateImport = async () => {
+    if (templateImportPreviewData.length === 0) {
+      alert('Không có dữ liệu để import')
+      return
+    }
+    setIsTemplateImporting(true)
+    try {
+      let successCount = 0
+      for (const template of templateImportPreviewData) {
+        await fbPush('hr/kpiTemplates', template)
+        successCount++
+      }
+      alert(`Đã import thành công ${successCount} KPI`)
+      setIsTemplateImportModalOpen(false)
+      setTemplateImportPreviewData([])
+      await loadData()
+    } catch (error) {
+      alert('Lỗi khi import: ' + error.message)
+    } finally {
+      setIsTemplateImporting(false)
+    }
+  }
+  const handleEmployeeKPIFileSelect = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setIsEmployeeKPIImporting(true)
+    try {
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data)
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+      if (jsonData.length < 2) {
+        alert('File Excel không có dữ liệu')
+        setIsEmployeeKPIImporting(false)
+        return
+      }
+      const headers = Array.from(jsonData[0] || []).map(h => String(h || '').toLowerCase().trim())
+      const empIdIdx = headers.findIndex(h => (h.includes('mã') && h.includes('nv')) || h.includes('employeeid'))
+      const monthIdx = headers.findIndex(h => h.includes('tháng') || h.includes('thang') || h === 'month')
+      const statusIdx = headers.findIndex(h => h.includes('trạng thái') || h.includes('trang thai') || h === 'status')
+      if (empIdIdx === -1) {
+        alert('File Excel cần có cột: Mã NV')
+        setIsEmployeeKPIImporting(false)
+        return
+      }
+      const kpiColumns = []
+      kpiTemplates.forEach(template => {
+        const kpiCode = (template.code || template.id || '').toLowerCase()
+        const idx = headers.findIndex(h => h.includes(kpiCode))
+        if (idx !== -1) {
+          kpiColumns.push({ kpiId: template.id, kpiCode: template.code, columnIndex: idx })
+        }
+      })
+      const parsedData = []
+      for (let i = 1; i < jsonData.length; i++) {
+        const row = jsonData[i]
+        if (!row[empIdIdx]) continue
+        const empId = String(row[empIdIdx]).trim()
+        const employee = employees.find(e => e.id === empId)
+        if (!employee) {
+          console.warn(`Không tìm thấy nhân viên với mã: ${empId}`)
+          continue
+        }
+        const kpiValues = {}
+        kpiColumns.forEach(kpiCol => {
+          const value = row[kpiCol.columnIndex]
+          if (value !== undefined && value !== null && value !== '') {
+            kpiValues[kpiCol.kpiId] = {
+              kpiId: kpiCol.kpiId,
+              target: Number(value) || value,
+              weight: kpiTemplates.find(t => t.id === kpiCol.kpiId)?.weight || 0
+            }
+          }
+        })
+        parsedData.push({
+          employeeId: empId,
+          employeeName: employee.ho_va_ten || employee.name || '',
+          department: employee.bo_phan || '',
+          month: monthIdx !== -1 ? (row[monthIdx] || '') : '',
+          status: statusIdx !== -1 ? (row[statusIdx] || 'Chưa chốt') : 'Chưa chốt',
+          kpiValues
+        })
+      }
+      setEmployeeKPIImportPreviewData(parsedData)
+      setIsEmployeeKPIImporting(false)
+    } catch (error) {
+      alert('Lỗi khi đọc file: ' + error.message)
+      setIsEmployeeKPIImporting(false)
+    }
+  }
+  const handleConfirmEmployeeKPIImport = async () => {
+    if (employeeKPIImportPreviewData.length === 0) {
+      alert('Không có dữ liệu để import')
+      return
+    }
+    setIsEmployeeKPIImporting(true)
+    try {
+      let successCount = 0
+      for (const empKPI of employeeKPIImportPreviewData) {
+        const { employeeName, department, ...dataToSave } = empKPI
+        await fbPush('hr/employeeKPIs', dataToSave)
+        successCount++
+      }
+      alert(`Đã import thành công ${successCount} KPI nhân viên`)
+      setIsEmployeeKPIImportModalOpen(false)
+      setEmployeeKPIImportPreviewData([])
+      await loadData()
+    } catch (error) {
+      alert('Lỗi khi import: ' + error.message)
+    } finally {
+      setIsEmployeeKPIImporting(false)
+    }
+  }
   // Get employee name
   const getEmployeeName = (employeeId) => {
     const emp = employees.find(e => e.id === employeeId)
@@ -158,7 +332,7 @@ function KPI() {
       summary[dept].count++
       const totalKPI = result.totalKPI || result.kpiTong || 0
       summary[dept].totalScore += totalKPI
-      
+
       if (totalKPI >= 100) {
         summary[dept].exceeded++
       } else if (totalKPI >= 80) {
@@ -191,7 +365,7 @@ function KPI() {
         </h1>
         {activeTab === 'assignment' && (
           <>
-            <button 
+            <button
               className="btn btn-primary"
               onClick={() => {
                 setSelectedTemplate(null)
@@ -202,10 +376,11 @@ function KPI() {
               Thêm danh mục KPI
             </button>
             <SeedKPIDataButton onComplete={loadData} />
+
           </>
         )}
         {activeTab === 'assignment' && (
-          <button 
+          <button
             className="btn btn-primary"
             onClick={() => {
               setSelectedEmployeeKPI(null)
@@ -218,27 +393,37 @@ function KPI() {
           </button>
         )}
         {activeTab === 'results' && (
-          <button 
-            className="btn btn-info"
-            onClick={() => {
-              setFilterResultDept('')
-              setFilterResultMonth('')
-            }}
-          >
-            <i className="fas fa-filter"></i>
-            Xóa bộ lọc
-          </button>
+          <>
+            <button
+              className="btn btn-info"
+              onClick={() => {
+                setFilterResultDept('')
+                setFilterResultMonth('')
+              }}
+            >
+              <i className="fas fa-filter"></i>
+              Xóa bộ lọc
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => setIsResultImportModalOpen(true)}
+              style={{ marginLeft: '10px' }}
+            >
+              <i className="fas fa-upload"></i>
+              Import Kết quả (Giả lập Sales/MKT)
+            </button>
+          </>
         )}
       </div>
 
       <div className="tabs">
-        <div 
+        <div
           className={`tab ${activeTab === 'assignment' ? 'active' : ''}`}
           onClick={() => setActiveTab('assignment')}
         >
           📋 Giao KPI
         </div>
-        <div 
+        <div
           className={`tab ${activeTab === 'results' ? 'active' : ''}`}
           onClick={() => setActiveTab('results')}
         >
@@ -251,8 +436,16 @@ function KPI() {
         <>
           {/* Bảng 1: Quản lý danh mục KPI */}
           <div className="card" style={{ marginBottom: '20px' }}>
-            <div className="card-header">
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 className="card-title">Bảng 1: Quản lý danh mục KPI</h3>
+              <button
+                className="btn btn-info"
+                onClick={() => setIsTemplateImportModalOpen(true)}
+                title="Import Excel"
+              >
+                <i className="fas fa-file-import"></i>
+                Import Excel
+              </button>
             </div>
             <table>
               <thead>
@@ -286,7 +479,7 @@ function KPI() {
                       </td>
                       <td>
                         <div className="actions">
-                          <button 
+                          <button
                             className="edit"
                             onClick={() => {
                               setSelectedTemplate(template)
@@ -295,7 +488,7 @@ function KPI() {
                           >
                             <i className="fas fa-edit"></i>
                           </button>
-                          <button 
+                          <button
                             className="delete"
                             onClick={() => handleDeleteTemplate(template.id)}
                           >
@@ -316,29 +509,40 @@ function KPI() {
 
           {/* Bảng 2: Nhập KPI cho từng cá nhân */}
           <div className="card" style={{ marginBottom: '20px' }}>
-            <div className="card-header">
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 className="card-title">Bảng 2: Nhập KPI cho từng cá nhân</h3>
-              <div className="search-box" style={{ display: 'flex', gap: '10px' }}>
-                <select 
-                  value={filterDept} 
-                  onChange={(e) => setFilterDept(e.target.value)}
-                  style={{ padding: '8px', borderRadius: '4px' }}
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <button
+                  className="btn btn-info"
+                  onClick={() => setIsEmployeeKPIImportModalOpen(true)}
+                  title="Import Excel"
+                  style={{ marginTop: '-20px' }}
                 >
-                  <option value="">Tất cả bộ phận</option>
-                  {[...new Set(employees.map(e => e.bo_phan || e.department).filter(Boolean))].sort().map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
-                <select 
-                  value={filterMonth} 
-                  onChange={(e) => setFilterMonth(e.target.value)}
-                  style={{ padding: '8px', borderRadius: '4px' }}
-                >
-                  <option value="">Tất cả tháng</option>
-                  {[...new Set(employeeKPIs.map(e => e.month).filter(Boolean))].sort().map(month => (
-                    <option key={month} value={month}>{month}</option>
-                  ))}
-                </select>
+                  <i className="fas fa-file-import"></i>
+                  Import Excel
+                </button>
+                <div className="search-box" style={{ display: 'flex', gap: '10px' }}>
+                  <select
+                    value={filterDept}
+                    onChange={(e) => setFilterDept(e.target.value)}
+                    style={{ padding: '8px', borderRadius: '4px' }}
+                  >
+                    <option value="">Tất cả bộ phận</option>
+                    {[...new Set(employees.map(e => e.bo_phan || e.department).filter(Boolean))].sort().map(dept => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={filterMonth}
+                    onChange={(e) => setFilterMonth(e.target.value)}
+                    style={{ padding: '8px', borderRadius: '4px' }}
+                  >
+                    <option value="">Tất cả tháng</option>
+                    {[...new Set(employeeKPIs.map(e => e.month).filter(Boolean))].sort().map(month => (
+                      <option key={month} value={month}>{month}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
             <div style={{ overflowX: 'auto' }}>
@@ -382,17 +586,16 @@ function KPI() {
                           })}
                           <td>{totalWeight}%</td>
                           <td>
-                            <span className={`badge ${
-                              empKPI.status === 'Đã giao' ? 'badge-success' :
+                            <span className={`badge ${empKPI.status === 'Đã giao' ? 'badge-success' :
                               empKPI.status === 'Chưa chốt' ? 'badge-warning' :
-                              'badge-secondary'
-                            }`}>
+                                'badge-secondary'
+                              }`}>
                               {escapeHtml(empKPI.status || 'Chưa chốt')}
                             </span>
                           </td>
                           <td>
                             <div className="actions">
-                              <button 
+                              <button
                                 className="edit"
                                 onClick={() => {
                                   setSelectedEmployeeKPI(empKPI)
@@ -402,12 +605,14 @@ function KPI() {
                                 <i className="fas fa-edit"></i>
                               </button>
                               {empKPI.status === 'Đã giao' && (
-                                <button 
+                                <button
                                   className="view"
                                   onClick={() => {
-                                setSelectedEmployeeKPIView(empKPI)
-                                setIsAssignmentViewOpen(true)
+                                    console.log('Viewing KPI:', empKPI)
+                                    setSelectedEmployeeKPIView(empKPI)
+                                    setIsAssignmentViewOpen(true)
                                   }}
+                                  title="Xem chi tiết"
                                 >
                                   <i className="fas fa-eye"></i>
                                 </button>
@@ -433,7 +638,7 @@ function KPI() {
           <div className="card">
             <div className="card-header">
               <h3 className="card-title">Bảng 3: Khai báo tỷ lệ quy đổi cho từng mã KPI</h3>
-              <select 
+              <select
                 onChange={(e) => {
                   if (e.target.value) {
                     const template = kpiTemplates.find(t => t.id === e.target.value || t.code === e.target.value)
@@ -484,7 +689,7 @@ function KPI() {
                           <td>{conv.toPercent === null || conv.toPercent === undefined ? '100%+' : `${conv.toPercent}%`}</td>
                           <td>{conv.conversionPercent || 0}%</td>
                           <td>
-                            <button 
+                            <button
                               className="edit"
                               onClick={() => {
                                 setSelectedKPIForConversion(template)
@@ -506,6 +711,49 @@ function KPI() {
               </table>
             </div>
           </div>
+
+          {/* Bảng 3: Báo cáo tổng hợp theo bộ phận */}
+          <div className="card">
+            <div className="card-header">
+              <h3 className="card-title">Bảng 3: Báo cáo tổng hợp theo bộ phận</h3>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>STT</th>
+                  <th>Bộ phận</th>
+                  <th>Số nhân sự</th>
+                  <th>% Đạt KPI</th>
+                  <th>% Vượt KPI</th>
+                  <th>% Không đạt</th>
+                  <th>Điểm KPI TB</th>
+                  <th>Ghi chú</th>
+                </tr>
+              </thead>
+              <tbody>
+                {getDepartmentSummary().length > 0 ? (
+                  getDepartmentSummary().map((dept, idx) => (
+                    <tr key={idx}>
+                      <td>{idx + 1}</td>
+                      <td>{dept.department}</td>
+                      <td>{dept.totalEmployees}</td>
+                      <td>{dept.achievedPercent}%</td>
+                      <td>{dept.exceededPercent}%</td>
+                      <td>{dept.notAchievedPercent}%</td>
+                      <td style={{ fontWeight: 'bold' }}>{dept.avgScore}%</td>
+                      <td>
+                        <span className={`badge ${dept.avgScore >= 100 ? 'badge-success' : dept.avgScore >= 80 ? 'badge-info' : 'badge-warning'}`}>
+                          {dept.note}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr><td colSpan="8" className="empty-state">Chưa có dữ liệu đánh giá</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
 
@@ -517,8 +765,8 @@ function KPI() {
             <div className="card-header">
               <h3 className="card-title">Bảng 1: Kết quả hoàn thành và quy đổi KPI</h3>
               <div className="search-box" style={{ display: 'flex', gap: '10px' }}>
-                <select 
-                  value={filterResultDept} 
+                <select
+                  value={filterResultDept}
                   onChange={(e) => setFilterResultDept(e.target.value)}
                   style={{ padding: '8px', borderRadius: '4px' }}
                 >
@@ -527,8 +775,8 @@ function KPI() {
                     <option key={dept} value={dept}>{dept}</option>
                   ))}
                 </select>
-                <select 
-                  value={filterResultMonth} 
+                <select
+                  value={filterResultMonth}
                   onChange={(e) => setFilterResultMonth(e.target.value)}
                   style={{ padding: '8px', borderRadius: '4px' }}
                 >
@@ -579,7 +827,7 @@ function KPI() {
                             return (
                               <td key={template.id}>
                                 {kpiResult?.actual !== undefined ? (
-                                  template.unit === 'VNĐ' || template.unit === 'VND' 
+                                  template.unit === 'VNĐ' || template.unit === 'VND'
                                     ? formatMoney(kpiResult.actual)
                                     : kpiResult.actual
                                 ) : '-'}
@@ -601,12 +849,13 @@ function KPI() {
                             </span>
                           </td>
                           <td>
-                            <button 
+                            <button
                               className="view"
                               onClick={() => {
                                 setSelectedResultForDetail(result)
-                                setIsDetailModalOpen(true)
+                                setIsResultDetailModalOpen(true)
                               }}
+                              title="Xem chi tiết tại Bảng 2"
                             >
                               <i className="fas fa-eye"></i>
                             </button>
@@ -614,6 +863,7 @@ function KPI() {
                         </tr>
                       )
                     })
+
                   ) : (
                     <tr>
                       <td colSpan={11 + kpiTemplates.filter(t => t.status === 'Đang áp dụng').length * 2} className="empty-state">
@@ -625,6 +875,8 @@ function KPI() {
               </table>
             </div>
           </div>
+
+
 
           {/* Bảng 3: Báo cáo tổng hợp theo bộ phận */}
           <div className="card">
@@ -665,7 +917,7 @@ function KPI() {
                 )}
               </tbody>
             </table>
-          </div>
+          </div >
         </>
       )}
 
@@ -703,78 +955,213 @@ function KPI() {
         onSave={loadData}
       />
 
-      <KPIDetailModal
+
+
+      {/* Modal xem chi tiết KPI đã giao (Bảng 2) */}
+      {
+        isAssignmentViewOpen && selectedEmployeeKPIView && (
+          <div className="modal show" onClick={() => setIsAssignmentViewOpen(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '1000px' }}>
+              <div className="modal-header">
+                <h3>
+                  <i className="fas fa-eye"></i>
+                  Bảng 2: KPI đã giao - {getEmployeeName(selectedEmployeeKPIView.employeeId)}
+                </h3>
+                <button className="modal-close" onClick={() => setIsAssignmentViewOpen(false)}>&times;</button>
+              </div>
+              <div className="modal-body">
+                <div style={{ marginBottom: '16px' }}>
+                  <p><strong>Tháng:</strong> {escapeHtml(selectedEmployeeKPIView.month || '-')}</p>
+                  <p><strong>Trạng thái:</strong> {escapeHtml(selectedEmployeeKPIView.status || '-')}</p>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>STT</th>
+                        <th>Mã KPI</th>
+                        <th>Tên KPI</th>
+                        <th>Đơn vị</th>
+                        <th>Kế hoạch</th>
+                        <th>Trọng số (%)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {kpiTemplates.filter(t => t.status === 'Đang áp dụng').map((template, idx) => {
+                        const kpiValue = selectedEmployeeKPIView.kpiValues?.[template.id] || selectedEmployeeKPIView.kpiValues?.[template.code] || {}
+                        return (
+                          <tr key={template.id}>
+                            <td>{idx + 1}</td>
+                            <td>{escapeHtml(template.code || template.id || '-')}</td>
+                            <td>{escapeHtml(template.name || '-')}</td>
+                            <td>{escapeHtml(template.unit || '-')}</td>
+                            <td>
+                              {template.unit === 'VNĐ' || template.unit === 'VND'
+                                ? formatMoney(kpiValue.target || 0)
+                                : kpiValue.target || 0}
+                            </td>
+                            <td>{template.weight || 0}%</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ marginTop: '12px', padding: '10px', background: '#f5f5f5', borderRadius: '4px' }}>
+
+                  <strong>Tổng trọng số: {calculateTotalWeight(selectedEmployeeKPIView)}%</strong>
+                </div>
+              </div>
+              <div style={{ padding: '16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
+                <button className="btn" onClick={() => setIsAssignmentViewOpen(false)}>Đóng</button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+      {/* Import Modal for KPI Templates */}
+      {
+        isTemplateImportModalOpen && (
+          <div className="modal show" onClick={() => setIsTemplateImportModalOpen(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+              <div className="modal-header">
+                <h3><i className="fas fa-file-import"></i> Import Danh mục KPI</h3>
+                <button className="modal-close" onClick={() => setIsTemplateImportModalOpen(false)}>&times;</button>
+              </div>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Chọn file Excel</label>
+                  <input type="file" accept=".xlsx,.xls" onChange={handleTemplateFileSelect} style={{ width: '100%', padding: '10px' }} />
+                </div>
+                <div style={{ marginTop: '15px', padding: '10px', background: '#f0f8ff', borderRadius: '4px', fontSize: '0.9rem' }}>
+                  <strong>Lưu ý:</strong>
+                  <ul style={{ marginTop: '5px', paddingLeft: '20px' }}>
+                    <li>File Excel cần có các cột bắt buộc: <b>Mã KPI, Tên KPI</b></li>
+                    <li>Các cột khác: Đơn vị đo, Đối tượng áp dụng, Trọng số, Tháng áp dụng, Trạng thái</li>
+                    <li>Thứ tự cột không quan trọng, hệ thống tự nhận diện</li>
+                  </ul>
+                </div>
+                {templateImportPreviewData.length > 0 && (
+                  <div style={{ marginTop: '20px' }}>
+                    <h4>Preview dữ liệu ({templateImportPreviewData.length} KPI)</h4>
+                    <div style={{ maxHeight: '300px', overflow: 'auto', border: '1px solid #ddd', borderRadius: '4px' }}>
+                      <table style={{ width: '100%', fontSize: '0.85rem' }}>
+                        <thead style={{ position: 'sticky', top: 0, background: '#f5f5f5' }}>
+                          <tr>
+                            <th>STT</th><th>Mã KPI</th><th>Tên KPI</th><th>Đơn vị</th><th>Trọng số</th><th>Trạng thái</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {templateImportPreviewData.map((item, idx) => (
+                            <tr key={idx}>
+                              <td>{idx + 1}</td>
+                              <td>{item.code}</td>
+                              <td>{item.name}</td>
+                              <td>{item.unit}</td>
+                              <td>{item.weight}%</td>
+                              <td>{item.status}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+                <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn" onClick={() => { setIsTemplateImportModalOpen(false); setTemplateImportPreviewData([]) }} disabled={isTemplateImporting}>Hủy</button>
+                  <button type="button" className="btn btn-primary" onClick={handleConfirmTemplateImport} disabled={isTemplateImporting || templateImportPreviewData.length === 0}>
+                    {isTemplateImporting ? <><i className="fas fa-spinner fa-spin"></i> Đang import...</> : <><i className="fas fa-check"></i> Xác nhận Import ({templateImportPreviewData.length})</>}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        )
+      }
+
+      {/* Import Modal for Employee KPIs */}
+      {
+        isEmployeeKPIImportModalOpen && (
+          <div className="modal show" onClick={() => setIsEmployeeKPIImportModalOpen(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '1000px' }}>
+              <div className="modal-header">
+                <h3><i className="fas fa-file-import"></i> Import KPI Nhân viên</h3>
+                <button className="modal-close" onClick={() => setIsEmployeeKPIImportModalOpen(false)}>&times;</button>
+              </div>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Chọn file Excel</label>
+                  <input type="file" accept=".xlsx,.xls" onChange={handleEmployeeKPIFileSelect} style={{ width: '100%', padding: '10px' }} />
+                </div>
+                <div style={{ marginTop: '15px', padding: '10px', background: '#f0f8ff', borderRadius: '4px', fontSize: '0.9rem' }}>
+                  <strong>Lưu ý:</strong>
+                  <ul style={{ marginTop: '5px', paddingLeft: '20px' }}>
+                    <li>File Excel cần có cột bắt buộc: <b>Mã NV</b></li>
+                    <li>Các cột KPI: Đặt tên cột theo Mã KPI (ví dụ: KPI01, KPI02...)</li>
+                    <li>Các cột khác: Tháng, Trạng thái</li>
+                    <li>Thứ tự cột không quan trọng</li>
+                  </ul>
+                </div>
+                {employeeKPIImportPreviewData.length > 0 && (
+                  <div style={{ marginTop: '20px' }}>
+                    <h4>Preview dữ liệu ({employeeKPIImportPreviewData.length} nhân viên)</h4>
+                    <div style={{ maxHeight: '300px', overflow: 'auto', border: '1px solid #ddd', borderRadius: '4px' }}>
+                      <table style={{ width: '100%', fontSize: '0.85rem' }}>
+                        <thead style={{ position: 'sticky', top: 0, background: '#f5f5f5' }}>
+                          <tr>
+                            <th>STT</th><th>Mã NV</th><th>Họ tên</th><th>Bộ phận</th><th>Tháng</th><th>Số KPI</th><th>Trạng thái</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {employeeKPIImportPreviewData.map((item, idx) => (
+                            <tr key={idx}>
+                              <td>{idx + 1}</td>
+                              <td>{item.employeeId}</td>
+                              <td>{item.employeeName}</td>
+                              <td>{item.department}</td>
+                              <td>{item.month}</td>
+                              <td>{Object.keys(item.kpiValues || {}).length}</td>
+                              <td>{item.status}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+                <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn" onClick={() => { setIsEmployeeKPIImportModalOpen(false); setEmployeeKPIImportPreviewData([]) }} disabled={isEmployeeKPIImporting}>Hủy</button>
+                  <button type="button" className="btn btn-primary" onClick={handleConfirmEmployeeKPIImport} disabled={isEmployeeKPIImporting || employeeKPIImportPreviewData.length === 0}>
+                    {isEmployeeKPIImporting ? <><i className="fas fa-spinner fa-spin"></i> Đang import...</> : <><i className="fas fa-check"></i> Xác nhận Import ({employeeKPIImportPreviewData.length})</>}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      }
+      <KPIResultDetailModal
         result={selectedResultForDetail}
-        employee={selectedResultForDetail ? employees.find(e => e.id === selectedResultForDetail.employeeId) : null}
+        employees={employees}
         kpiTemplates={kpiTemplates}
-        kpiConversions={kpiConversions}
-        isOpen={isDetailModalOpen}
+        isOpen={isResultDetailModalOpen}
         onClose={() => {
-          setIsDetailModalOpen(false)
+          setIsResultDetailModalOpen(false)
           setSelectedResultForDetail(null)
         }}
       />
 
-      {/* Modal xem chi tiết KPI đã giao (Bảng 2) */}
-      {isAssignmentViewOpen && selectedEmployeeKPIView && (
-        <div className="modal show" onClick={() => setIsAssignmentViewOpen(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '1000px' }}>
-            <div className="modal-header">
-              <h3>
-                <i className="fas fa-eye"></i>
-                Bảng 2: KPI đã giao - {getEmployeeName(selectedEmployeeKPIView.employeeId)}
-              </h3>
-              <button className="modal-close" onClick={() => setIsAssignmentViewOpen(false)}>&times;</button>
-            </div>
-            <div className="modal-body">
-              <div style={{ marginBottom: '16px' }}>
-                <p><strong>Tháng:</strong> {escapeHtml(selectedEmployeeKPIView.month || '-')}</p>
-                <p><strong>Trạng thái:</strong> {escapeHtml(selectedEmployeeKPIView.status || '-')}</p>
-              </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>STT</th>
-                      <th>Mã KPI</th>
-                      <th>Tên KPI</th>
-                      <th>Đơn vị</th>
-                      <th>Kế hoạch</th>
-                      <th>Trọng số (%)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {kpiTemplates.filter(t => t.status === 'Đang áp dụng').map((template, idx) => {
-                      const kpiValue = selectedEmployeeKPIView.kpiValues?.[template.id] || selectedEmployeeKPIView.kpiValues?.[template.code] || {}
-                      return (
-                        <tr key={template.id}>
-                          <td>{idx + 1}</td>
-                          <td>{escapeHtml(template.code || template.id || '-')}</td>
-                          <td>{escapeHtml(template.name || '-')}</td>
-                          <td>{escapeHtml(template.unit || '-')}</td>
-                          <td>
-                            {template.unit === 'VNĐ' || template.unit === 'VND'
-                              ? formatMoney(kpiValue.target || 0)
-                              : kpiValue.target || 0}
-                          </td>
-                          <td>{template.weight || 0}%</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <div style={{ marginTop: '12px', padding: '10px', background: '#f5f5f5', borderRadius: '4px' }}>
-                <strong>Tổng trọng số: {calculateTotalWeight(selectedEmployeeKPIView)}%</strong>
-              </div>
-            </div>
-            <div style={{ padding: '16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
-              <button className="btn" onClick={() => setIsAssignmentViewOpen(false)}>Đóng</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <KPIResultImportModal
+        employees={employees}
+        kpiTemplates={kpiTemplates}
+        employeeKPIs={employeeKPIs}
+        kpiConversions={kpiConversions}
+        isOpen={isResultImportModalOpen}
+        onClose={() => setIsResultImportModalOpen(false)}
+        onSave={loadData}
+      />
+    </div >
   )
 }
 

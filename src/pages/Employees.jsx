@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import EmployeeModal from '../components/EmployeeModal'
 import { fbDelete, fbGet, fbPush } from '../services/firebase'
@@ -30,17 +30,17 @@ function Employees() {
       setLoading(true)
       const raw = await fbGet("employees")
       let data = []
-      
+
       if (raw === null || raw === undefined) {
         data = []
       } else if (Array.isArray(raw)) {
         data = raw.filter(item => item !== null && item !== undefined)
       } else if (typeof raw === "object") {
         data = Object.entries(raw)
-          .filter(([k,v]) => v !== null && v !== undefined)
-          .map(([k,v]) => ({...v, id: k}))
+          .filter(([k, v]) => v !== null && v !== undefined)
+          .map(([k, v]) => ({ ...v, id: k }))
       }
-      
+
       setEmployees(data)
       setLoading(false)
     } catch (err) {
@@ -53,21 +53,21 @@ function Employees() {
   const filterEmployees = () => {
     let filtered = employees.filter(item => {
       if (!item) return false
-      
+
       const nameField = item.ho_va_ten || item.name || item.Tên || ""
-      const matchSearch = !searchTerm || 
-        nameField.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      const matchSearch = !searchTerm ||
+        nameField.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (item.email && item.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (item.sđt && String(item.sđt || '').includes(searchTerm)) ||
         (item.sdt && String(item.sdt || '').includes(searchTerm))
-      
+
       const matchBranch = !filterBranch || item.chi_nhanh === filterBranch
       const matchDept = !filterDept || item.bo_phan === filterDept
       const matchStatus = !filterStatus || item.trang_thai === filterStatus || item.status === filterStatus
-      
+
       return matchSearch && matchBranch && matchDept && matchStatus
     })
-    
+
     setFilteredEmployees(filtered)
   }
 
@@ -75,7 +75,7 @@ function Employees() {
     if (!confirm(`Bạn có chắc muốn xóa nhân viên "${name}"?\n\nHành động này không thể hoàn tác!`)) {
       return
     }
-    
+
     try {
       await fbDelete(`employees/${id}`)
       alert(`Đã xóa nhân viên "${name}"`)
@@ -83,6 +83,95 @@ function Employees() {
     } catch (error) {
       alert(`Lỗi: ${error.message}`)
     }
+  }
+
+  const downloadTemplate = () => {
+    const headers = [
+      'Họ và tên',
+      'Email',
+      'SĐT',
+      'Chi nhánh',
+      'Bộ phận',
+      'Vị trí',
+      'Trạng thái',
+      'Ngày vào làm',
+      'CCCD',
+      'Ngày cấp',
+      'Nơi cấp',
+      'Quê quán',
+      'Giới tính',
+      'Tình trạng hôn nhân',
+      'Link ảnh'
+    ]
+
+    const sampleData = [
+      [
+        'Nguyễn Văn A',
+        'nguyenvana@example.com',
+        '0901234567',
+        'HCM',
+        'Kinh doanh',
+        'Nhân viên',
+        'Chính thức',
+        '2024-01-15',
+        '001234567890',
+        '2020-01-01',
+        'CA TP.HCM',
+        'TP.HCM',
+        'Nam',
+        'Độc thân',
+        'https://drive.google.com/file/d/YOUR_FILE_ID/view'
+      ],
+      [
+        'Trần Thị B',
+        'tranthib@example.com',
+        '0912345678',
+        'Hà Nội',
+        'Marketing',
+        'Trưởng phòng',
+        'Chính thức',
+        '2023-06-01',
+        '001234567891',
+        '2019-05-15',
+        'CA Hà Nội',
+        'Hà Nội',
+        'Nữ',
+        'Đã kết hôn',
+        'https://i.imgur.com/example.jpg'
+      ]
+    ]
+
+    const escapeCell = (val) => {
+      return String(val || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+    }
+
+    const headerHtml = headers.map(h => `<th>${escapeCell(h)}</th>`).join('')
+    const rowsHtml = sampleData.map(row => {
+      const tds = row.map(cell => `<td>${escapeCell(cell)}</td>`).join('')
+      return `<tr>${tds}</tr>`
+    }).join('')
+
+    const tableHtml = `<table><thead><tr>${headerHtml}</tr></thead><tbody>${rowsHtml}</tbody></table>`
+
+    const htmlContent = `
+      <html xmlns:x="urn:schemas-microsoft-com:office:excel">
+        <head><meta charset="UTF-8"></head>
+        <body>${tableHtml}</body>
+      </html>
+    `
+
+    const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.href = url
+    link.download = 'Mau_import_nhan_su.xls'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   const exportToExcel = () => {
@@ -162,6 +251,52 @@ function Employees() {
     document.body.removeChild(link)
   }
 
+  // Convert Google Drive link to direct image URL
+  const convertDriveLink = (url) => {
+    if (!url) return ''
+    const urlStr = String(url).trim()
+
+    // Check if it's a Google Drive link
+    if (urlStr.includes('drive.google.com')) {
+      // Extract file ID from various Drive URL formats
+      let fileId = ''
+
+      // Format: https://drive.google.com/file/d/FILE_ID/view
+      const match1 = urlStr.match(/\/file\/d\/([^\/]+)/)
+      if (match1) {
+        fileId = match1[1]
+      }
+
+      // Format: https://drive.google.com/open?id=FILE_ID
+      const match2 = urlStr.match(/[?\&]id=([^\&]+)/)
+      if (match2) {
+        fileId = match2[1]
+      }
+
+      // Format: https://drive.google.com/uc?id=FILE_ID
+      const match3 = urlStr.match(/\/uc\?.*id=([^\&]+)/)
+      if (match3) {
+        fileId = match3[1]
+      }
+
+      if (fileId) {
+        // Use thumbnail endpoint - works better with CORS
+        const directUrl = `https://lh3.googleusercontent.com/d/${fileId}`
+        console.log('🔄 Converted Drive link:', urlStr, '→', directUrl)
+        console.log('   ℹ️ Alternative format: https://drive.google.com/uc?export=view&id=' + fileId)
+        return directUrl
+      } else {
+        console.warn('⚠️ Could not extract file ID from Drive link:', urlStr)
+      }
+    }
+
+    // If it's already a direct image URL (imgur, etc), return as is
+    if (urlStr) {
+      console.log('✅ Using direct URL:', urlStr)
+    }
+    return urlStr
+  }
+
   const handleImportExcel = async (event) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -176,12 +311,31 @@ function Employees() {
 
       if (!rows || rows.length < 2) {
         alert('File không có dữ liệu.')
+        setLoading(false)
         return
       }
 
-      const headers = rows[0].map(h => String(h || '').trim().toLowerCase())
+      // Normalize header: remove accents, spaces, special chars
+      const normalizeHeader = (str) => {
+        return String(str || '')
+          .toLowerCase()
+          .trim()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '') // Remove accents
+          .replace(/đ/g, 'd')
+          .replace(/[^a-z0-9]/g, '_') // Replace non-alphanumeric with underscore
+          .replace(/_+/g, '_') // Replace multiple underscores with single
+          .replace(/^_|_$/g, '') // Remove leading/trailing underscores
+      }
+
+      const headers = rows[0].map(h => normalizeHeader(h))
       const dataRows = rows.slice(1).filter(r => r.some(cell => String(cell || '').trim() !== ''))
+
+      console.log('📋 Headers detected:', headers)
+      console.log('📊 Total data rows:', dataRows.length)
+
       let imported = 0
+      let skipped = 0
 
       for (const row of dataRows) {
         const rowObj = {}
@@ -190,30 +344,43 @@ function Employees() {
         })
 
         const payload = {
-          ho_va_ten: rowObj['ho_va_ten'] || rowObj['ten'] || '',
+          ho_va_ten: rowObj['ho_va_ten'] || rowObj['ho_ten'] || rowObj['ten'] || rowObj['ho_va_ten'] || rowObj['name'] || '',
           email: rowObj['email'] || '',
-          sđt: rowObj['sđt'] || rowObj['sdt'] || rowObj['so_dien_thoai'] || '',
-          chi_nhanh: rowObj['chi_nhanh'] || '',
-          bo_phan: rowObj['bo_phan'] || '',
-          vi_tri: rowObj['vi_tri'] || '',
-          trang_thai: rowObj['trang_thai'] || '',
-          ngay_vao_lam: rowObj['ngay_vao_lam'] || '',
-          cccd: rowObj['cccd'] || '',
+          sđt: rowObj['sdt'] || rowObj['so_dien_thoai'] || rowObj['dien_thoai'] || rowObj['phone'] || '',
+          chi_nhanh: rowObj['chi_nhanh'] || rowObj['branch'] || '',
+          bo_phan: rowObj['bo_phan'] || rowObj['phong_ban'] || rowObj['department'] || '',
+          vi_tri: rowObj['vi_tri'] || rowObj['chuc_vu'] || rowObj['position'] || '',
+          trang_thai: rowObj['trang_thai'] || rowObj['status'] || '',
+          ngay_vao_lam: rowObj['ngay_vao_lam'] || rowObj['ngay_bat_dau'] || '',
+          cccd: rowObj['cccd'] || rowObj['cmnd'] || '',
           ngay_cap: rowObj['ngay_cap'] || '',
           noi_cap: rowObj['noi_cap'] || '',
           que_quan: rowObj['que_quan'] || '',
-          gioi_tinh: rowObj['gioi_tinh'] || '',
-          tinh_trang_hon_nhan: rowObj['tinh_trang_hon_nhan'] || ''
+          gioi_tinh: rowObj['gioi_tinh'] || rowObj['gender'] || '',
+          tinh_trang_hon_nhan: rowObj['tinh_trang_hon_nhan'] || rowObj['hon_nhan'] || '',
+          avatarUrl: convertDriveLink(rowObj['link_anh'] || rowObj['avatar'] || rowObj['anh'] || rowObj['hinh_anh'] || rowObj['image'] || '')
         }
 
-        if (!payload.ho_va_ten) continue
+
+        if (!payload.ho_va_ten) {
+          console.log('⚠️ Skipped row (no name):', rowObj)
+          skipped++
+          continue
+        }
+
+        console.log('✅ Importing:', payload.ho_va_ten)
+        if (payload.avatarUrl) {
+          console.log('   🖼️ Avatar URL:', payload.avatarUrl)
+        }
         await fbPush('employees', payload)
         imported++
       }
 
       await loadEmployees()
-      alert(`Đã import ${imported} dòng.`)
+      console.log(`📊 Import summary: ${imported} imported, ${skipped} skipped`)
+      alert(`Đã import ${imported} dòng.${skipped > 0 ? ` Bỏ qua ${skipped} dòng (thiếu tên).` : ''}`)
     } catch (error) {
+      console.error('❌ Import error:', error)
       alert('Lỗi import: ' + error.message)
     } finally {
       setLoading(false)
@@ -236,8 +403,8 @@ function Employees() {
           Hồ sơ nhân sự
         </h1>
         <div>
-          <button 
-            className="btn btn-primary" 
+          <button
+            className="btn btn-primary"
             onClick={() => {
               setSelectedEmployee(null)
               setIsModalOpen(true)
@@ -247,18 +414,18 @@ function Employees() {
             <i className="fas fa-plus"></i>
             Tạo mới NV
           </button>
-          <button 
-            className="btn btn-secondary" 
+          <button
+            className="btn btn-secondary"
             onClick={() => setIsImportModalOpen(true)}
             style={{ marginRight: '10px' }}
           >
             <i className="fas fa-file-upload"></i>
             Upload Excel
           </button>
-          <button 
-            className="btn btn-success" 
+          <button
+            className="btn btn-success"
             onClick={exportToExcel}
-            style={{ 
+            style={{
               marginRight: '10px',
               background: '#28a745',
               borderColor: '#28a745',
@@ -266,7 +433,7 @@ function Employees() {
             }}
           >
             <i className="fas fa-file-excel"></i>
-            Tải Excel
+            Xuất Excel
           </button>
           <button className="btn btn-primary" onClick={loadEmployees}>
             <i className="fas fa-sync"></i>
@@ -327,8 +494,8 @@ function Employees() {
                     <td>{idx + 1}</td>
                     <td>
                       {avatar ? (
-                        <img 
-                          src={avatar} 
+                        <img
+                          src={avatar}
                           alt={name}
                           style={{
                             width: '40px',
@@ -356,8 +523,8 @@ function Employees() {
                     <td>{escapeHtml(emp.vi_tri || '-')}</td>
                     <td>
                       <div className="actions">
-                        <button 
-                          className="view" 
+                        <button
+                          className="view"
                           title="Xem"
                           onClick={() => {
                             setSelectedEmployee(emp)
@@ -366,8 +533,8 @@ function Employees() {
                         >
                           <i className="fas fa-eye"></i>
                         </button>
-                        <button 
-                          className="edit" 
+                        <button
+                          className="edit"
                           title="Sửa"
                           onClick={() => {
                             setSelectedEmployee(emp)
@@ -376,8 +543,8 @@ function Employees() {
                         >
                           <i className="fas fa-edit"></i>
                         </button>
-                        <button 
-                          className="delete" 
+                        <button
+                          className="delete"
                           title="Xóa"
                           onClick={() => handleDelete(emp.id, name)}
                         >
@@ -449,8 +616,9 @@ function Employees() {
                   <li>Quê quán</li>
                   <li>Giới tính</li>
                   <li>Tình trạng hôn nhân</li>
+                  <li>Link ảnh (tùy chọn)</li>
                 </ul>
-                <small>Hàng đầu tiên nên là header với tên cột như trên.</small>
+                <small>Hàng đầu tiên nên là header với tên cột như trên. Cột "Link ảnh" có thể để trống nếu không có.</small>
               </div>
             </div>
             <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>

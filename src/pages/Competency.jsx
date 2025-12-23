@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react'
-import CompetencyEvaluationModal from '../components/CompetencyEvaluationModal'
-import CompetencyFrameworkModal from '../components/CompetencyFrameworkModal'
+import { useEffect, useState } from 'react'
+
+
 import EvaluationDetailModal from '../components/EvaluationDetailModal'
 import SeedCompetencyDataButton from '../components/SeedCompetencyDataButton'
 import TrainingParticipantModal from '../components/TrainingParticipantModal'
 import TrainingProgramModal from '../components/TrainingProgramModal'
-import { fbDelete, fbGet } from '../services/firebase'
+import { fbDelete, fbGet, fbPush, fbUpdate } from '../services/firebase'
 import { escapeHtml } from '../utils/helpers'
 
 function Competency() {
@@ -16,26 +16,52 @@ function Competency() {
   const [trainingParticipants, setTrainingParticipants] = useState([])
   const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(true)
-  
+
   // Modal states
-  const [isFrameworkModalOpen, setIsFrameworkModalOpen] = useState(false)
-  const [isEvaluationModalOpen, setIsEvaluationModalOpen] = useState(false)
+
+
   const [isTrainingModalOpen, setIsTrainingModalOpen] = useState(false)
   const [isParticipantModalOpen, setIsParticipantModalOpen] = useState(false)
   const [isEvaluationDetailModalOpen, setIsEvaluationDetailModalOpen] = useState(false)
-  
+
   // Selected items
   const [selectedFramework, setSelectedFramework] = useState(null)
   const [selectedEvaluation, setSelectedEvaluation] = useState(null)
   const [selectedTraining, setSelectedTraining] = useState(null)
   const [selectedEvaluationDetail, setSelectedEvaluationDetail] = useState(null)
   const [participantInitialView, setParticipantInitialView] = useState('participants')
-  
+
   // Filters
   const [filterDept, setFilterDept] = useState('')
   const [filterEvaluationDept, setFilterEvaluationDept] = useState('')
   const [filterEvaluationPeriod, setFilterEvaluationPeriod] = useState('')
   const [filterTrainingProgram, setFilterTrainingProgram] = useState('')
+
+  // Bảng 1: Nhập đánh giá state
+  const [assessmentForm, setAssessmentForm] = useState({
+    employeeId: '',
+    employeeCode: '',
+    position: '',
+    department: '',
+    period: '',
+    evaluationDate: new Date().toISOString().split('T')[0],
+    items: []
+  })
+  const [inputFilterDept, setInputFilterDept] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Bảng 1: Khai báo khung năng lực state
+  const [frameworkForm, setFrameworkForm] = useState({
+    id: null,
+    department: '',
+    position: '',
+    group: 'Chuyên môn',
+    name: '',
+    level: 1,
+    status: 'Áp dụng',
+    note: ''
+  })
+  const [isFrameworkSaving, setIsFrameworkSaving] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -44,7 +70,7 @@ function Competency() {
   const loadData = async () => {
     try {
       setLoading(true)
-      
+
       // Load employees
       const empData = await fbGet('employees')
       let empList = []
@@ -53,29 +79,29 @@ function Competency() {
           empList = empData.filter(item => item !== null && item !== undefined)
         } else if (typeof empData === "object") {
           empList = Object.entries(empData)
-            .filter(([k,v]) => v !== null && v !== undefined)
-            .map(([k,v]) => ({...v, id: k}))
+            .filter(([k, v]) => v !== null && v !== undefined)
+            .map(([k, v]) => ({ ...v, id: k }))
         }
       }
       setEmployees(empList)
 
       // Load competency framework
       const hrData = await fbGet('hr')
-      const framework = hrData?.competencyFramework ? Object.entries(hrData.competencyFramework).map(([k,v]) => ({...v, id: k})) : []
+      const framework = hrData?.competencyFramework ? Object.entries(hrData.competencyFramework).map(([k, v]) => ({ ...v, id: k })) : []
       setCompetencyFramework(framework)
 
       // Load evaluations (đổi sang employee_competency_assessment)
-      const evals = hrData?.employee_competency_assessment 
-        ? Object.entries(hrData.employee_competency_assessment).map(([k,v]) => ({...v, id: k})) 
+      const evals = hrData?.employee_competency_assessment
+        ? Object.entries(hrData.employee_competency_assessment).map(([k, v]) => ({ ...v, id: k }))
         : []
       setEvaluations(evals)
 
       // Load training programs
-      const trainings = hrData?.trainings ? Object.entries(hrData.trainings).map(([k,v]) => ({...v, id: k})) : []
+      const trainings = hrData?.trainings ? Object.entries(hrData.trainings).map(([k, v]) => ({ ...v, id: k })) : []
       setTrainingPrograms(trainings)
 
       // Load training participants
-      const participants = hrData?.trainingParticipants ? Object.entries(hrData.trainingParticipants).map(([k,v]) => ({...v, id: k})) : []
+      const participants = hrData?.trainingParticipants ? Object.entries(hrData.trainingParticipants).map(([k, v]) => ({ ...v, id: k })) : []
       setTrainingParticipants(participants)
 
       setLoading(false)
@@ -108,12 +134,12 @@ function Competency() {
   }
 
   // Filter competency framework by department
-  const filteredFramework = filterDept 
+  const filteredFramework = filterDept
     ? competencyFramework.filter(c => c.department === filterDept)
     : competencyFramework
 
-  // Pivot dữ liệu: hàng = (Nhóm năng lực, Tên năng lực), cột = Vị trí
-  const positions = [...new Set(filteredFramework.map(c => c.position).filter(Boolean))].sort()
+  // Pivot dữ liệu cho Ma trận (Bảng 2)
+  const matrixPositions = [...new Set(filteredFramework.map(c => c.position).filter(Boolean))].sort()
 
   const pivotRows = Object.values(
     filteredFramework.reduce((acc, item) => {
@@ -126,8 +152,12 @@ function Competency() {
       acc[key].levels[item.position || ''] = item.level || '–'
       return acc
     }, {})
-  )
-  
+  ).sort((a, b) => {
+    // Sort by group then by name
+    if (a.group !== b.group) return a.group.localeCompare(b.group)
+    return a.name.localeCompare(b.name)
+  })
+
   // Filter evaluations
   const filteredEvaluations = evaluations.filter(e => {
     if (filterEvaluationDept && e.department !== filterEvaluationDept) return false
@@ -136,9 +166,189 @@ function Competency() {
   })
 
   // Filter training participants
-  const filteredParticipants = filterTrainingProgram
-    ? trainingParticipants.filter(p => p.trainingProgramId === filterTrainingProgram)
-    : trainingParticipants
+  const [filteredParticipants, setFilteredParticipants] = useState([])
+  useEffect(() => {
+    setFilteredParticipants(filterTrainingProgram
+      ? trainingParticipants.filter(p => p.trainingProgramId === filterTrainingProgram)
+      : trainingParticipants)
+  }, [filterTrainingProgram, trainingParticipants])
+
+  // Bảng 1 Logic
+  const handleAssessmentFormChange = (e) => {
+    const { name, value } = e.target
+    setAssessmentForm(prev => ({ ...prev, [name]: value }))
+
+    if (name === 'employeeId') {
+      const emp = employees.find(e => e.id === value)
+      if (emp) {
+        // Try to auto-match position from framework
+        const empPosition = String(emp.vi_tri || emp.position || '').trim()
+        const empDept = String(emp.bo_phan || emp.department || '').trim()
+
+        // Find if this position exists in framework (case-insensitive)
+        const frameworkPositions = [...new Set(competencyFramework
+          .filter(c => (!inputFilterDept || c.department === inputFilterDept))
+          .map(c => c.position))]
+
+        const matchingPos = frameworkPositions.find(p => p.toLowerCase() === empPosition.toLowerCase())
+        const positionToUse = matchingPos || empPosition // Fallback to employee's own position string if no match found, user can change later
+
+        setAssessmentForm(prev => ({
+          ...prev,
+          employeeId: value,
+          employeeCode: emp.ma_nhan_vien || emp.employeeCode || emp.code || emp.id || '',
+          position: positionToUse, // Set the tentative position
+          department: emp.bo_phan || emp.department || ''
+        }))
+        loadAssessmentItems(positionToUse, empDept)
+      } else {
+        setAssessmentForm(prev => ({ ...prev, items: [] }))
+      }
+    }
+
+    if (name === 'position') {
+      // User manually changed the framework position
+      loadAssessmentItems(value, assessmentForm.department)
+    }
+  }
+
+  const loadAssessmentItems = (position, department, existingItems = null) => {
+    if (!position) return
+
+    const searchPos = position.trim().toLowerCase()
+    const searchDept = String(department || '').trim().toLowerCase()
+
+    const frameworkItems = competencyFramework.filter(c => {
+      const framePosition = String(c.position || '').trim().toLowerCase()
+      const frameDept = String(c.department || '').trim().toLowerCase()
+
+      // Match Position AND Department (if Dept is specified in framework)
+      // Note: We prioritize the explicitly selected 'position'
+      return framePosition === searchPos && (!c.department || frameDept === searchDept || searchDept === '') && c.status !== 'Không áp dụng'
+    })
+
+    const items = frameworkItems.map(item => {
+      const existing = existingItems?.find(i => i.competencyId === item.id)
+      const requiredLevel = Number(item.level || 0)
+      const achievedLevel = existing ? Number(existing.achievedLevel || 0) : requiredLevel
+
+      return {
+        competencyId: item.id,
+        competencyCode: item.code || item.id,
+        competencyName: item.name,
+        group: item.group,
+        requiredLevel: requiredLevel,
+        achievedLevel: achievedLevel,
+        difference: achievedLevel - requiredLevel,
+        comment: existing ? existing.comment : ''
+      }
+    })
+
+    setAssessmentForm(prev => ({ ...prev, items }))
+  }
+
+  const handleAssessmentItemChange = (index, field, value) => {
+    const newItems = [...assessmentForm.items]
+    const item = { ...newItems[index] }
+    item[field] = field === 'achievedLevel' ? (parseInt(value) || 0) : value
+    if (field === 'achievedLevel') {
+      item.difference = item.achievedLevel - item.requiredLevel
+    }
+    newItems[index] = item
+    setAssessmentForm(prev => ({ ...prev, items: newItems }))
+  }
+
+  const handleSaveAssessment = async () => {
+    if (!assessmentForm.employeeId || !assessmentForm.period) {
+      alert('Vui lòng chọn nhân viên và kỳ đánh giá')
+      return
+    }
+    if (assessmentForm.items.length === 0) {
+      alert('Không có năng lực để đánh giá cho nhân viên này. Vui lòng kiểm tra Khung năng lực.')
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      const avgRequired = assessmentForm.items.reduce((sum, i) => sum + i.requiredLevel, 0) / assessmentForm.items.length
+      const avgAchieved = assessmentForm.items.reduce((sum, i) => sum + i.achievedLevel, 0) / assessmentForm.items.length
+
+      const dataToSave = {
+        ...assessmentForm,
+        diemYC: avgRequired,
+        diemKQ: avgAchieved,
+        result: avgAchieved >= avgRequired ? 'Đạt' : 'Cần cải thiện',
+        updatedAt: new Date().toISOString()
+      }
+
+      if (assessmentForm.id) {
+        const { id, ...cleanData } = dataToSave
+        await fbUpdate(`hr/employee_competency_assessment/${id}`, cleanData)
+      } else {
+        await fbPush('hr/employee_competency_assessment', dataToSave)
+      }
+
+      alert('Đã lưu kết quả đánh giá thành công')
+      setAssessmentForm({
+        employeeId: '',
+        employeeCode: '',
+        position: '',
+        department: '',
+        period: '',
+        evaluationDate: new Date().toISOString().split('T')[0],
+        items: []
+      })
+      loadData()
+    } catch (error) {
+      alert('Lỗi khi lưu: ' + error.message)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Khung năng lực Logic
+  const handleFrameworkFormChange = (e) => {
+    const { name, value } = e.target
+    const val = name === 'level' ? parseInt(value) || 1 : value
+    setFrameworkForm(prev => ({ ...prev, [name]: val }))
+  }
+
+  const handleSaveFramework = async (e) => {
+    e.preventDefault()
+    if (!frameworkForm.department || !frameworkForm.position || !frameworkForm.name) {
+      alert('Vui lòng nhập đầy đủ Bộ phận, Vị trí và Tên năng lực')
+      return
+    }
+
+    try {
+      setIsFrameworkSaving(true)
+      const { id, ...dataToSave } = frameworkForm
+
+      if (id) {
+        await fbUpdate(`hr/competencyFramework/${id}`, dataToSave)
+        alert('Cập nhật năng lực thành công')
+      } else {
+        await fbPush('hr/competencyFramework', dataToSave)
+        alert('Thêm năng lực thành công')
+      }
+
+      setFrameworkForm({
+        id: null,
+        department: '',
+        position: '',
+        group: 'Chuyên môn',
+        name: '',
+        level: 1,
+        status: 'Áp dụng',
+        note: ''
+      })
+      loadData()
+    } catch (error) {
+      alert('Lỗi khi lưu: ' + error.message)
+    } finally {
+      setIsFrameworkSaving(false)
+    }
+  }
 
   if (loading) {
     return <div className="loadingState">Đang tải dữ liệu...</div>
@@ -153,33 +363,11 @@ function Competency() {
         </h1>
         {activeTab === 'framework' && (
           <>
-            <button 
-              className="btn btn-primary"
-              onClick={() => {
-                setSelectedFramework(null)
-                setIsFrameworkModalOpen(true)
-              }}
-            >
-              <i className="fas fa-plus"></i>
-              Thêm năng lực
-            </button>
             <SeedCompetencyDataButton onComplete={loadData} />
           </>
         )}
-        {activeTab === 'evaluation' && (
-          <button 
-            className="btn btn-primary"
-            onClick={() => {
-              setSelectedEvaluation(null)
-              setIsEvaluationModalOpen(true)
-            }}
-          >
-            <i className="fas fa-plus"></i>
-            Nhập đánh giá
-          </button>
-        )}
         {activeTab === 'training' && (
-          <button 
+          <button
             className="btn btn-primary"
             onClick={() => {
               setSelectedTraining(null)
@@ -193,19 +381,19 @@ function Competency() {
       </div>
 
       <div className="tabs">
-        <div 
+        <div
           className={`tab ${activeTab === 'framework' ? 'active' : ''}`}
           onClick={() => setActiveTab('framework')}
         >
           📋 Khung năng lực
         </div>
-        <div 
+        <div
           className={`tab ${activeTab === 'evaluation' ? 'active' : ''}`}
           onClick={() => setActiveTab('evaluation')}
         >
           ⭐ Đánh giá năng lực
         </div>
-        <div 
+        <div
           className={`tab ${activeTab === 'training' ? 'active' : ''}`}
           onClick={() => setActiveTab('training')}
         >
@@ -216,123 +404,270 @@ function Competency() {
       {/* Tab 1: Khung năng lực */}
       {activeTab === 'framework' && (
         <>
+          {/* Bảng 1: Khai báo khung năng lực theo vị trí (Inline) */}
           <div className="card" style={{ marginBottom: '20px' }}>
             <div className="card-header">
               <h3 className="card-title">Bảng 1: Khai báo khung năng lực theo vị trí</h3>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>STT</th>
-                  <th>Bộ phận</th>
-                  <th>Vị trí</th>
-                  <th>Nhóm năng lực</th>
-                  <th>Tên năng lực</th>
-                  <th>Level yêu cầu</th>
-                  <th>Trạng thái</th>
-                  <th>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {competencyFramework.length > 0 ? (
-                  competencyFramework.map((c, idx) => (
-                    <tr key={c.id}>
-                      <td>{idx + 1}</td>
-                      <td>{escapeHtml(c.department || '-')}</td>
-                      <td>{escapeHtml(c.position || '-')}</td>
-                      <td>{escapeHtml(c.group || '-')}</td>
-                      <td>{escapeHtml(c.name || '-')}</td>
-                      <td>{c.level || '-'}</td>
-                      <td>
-                        <span className={`badge ${c.status === 'Áp dụng' ? 'badge-success' : 'badge-danger'}`}>
-                          {escapeHtml(c.status || 'Áp dụng')}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="actions">
-                          <button 
-                            className="edit"
-                            onClick={() => {
-                              setSelectedFramework(c)
-                              setIsFrameworkModalOpen(true)
-                            }}
-                          >
-                            <i className="fas fa-edit"></i>
-                          </button>
-                          <button 
-                            className="delete"
-                            onClick={() => handleDeleteFramework(c.id)}
-                          >
-                            <i className="fas fa-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="8" className="empty-state">Chưa có khung năng lực</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+            <div style={{ padding: '15px' }}>
+              <form onSubmit={handleSaveFramework}>
+                <div className="form-row" style={{ display: 'flex', gap: '15px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                  <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
+                    <label>Bộ phận *</label>
+                    <select
+                      name="department"
+                      value={frameworkForm.department}
+                      onChange={handleFrameworkFormChange}
+                      style={{ width: '100%', padding: '8px' }}
+                      required
+                    >
+                      <option value="">Chọn bộ phận</option>
+                      {['MKT', 'Sale', 'BOD', 'Nhân sự', 'Kế toán', 'Vận đơn', 'CSKH'].sort().map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                      {[...new Set(employees.map(e => e.bo_phan || e.department).filter(Boolean))].filter(d => !['MKT', 'Sale', 'BOD', 'Nhân sự', 'Kế toán', 'Vận đơn', 'CSKH'].includes(d)).map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
+                    <label>Vị trí *</label>
+                    <input
+                      type="text"
+                      name="position"
+                      value={frameworkForm.position}
+                      onChange={handleFrameworkFormChange}
+                      placeholder="VD: MKT 1, Sale 1, Trưởng team 1..."
+                      style={{ width: '100%', padding: '8px' }}
+                      required
+                    />
+                  </div>
+                  <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
+                    <label>Nhóm năng lực *</label>
+                    <select
+                      name="group"
+                      value={frameworkForm.group}
+                      onChange={handleFrameworkFormChange}
+                      style={{ width: '100%', padding: '8px' }}
+                      required
+                    >
+                      <option value="Chuyên môn">Chuyên môn</option>
+                      <option value="Lãnh đạo">Lãnh đạo</option>
+                      <option value="Cá nhân">Cá nhân</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-row" style={{ display: 'flex', gap: '15px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                  <div className="form-group" style={{ flex: '2', minWidth: '300px' }}>
+                    <label>Tên năng lực *</label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={frameworkForm.name}
+                      onChange={handleFrameworkFormChange}
+                      placeholder="VD: Lập kế hoạch & giám sát KPI"
+                      style={{ width: '100%', padding: '8px' }}
+                      required
+                    />
+                  </div>
+                  <div className="form-group" style={{ flex: '1', minWidth: '150px' }}>
+                    <label>Level yêu cầu (1-5) *</label>
+                    <select
+                      name="level"
+                      value={frameworkForm.level}
+                      onChange={handleFrameworkFormChange}
+                      style={{ width: '100%', padding: '8px' }}
+                      required
+                    >
+                      {[1, 2, 3, 4, 5].map(l => (
+                        <option key={l} value={l}>{l}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ flex: '1', minWidth: '150px' }}>
+                    <label>Trạng thái</label>
+                    <select
+                      name="status"
+                      value={frameworkForm.status}
+                      onChange={handleFrameworkFormChange}
+                      style={{ width: '100%', padding: '8px' }}
+                    >
+                      <option value="Áp dụng">Áp dụng</option>
+                      <option value="Ngừng">Ngừng</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '15px' }}>
+                  <label>Ghi chú</label>
+                  <textarea
+                    name="note"
+                    value={frameworkForm.note}
+                    onChange={handleFrameworkFormChange}
+                    rows="2"
+                    style={{ width: '100%', padding: '8px' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                  {frameworkForm.id && (
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => setFrameworkForm({
+                        id: null,
+                        department: '',
+                        position: '',
+                        group: 'Chuyên môn',
+                        name: '',
+                        level: 1,
+                        status: 'Áp dụng',
+                        note: ''
+                      })}
+                    >Hủy</button>
+                  )}
+                  <button type="submit" className="btn btn-primary" disabled={isFrameworkSaving}>
+                    {isFrameworkSaving ? 'Đang lưu...' : (frameworkForm.id ? 'Cập nhật Năng lực' : 'Tạo mới Năng lực')}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
 
           {/* Bảng 2: Danh mục khung năng lực theo bộ phận (Ma trận) */}
-          <div className="card">
-            <div className="card-header">
+          <div className="card" style={{ marginBottom: '20px' }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 className="card-title">Bảng 2: Danh mục khung năng lực theo bộ phận</h3>
-              <select 
-                value={filterDept} 
+              <select
+                value={filterDept}
                 onChange={(e) => setFilterDept(e.target.value)}
                 style={{ padding: '8px', borderRadius: '4px' }}
               >
-                <option value="">Tất cả bộ phận</option>
+                <option value="">Chọn Bộ phận để xem Ma trận</option>
                 {[...new Set(competencyFramework.map(c => c.department).filter(Boolean))].sort().map(dept => (
                   <option key={dept} value={dept}>{dept}</option>
                 ))}
               </select>
             </div>
-            {positions.length > 0 ? (
-              <div style={{ overflowX: 'auto' }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>STT</th>
-                      <th>Nhóm năng lực</th>
-                      <th>Tên năng lực</th>
-                      {positions.map(pos => (
-                        <th key={pos}>{escapeHtml(pos)}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pivotRows.length > 0 ? (
-                      pivotRows.map((row, idx) => (
-                        <tr key={`${row.group}_${row.name}`}>
-                          <td>{idx + 1}</td>
-                          <td>{escapeHtml(row.group)}</td>
-                          <td>{escapeHtml(row.name)}</td>
-                          {positions.map(pos => (
-                            <td key={pos} style={{ textAlign: 'center' }}>
-                              {row.levels[pos] || '–'}
-                            </td>
-                          ))}
-                        </tr>
-                      ))
-                    ) : (
+            {filterDept ? (
+              matrixPositions.length > 0 ? (
+                <div style={{ overflowX: 'auto', padding: '15px' }}>
+                  <table>
+                    <thead>
                       <tr>
-                        <td colSpan={3 + positions.length} className="empty-state">
-                          Chưa có dữ liệu để hiển thị ma trận
+                        <th rowSpan="2">STT</th>
+                        <th rowSpan="2">Nhóm năng lực</th>
+                        <th rowSpan="2">Tên năng lực</th>
+                        {matrixPositions.map(pos => (
+                          <th key={pos}>{escapeHtml(pos)}</th>
+                        ))}
+                      </tr>
+                      <tr>
+                        {matrixPositions.map((pos, idx) => (
+                          <th key={`code_${pos}`} style={{ fontSize: '0.85em', color: '#666', background: '#f8f9fa' }}>B{idx + 1}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pivotRows.length > 0 ? (
+                        pivotRows.map((row, idx) => (
+                          <tr key={`${row.group}_${row.name}`}>
+                            <td style={{ textAlign: 'center' }}>{idx + 1}</td>
+                            <td>{escapeHtml(row.group)}</td>
+                            <td>{escapeHtml(row.name)}</td>
+                            {matrixPositions.map(pos => (
+                              <td key={pos} style={{ textAlign: 'center', fontWeight: 'bold', color: row.levels[pos] !== '–' ? 'var(--primary)' : 'inherit' }}>
+                                {row.levels[pos] || '–'}
+                              </td>
+                            ))}
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={3 + matrixPositions.length} className="empty-state">
+                            Chưa có dữ liệu để hiển thị ma trận
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="empty-state" style={{ padding: '40px' }}>Bộ phận này chưa có dữ liệu khung năng lực</p>
+              )
+            ) : (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+                <i className="fas fa-hand-pointer" style={{ fontSize: '24px', marginBottom: '10px' }}></i>
+                <p>Vui lòng chọn <strong>Bộ phận</strong> ở trên để hiển thị Ma trận năng lực</p>
+              </div>
+            )}
+          </div>
+
+          {/* Bảng 3: Danh sách tổng hợp */}
+          <div className="card">
+            <div className="card-header">
+              <h3 className="card-title">Bảng 3: Danh sách chi tiết khung năng lực</h3>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>STT</th>
+                    <th>Bộ phận</th>
+                    <th>Vị trí</th>
+                    <th>Nhóm năng lực</th>
+                    <th>Tên năng lực</th>
+                    <th>Level yêu cầu</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {competencyFramework.length > 0 ? (
+                    competencyFramework.map((c, idx) => (
+                      <tr key={c.id}>
+                        <td>{idx + 1}</td>
+                        <td>{escapeHtml(c.department || '-')}</td>
+                        <td>{escapeHtml(c.position || '-')}</td>
+                        <td>{escapeHtml(c.group || '-')}</td>
+                        <td>{escapeHtml(c.name || '-')}</td>
+                        <td style={{ textAlign: 'center' }}>{c.level || '-'}</td>
+                        <td>
+                          <span className={`badge ${c.status === 'Áp dụng' ? 'badge-success' : 'badge-danger'}`}>
+                            {escapeHtml(c.status || 'Áp dụng')}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="actions">
+                            <button
+                              className="edit"
+                              onClick={() => {
+                                setFrameworkForm({ ...c })
+                                window.scrollTo({ top: 0, behavior: 'smooth' })
+                              }}
+                              title="Sửa (Load lên Bảng 1)"
+                            >
+                              <i className="fas fa-edit"></i>
+                            </button>
+                            <button
+                              className="delete"
+                              onClick={() => handleDeleteFramework(c.id)}
+                            >
+                              <i className="fas fa-trash"></i>
+                            </button>
+                          </div>
                         </td>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="empty-state">Chưa có dữ liệu để hiển thị ma trận</p>
-            )}
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="8" className="empty-state">Chưa có khung năng lực</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </>
       )}
@@ -340,87 +675,271 @@ function Competency() {
       {/* Tab 2: Đánh giá năng lực */}
       {activeTab === 'evaluation' && (
         <>
+          {/* Bảng 1: Nhập kết quả đánh giá năng lực cho 1 nhân sự */}
           <div className="card" style={{ marginBottom: '20px' }}>
-            <div className="search-box">
-              <select 
-                value={filterEvaluationDept} 
-                onChange={(e) => setFilterEvaluationDept(e.target.value)}
-              >
-                <option value="">Tất cả bộ phận</option>
-                {[...new Set(evaluations.map(e => e.department).filter(Boolean))].sort().map(dept => (
-                  <option key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
-              <select 
-                value={filterEvaluationPeriod} 
-                onChange={(e) => setFilterEvaluationPeriod(e.target.value)}
-              >
-                <option value="">Tất cả kỳ</option>
-                {[...new Set(evaluations.map(e => e.period).filter(Boolean))].sort().map(period => (
-                  <option key={period} value={period}>{period}</option>
-                ))}
-              </select>
+            <div className="card-header">
+              <h3 className="card-title">Bảng 1: HR nhập kết quả đánh giá năng lực cho 1 nhân sự</h3>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>STT</th>
-                  <th>Kỳ đánh giá</th>
-                  <th>Mã NV</th>
-                  <th>Họ và tên</th>
-                  <th>Bộ phận</th>
-                  <th>Vị trí</th>
-                  <th>Điểm YC</th>
-                  <th>Điểm KQ</th>
-                  <th>Kết quả</th>
-                  <th>Ngày đánh giá</th>
-                  <th>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredEvaluations.length > 0 ? (
-                  filteredEvaluations.map((evaluation, idx) => {
-                    const employee = employees.find(e => e.id === evaluation.employeeId)
-                    const avgRequired = evaluation.avgRequired || evaluation.diemYC || 0
-                    const avgAchieved = evaluation.avgAchieved || evaluation.diemKQ || 0
-                    const result = avgAchieved > avgRequired ? 'Đạt' : 'Cần cải thiện'
-                    return (
-                      <tr key={evaluation.id}>
-                        <td>{idx + 1}</td>
-                        <td>{escapeHtml(evaluation.period || '-')}</td>
-                        <td>{evaluation.employeeId || '-'}</td>
-                        <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
-                        <td>{escapeHtml(evaluation.department || '-')}</td>
-                        <td>{employee ? (employee.vi_tri || '-') : '-'}</td>
-                        <td>{avgRequired.toFixed(1)}</td>
-                        <td>{avgAchieved.toFixed(1)}</td>
-                        <td>
-                          <span className={`badge ${result === 'Đạt' ? 'badge-success' : 'badge-warning'}`}>
-                            {result}
-                          </span>
-                        </td>
-                        <td>{evaluation.evaluationDate ? new Date(evaluation.evaluationDate).toLocaleDateString('vi-VN') : '-'}</td>
-                        <td>
-                          <button 
-                            className="view"
-                            onClick={() => {
-                              setSelectedEvaluationDetail(evaluation)
-                              setIsEvaluationDetailModalOpen(true)
-                            }}
-                          >
-                            <i className="fas fa-eye"></i>
-                          </button>
-                        </td>
+            <div style={{ padding: '15px' }}>
+              <div className="form-row" style={{ display: 'flex', gap: '15px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
+                  <label>Chọn Bộ phận</label>
+                  <select
+                    value={inputFilterDept}
+                    onChange={(e) => setInputFilterDept(e.target.value)}
+                    style={{ width: '100%', padding: '8px' }}
+                  >
+                    <option value="">Tất cả bộ phận</option>
+                    {[...new Set(employees.map(e => e.bo_phan || e.department).filter(Boolean))].sort().map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
+                  <label>Nhân sự *</label>
+                  <select
+                    name="employeeId"
+                    value={assessmentForm.employeeId}
+                    onChange={handleAssessmentFormChange}
+                    style={{ width: '100%', padding: '8px' }}
+                  >
+                    <option value="">Chọn nhân sự</option>
+                    {employees
+                      .filter(e => !inputFilterDept || (e.bo_phan || e.department) === inputFilterDept)
+                      .map(e => (
+                        <option key={e.id} value={e.id}>{e.ho_va_ten || e.name} ({e.vi_tri || '-'})</option>
+                      ))
+                    }
+                  </select>
+                </div>
+                <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
+                  <label>Vị trí áp dụng KHNL *</label>
+                  <select
+                    name="position"
+                    value={assessmentForm.position}
+                    onChange={handleAssessmentFormChange}
+                    style={{ width: '100%', padding: '8px' }}
+                  >
+                    <option value="">Chọn vị trí KHNL</option>
+                    {[...new Set(competencyFramework
+                      .filter(c => !inputFilterDept || c.department === inputFilterDept)
+                      .map(c => c.position)
+                    )].sort().map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
+                  <label>Kỳ đánh giá (Tháng) *</label>
+                  <input
+                    type="month"
+                    name="period"
+                    value={assessmentForm.period}
+                    onChange={handleAssessmentFormChange}
+                    style={{ width: '100%', padding: '8px' }}
+                  />
+                </div>
+                <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
+                  <label>Ngày đánh giá</label>
+                  <input
+                    type="date"
+                    name="evaluationDate"
+                    value={assessmentForm.evaluationDate}
+                    onChange={handleAssessmentFormChange}
+                    style={{ width: '100%', padding: '8px' }}
+                  />
+                </div>
+              </div>
+
+              {assessmentForm.items.length > 0 ? (
+                <div style={{ overflowX: 'auto', marginBottom: '15px' }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>STT</th>
+                        <th>Nhóm năng lực</th>
+                        <th>Tên năng lực</th>
+                        <th>Level yêu cầu</th>
+                        <th>Level đạt được</th>
+                        <th>Điểm chênh lệch</th>
+                        <th>Nhận xét</th>
                       </tr>
-                    )
-                  })
-                ) : (
+                    </thead>
+                    <tbody>
+                      {assessmentForm.items.map((item, idx) => (
+                        <tr key={idx}>
+                          <td>{idx + 1}</td>
+                          <td>{escapeHtml(item.group || '-')}</td>
+                          <td>{escapeHtml(item.competencyName || '-')}</td>
+                          <td style={{ textAlign: 'center' }}>{item.requiredLevel}</td>
+                          <td>
+                            <select
+                              value={item.achievedLevel}
+                              onChange={(e) => handleAssessmentItemChange(idx, 'achievedLevel', e.target.value)}
+                              style={{ width: '100%', padding: '5px' }}
+                            >
+                              {[1, 2, 3, 4, 5].map(v => (
+                                <option key={v} value={v}>{v}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td style={{
+                            textAlign: 'center',
+                            fontWeight: 'bold',
+                            color: item.difference > 0 ? 'var(--success)' : item.difference < 0 ? 'var(--danger)' : 'inherit'
+                          }}>
+                            {item.difference > 0 ? `+${item.difference}` : item.difference}
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              value={item.comment}
+                              onChange={(e) => handleAssessmentItemChange(idx, 'comment', e.target.value)}
+                              placeholder="Nhập nhận xét..."
+                              style={{ width: '100%', padding: '5px' }}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : assessmentForm.employeeId && (
+                <p style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                  Nhân sự này chưa được cài đặt Khung năng lực cho vị trí: <strong>{assessmentForm.position}</strong>. <br />
+                  Vui lòng qua tab <strong>Khung năng lực</strong> để thiết lập trước.
+                </p>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  className="btn"
+                  onClick={() => setAssessmentForm({
+                    employeeId: '',
+                    employeeCode: '',
+                    position: '',
+                    department: '',
+                    period: '',
+                    evaluationDate: new Date().toISOString().split('T')[0],
+                    items: []
+                  })}
+                >Hủy</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleSaveAssessment}
+                  disabled={isSaving || assessmentForm.items.length === 0}
+                >
+                  {isSaving ? 'Đang lưu...' : (assessmentForm.id ? 'Cập nhật kết quả' : 'Lưu kết quả')}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="card" style={{ marginBottom: '20px' }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 className="card-title">Bảng 2: Kết quả đánh giá năng lực</h3>
+              <div className="search-box" style={{ display: 'flex', gap: '10px' }}>
+                <select
+                  value={filterEvaluationDept}
+                  onChange={(e) => setFilterEvaluationDept(e.target.value)}
+                  style={{ padding: '8px', borderRadius: '4px' }}
+                >
+                  <option value="">Tất cả bộ phận</option>
+                  {[...new Set(evaluations.map(e => e.department).filter(Boolean))].sort().map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+                <select
+                  value={filterEvaluationPeriod}
+                  onChange={(e) => setFilterEvaluationPeriod(e.target.value)}
+                  style={{ padding: '8px', borderRadius: '4px' }}
+                >
+                  <option value="">Tất cả kỳ</option>
+                  {[...new Set(evaluations.map(e => e.period).filter(Boolean))].sort().map(period => (
+                    <option key={period} value={period}>{period}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table>
+                <thead>
                   <tr>
-                    <td colSpan="11" className="empty-state">Chưa có đánh giá năng lực</td>
+                    <th>STT</th>
+                    <th>Kỳ đánh giá</th>
+                    <th>Mã NV</th>
+                    <th>Họ và tên</th>
+                    <th>Bộ phận</th>
+                    <th>Vị trí</th>
+                    <th>Điểm YC</th>
+                    <th>Điểm KQ</th>
+                    <th>Kết quả</th>
+                    <th>Ngày đánh giá</th>
+                    <th>Thao tác</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filteredEvaluations.length > 0 ? (
+                    filteredEvaluations.map((evaluation, idx) => {
+                      const employee = employees.find(e => e.id === evaluation.employeeId)
+                      const avgRequired = evaluation.diemYC || evaluation.avgRequired || 0
+                      const avgAchieved = evaluation.diemKQ || evaluation.avgAchieved || 0
+                      const result = avgAchieved >= avgRequired ? 'Đạt' : 'Cần cải thiện'
+
+                      return (
+                        <tr key={evaluation.id}>
+                          <td>{idx + 1}</td>
+                          <td>{escapeHtml(evaluation.period || '-')}</td>
+                          <td>{evaluation.employeeCode || evaluation.employeeId || '-'}</td>
+                          <td>{employee ? (employee.ho_va_ten || employee.name || '-') : (evaluation.employeeName || '-')}</td>
+                          <td>{escapeHtml(evaluation.department || '-')}</td>
+                          <td>{escapeHtml(evaluation.position || '-')}</td>
+                          <td style={{ fontWeight: 'bold' }}>{avgRequired.toFixed(1)}</td>
+                          <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{avgAchieved.toFixed(1)}</td>
+                          <td>
+                            <span className={`badge ${result === 'Đạt' ? 'badge-success' : 'badge-warning'}`}>
+                              {result}
+                            </span>
+                          </td>
+                          <td>{evaluation.evaluationDate ? new Date(evaluation.evaluationDate).toLocaleDateString('vi-VN') : '-'}</td>
+                          <td>
+                            <div className="actions">
+                              <button
+                                className="view"
+                                onClick={() => {
+                                  setSelectedEvaluationDetail(evaluation)
+                                  setIsEvaluationDetailModalOpen(true)
+                                }}
+                                title="Xem chi tiết"
+                              >
+                                <i className="fas fa-eye"></i>
+                              </button>
+                              <button
+                                className="edit"
+                                onClick={() => {
+                                  const emp = employees.find(e => e.id === evaluation.employeeId)
+                                  setAssessmentForm({ ...evaluation })
+                                  // Load items based on the saved position (or employee position if missing) and department
+                                  loadAssessmentItems(evaluation.position || (emp ? emp.vi_tri : ''), evaluation.department, evaluation.items)
+                                  // Scroll to top to see Bảng 1
+                                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                                }}
+                                title="Sửa (Load lên Bảng 1)"
+                              >
+                                <i className="fas fa-edit"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="11" className="empty-state">Chưa có đánh giá năng lượng</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </>
       )}
@@ -460,18 +979,17 @@ function Competency() {
                       <td>{training.endDate ? new Date(training.endDate).toLocaleDateString('vi-VN') : '-'}</td>
                       <td>{escapeHtml(training.objective || training.mucTieu || '-')}</td>
                       <td>
-                        <span className={`badge ${
-                          training.status === 'Đã kết thúc' ? 'badge-success' :
+                        <span className={`badge ${training.status === 'Đã kết thúc' ? 'badge-success' :
                           training.status === 'Đang diễn ra' ? 'badge-info' :
-                          training.status === 'Sắp diễn ra' ? 'badge-warning' :
-                          'badge-danger'
-                        }`}>
+                            training.status === 'Sắp diễn ra' ? 'badge-warning' :
+                              'badge-danger'
+                          }`}>
                           {escapeHtml(training.status || '-')}
                         </span>
                       </td>
                       <td>
                         <div className="actions">
-                          <button 
+                          <button
                             className="edit"
                             onClick={() => {
                               setSelectedTraining(training)
@@ -480,13 +998,13 @@ function Competency() {
                           >
                             <i className="fas fa-edit"></i>
                           </button>
-                          <button 
+                          <button
                             className="delete"
                             onClick={() => handleDeleteTraining(training.id)}
                           >
                             <i className="fas fa-trash"></i>
                           </button>
-                          <button 
+                          <button
                             className="view"
                             onClick={() => {
                               setSelectedTraining(training)
@@ -527,8 +1045,8 @@ function Competency() {
           <div className="card">
             <div className="card-header">
               <h3 className="card-title">Bảng 2: Danh sách học viên tham gia</h3>
-              <select 
-                value={filterTrainingProgram} 
+              <select
+                value={filterTrainingProgram}
                 onChange={(e) => setFilterTrainingProgram(e.target.value)}
                 style={{ padding: '8px', borderRadius: '4px' }}
               >
@@ -567,18 +1085,17 @@ function Competency() {
                         <td>{employee ? (employee.vi_tri || '-') : '-'}</td>
                         <td>{training ? (training.name || '-') : '-'}</td>
                         <td>
-                          <span className={`badge ${
-                            participant.status === 'Đã tham gia' ? 'badge-success' :
+                          <span className={`badge ${participant.status === 'Đã tham gia' ? 'badge-success' :
                             participant.status === 'Vắng' ? 'badge-danger' :
-                            'badge-warning'
-                          }`}>
+                              'badge-warning'
+                            }`}>
                             {escapeHtml(participant.status || '-')}
                           </span>
                         </td>
                         <td>{participant.attendanceRate || participant.tyLeThamDu || 0}%</td>
                         <td>{escapeHtml(participant.note || participant.ghiChu || '-')}</td>
                         <td>
-                          <button 
+                          <button
                             className="edit"
                             onClick={() => {
                               setSelectedTraining(training)
@@ -603,27 +1120,9 @@ function Competency() {
       )}
 
       {/* Modals */}
-      <CompetencyFrameworkModal
-        framework={selectedFramework}
-        isOpen={isFrameworkModalOpen}
-        onClose={() => {
-          setIsFrameworkModalOpen(false)
-          setSelectedFramework(null)
-        }}
-        onSave={loadData}
-      />
 
-      <CompetencyEvaluationModal
-        evaluation={selectedEvaluation}
-        employees={employees}
-        competencyFramework={competencyFramework}
-        isOpen={isEvaluationModalOpen}
-        onClose={() => {
-          setIsEvaluationModalOpen(false)
-          setSelectedEvaluation(null)
-        }}
-        onSave={loadData}
-      />
+
+
 
       <EvaluationDetailModal
         evaluation={selectedEvaluationDetail}

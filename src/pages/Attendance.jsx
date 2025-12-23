@@ -145,29 +145,69 @@ function Attendance() {
     return totalIncome - totalDeductions
   }
 
-  // Download Excel Template for Attendance
-  const handleDownloadAttendanceTemplate = () => {
-    const headers = [
-      'Mã NV',
-      'Họ và tên',
-      'Ngày (YYYY-MM-DD)',
-      'Check-in (HH:MM)',
-      'Check-out (HH:MM)',
-      'Số giờ làm',
-      'Trạng thái'
-    ]
+  // Export Attendance Data to Excel
+  const handleExportAttendance = () => {
+    // Determine data to export (filtered or all)
+    let dataToExport = attendanceLogs
+    if (filterAttendanceMonth) {
+      dataToExport = attendanceLogs.filter(log => {
+        const date = new Date(log.date || log.timestamp)
+        const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        return monthStr === filterAttendanceMonth
+      })
+    }
 
-    const sampleData = [
-      ['emp001', 'Nguyễn Văn A', '2025-12-23', '08:00', '17:00', '8', 'Đủ'],
-      ['emp002', 'Trần Thị B', '2025-12-23', '08:30', '17:30', '8', 'Đủ'],
-      ['emp003', 'Lê Văn C', '2025-12-23', '09:00', '16:00', '6.5', 'Thiếu']
-    ]
+    if (dataToExport.length === 0 && attendanceLogs.length === 0) {
+      // If absolutely no data, export just empty template with headers
+      const headers = [
+        'Mã NV',
+        'Họ và tên',
+        'Ngày (YYYY-MM-DD)',
+        'Check-in (HH:MM)',
+        'Check-out (HH:MM)',
+        'Số giờ làm',
+        'Trạng thái'
+      ]
+      const ws = XLSX.utils.aoa_to_sheet([headers])
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Chấm công')
+      XLSX.writeFile(wb, 'Mau_Cham_Cong.xlsx')
+      return
+    }
 
-    const wsData = [headers, ...sampleData]
-    const ws = XLSX.utils.aoa_to_sheet(wsData)
+    // Map data to export format
+    const exportData = dataToExport.map((log, idx) => {
+      const employee = employees.find(e => e.id === log.employeeId)
+
+      const checkIn = log.checkIn ? new Date(log.checkIn).toLocaleTimeString('vi-VN') : ''
+      const checkOut = log.checkOut ? new Date(log.checkOut).toLocaleTimeString('vi-VN') : ''
+
+      let hours = 0
+      if (log.hours !== undefined && log.hours !== null) {
+        hours = typeof log.hours === 'string' ? parseFloat(log.hours) : Number(log.hours)
+      } else if (log.soGio !== undefined && log.soGio !== null) {
+        hours = typeof log.soGio === 'string' ? parseFloat(log.soGio) : Number(log.soGio)
+      }
+
+      return {
+        'STT': idx + 1,
+        'Mã NV': log.employeeId || '',
+        'Họ và tên': employee ? (employee.ho_va_ten || employee.name || '') : '',
+        'Ngày': log.date ? new Date(log.date).toLocaleDateString('vi-VN') : '',
+        'Check-in': checkIn,
+        'Check-out': checkOut,
+        'Số giờ làm': typeof hours === 'number' && !isNaN(hours) ? hours.toFixed(1) : 0,
+        'Trạng thái': log.status || ''
+      }
+    })
+
+    const ws = XLSX.utils.json_to_sheet(exportData)
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Chấm công')
-    XLSX.writeFile(wb, 'Mau_Cham_Cong.xlsx')
+    XLSX.utils.book_append_sheet(wb, ws, 'Dữ liệu Chấm công')
+    const fileName = filterAttendanceMonth
+      ? `Cham_cong_${filterAttendanceMonth}.xlsx`
+      : `Du_lieu_Cham_cong_${new Date().toISOString().split('T')[0]}.xlsx`
+    XLSX.writeFile(wb, fileName)
   }
 
   if (loading) {
@@ -185,11 +225,11 @@ function Attendance() {
           <>
             <button
               className="btn btn-success"
-              onClick={handleDownloadAttendanceTemplate}
-              title="Tải file Excel mẫu"
+              onClick={handleExportAttendance}
+              title="Xuất dữ liệu Excel"
             >
-              <i className="fas fa-download"></i>
-              Tải file Excel mẫu
+              <i className="fas fa-file-excel"></i>
+              Xuất Excel
             </button>
             <button
               className="btn btn-primary"

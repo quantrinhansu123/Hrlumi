@@ -124,28 +124,34 @@ function Salary() {
     }
   }
 
-  // Download Excel Template for Insurance
-  const handleDownloadInsuranceTemplate = () => {
-    const headers = [
-      'Mã NV',
-      'Số sổ BHXH',
-      'Ngày tham gia (YYYY-MM-DD)',
-      'Mức lương đóng BHXH (VNĐ)',
-      'Tỷ lệ NLĐ (%)',
-      'Tỷ lệ DN (%)',
-      'Trạng thái'
-    ]
+  // Export Insurance Data to Excel
+  const exportInsuranceToExcel = () => {
+    if (insuranceInfo.length === 0) {
+      alert('Không có dữ liệu để xuất!')
+      return
+    }
 
-    const sampleData = [
-      ['emp001', 'BHXH123456', '2024-01-01', '15000000', '10.5', '21.5', 'Đang tham gia'],
-      ['emp002', 'BHXH789012', '2024-02-15', '12000000', '10.5', '21.5', 'Đang tham gia']
-    ]
+    const exportData = insuranceInfo.map((ins, idx) => {
+      const employee = employees.find(e => e.id === ins.employeeId)
+      return {
+        'STT': idx + 1,
+        'Mã NV': ins.employeeId || '',
+        'Họ và tên': employee ? (employee.ho_va_ten || employee.name || '') : '',
+        'Bộ phận': employee ? (employee.bo_phan || '') : '',
+        'Số sổ BHXH': ins.soSoBHXH || '',
+        'Ngày tham gia': ins.ngayThamGia ? new Date(ins.ngayThamGia).toLocaleDateString('vi-VN') : '',
+        'Mức lương đóng BHXH': ins.mucLuongDong || 0,
+        'Tỷ lệ NLĐ (%)': ins.tyLeNLD || 0,
+        'Tỷ lệ DN (%)': ins.tyLeDN || 0,
+        'Trạng thái': ins.status || ''
+      }
+    })
 
-    const wsData = [headers, ...sampleData]
-    const ws = XLSX.utils.aoa_to_sheet(wsData)
+    const ws = XLSX.utils.json_to_sheet(exportData)
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Thông tin BHXH')
-    XLSX.writeFile(wb, 'Mau_Thong_Tin_BHXH.xlsx')
+    XLSX.utils.book_append_sheet(wb, ws, 'Bảo Hiểm Xã Hội')
+    const fileName = `Thong_tin_BHXH_${new Date().toISOString().split('T')[0]}.xlsx`
+    XLSX.writeFile(wb, fileName)
   }
 
   // Handle file selection for insurance import
@@ -168,7 +174,7 @@ function Salary() {
         return
       }
 
-      const headers = jsonData[0].map(h => String(h).toLowerCase().trim())
+      const headers = Array.from(jsonData[0] || []).map(h => String(h || '').toLowerCase().trim())
 
       // Find column indexes
       const maNVIdx = headers.findIndex(h => h.includes('mã nv') || h.includes('mã nhân viên'))
@@ -251,27 +257,37 @@ function Salary() {
     }
   }
 
-  // Download Excel Template for Tax
-  const handleDownloadTaxTemplate = () => {
-    const headers = [
-      'Mã NV',
-      'Mã số thuế TNCN',
-      'Thu nhập tính thuế (VNĐ)',
-      'Giảm trừ bản thân (VNĐ)',
-      'Biểu thuế',
-      'Kỳ áp dụng (YYYY-MM)'
-    ]
+  // Export Tax Data to Excel
+  const exportTaxToExcel = () => {
+    if (taxInfo.length === 0) {
+      alert('Không có dữ liệu để xuất!')
+      return
+    }
 
-    const sampleData = [
-      ['emp001', 'MST123456789', '20000000', '15500000', 'Lũy tiến', '2025-12'],
-      ['emp002', 'MST987654321', '15000000', '15500000', 'Lũy tiến', '2025-12']
-    ]
+    const exportData = taxInfo.map((tax, idx) => {
+      const employee = employees.find(e => e.id === tax.employeeId)
+      return {
+        'STT': idx + 1,
+        'Mã NV': tax.employeeId || '',
+        'Họ và tên': employee ? (employee.ho_va_ten || employee.name || '') : '',
+        'Bộ phận': employee ? (employee.bo_phan || '') : '',
+        'Mã số thuế': tax.maSoThue || '',
+        'Thu nhập tính thuế': tax.thuNhapTinhThue || 0,
+        'Giảm trừ bản thân': tax.giamTruBanThan || 0,
+        'Giảm trừ BHXH': tax.giamTruBHXH || 0,
+        'Tổng giảm trừ NPT': tax.tongGiamTruNguoiPhuThuoc || 0,
+        'Thu nhập chịu thuế': tax.thuNhapChiuThue || 0,
+        'Thuế phải nộp': tax.thuePhaiNop || 0,
+        'Biểu thuế': tax.bieuThue || '',
+        'Kỳ áp dụng': tax.kyApDung || ''
+      }
+    })
 
-    const wsData = [headers, ...sampleData]
-    const ws = XLSX.utils.aoa_to_sheet(wsData)
+    const ws = XLSX.utils.json_to_sheet(exportData)
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Thông tin Thuế TNCN')
-    XLSX.writeFile(wb, 'Mau_Thong_Tin_Thue_TNCN.xlsx')
+    XLSX.utils.book_append_sheet(wb, ws, 'Thuế TNCN')
+    const fileName = `Thong_tin_Thue_TNCN_${new Date().toISOString().split('T')[0]}.xlsx`
+    XLSX.writeFile(wb, fileName)
   }
 
   // Handle file selection for tax import
@@ -294,7 +310,7 @@ function Salary() {
         return
       }
 
-      const headers = jsonData[0].map(h => String(h).toLowerCase().trim())
+      const headers = Array.from(jsonData[0] || []).map(h => String(h || '').toLowerCase().trim())
 
       // Find column indexes
       const maNVIdx = headers.findIndex(h => h.includes('mã nv') || h.includes('mã nhân viên'))
@@ -474,11 +490,11 @@ function Salary() {
           <>
             <button
               className="btn btn-success"
-              onClick={handleDownloadInsuranceTemplate}
-              title="Tải file Excel mẫu"
+              onClick={exportInsuranceToExcel}
+              title="Xuất dữ liệu ra Excel"
             >
-              <i className="fas fa-download"></i>
-              Tải file Excel mẫu
+              <i className="fas fa-file-excel"></i>
+              Xuất Excel
             </button>
             <button
               className="btn btn-info"
@@ -504,11 +520,11 @@ function Salary() {
           <>
             <button
               className="btn btn-success"
-              onClick={handleDownloadTaxTemplate}
-              title="Tải file Excel mẫu"
+              onClick={exportTaxToExcel}
+              title="Xuất dữ liệu ra Excel"
             >
-              <i className="fas fa-download"></i>
-              Tải file Excel mẫu
+              <i className="fas fa-file-excel"></i>
+              Xuất Excel
             </button>
             <button
               className="btn btn-info"
