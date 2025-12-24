@@ -10,7 +10,8 @@ import SeedAttendanceDataButton from '../components/SeedAttendanceDataButton'
 import SeedPayrollDataButton from '../components/SeedPayrollDataButton'
 import TaxModal from '../components/TaxModal'
 import { fbDelete, fbGet } from '../services/firebase'
-import { escapeHtml, formatMoney } from '../utils/helpers'
+import { TAX_CONFIG } from '../utils/constants'
+import { calculateProgressiveTax, escapeHtml, formatMoney } from '../utils/helpers'
 
 function Attendance() {
   const [activeTab, setActiveTab] = useState('attendance')
@@ -786,23 +787,40 @@ function Attendance() {
                 {taxInfo.length > 0 ? (
                   taxInfo.map((tax, idx) => {
                     const employee = employees.find(e => e.id === tax.employeeId)
-                    const employeeDependents = dependents.filter(d => d.employeeId === tax.employeeId && d.status === 'Đang áp dụng')
-                    const totalDependentDeduction = employeeDependents.length * 6200000 // 6.2 triệu/người phụ thuộc
-                    const personalDeduction = tax.giamTruBanThan || 11000000 // 11 triệu
-                    const taxableIncome = (tax.thuNhapTinhThue || 0) - personalDeduction - totalDependentDeduction - (tax.bhxh || 0)
+
+                    // 1. Calculate Deductions
+                    const personalDeduction = TAX_CONFIG.PERSONAL_DEDUCTION
+
+                    const employeeDependents = dependents.filter(d =>
+                      d.employeeId === tax.employeeId &&
+                      d.status === 'Đang áp dụng'
+                    )
+                    const dependentDeduction = employeeDependents.length * TAX_CONFIG.DEPENDENT_DEDUCTION
+
+                    // BHXH Deduction (10.5% of Insurance Salary)
+                    const empInsurance = insuranceInfo.find(i => i.employeeId === tax.employeeId && i.status === 'Đang tham gia')
+                    const insuranceDeduction = empInsurance ? (Number(empInsurance.mucLuongDongBHXH || 0) * 0.105) : 0
+
+                    // 2. Calculate Assessable Income
+                    const inputIncome = Number(tax.thuNhapTinhThue || 0)
+                    const assessableIncome = Math.max(0, inputIncome - personalDeduction - dependentDeduction - insuranceDeduction)
+
+                    // 3. Calculate Tax using progressive formula
+                    const taxAmount = calculateProgressiveTax(assessableIncome)
+
                     return (
                       <tr key={tax.id}>
                         <td>{idx + 1}</td>
                         <td>{tax.employeeId || '-'}</td>
                         <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
                         <td>{escapeHtml(tax.maSoThue || tax.mst || '-')}</td>
-                        <td>{formatMoney(tax.thuNhapTinhThue || 0)}</td>
+                        <td>{formatMoney(inputIncome)}</td>
                         <td>{formatMoney(personalDeduction)}</td>
-                        <td>{formatMoney(totalDependentDeduction)}</td>
-                        <td>{formatMoney(Math.max(0, taxableIncome))}</td>
+                        <td>{formatMoney(dependentDeduction)}</td>
+                        <td>{formatMoney(assessableIncome)}</td>
                         <td>{escapeHtml(tax.bieuThue || 'Lũy tiến')}</td>
                         <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>
-                          {formatMoney(tax.thuePhaiNop || tax.thueTNCN || 0)}
+                          {formatMoney(taxAmount)}
                         </td>
                         <td>{escapeHtml(tax.kyApDung || tax.period || '-')}</td>
                         <td>

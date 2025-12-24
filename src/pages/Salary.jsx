@@ -9,7 +9,8 @@ import SeedDataButton from '../components/SeedDataButton'
 import SeedPromotionHistoryButton from '../components/SeedPromotionHistoryButton'
 import TaxModal from '../components/TaxModal'
 import { fbDelete, fbGet, fbPush } from '../services/firebase'
-import { escapeHtml, formatMoney } from '../utils/helpers'
+import { TAX_CONFIG } from '../utils/constants'
+import { calculateProgressiveTax, escapeHtml, formatMoney } from '../utils/helpers'
 
 
 function Salary() {
@@ -998,18 +999,40 @@ function Salary() {
               {taxInfo.length > 0 ? (
                 taxInfo.map((tax, idx) => {
                   const employee = employees.find(e => e.id === tax.employeeId)
+
+                  // 1. Calculate Deductions
+                  const personalDeduction = TAX_CONFIG.PERSONAL_DEDUCTION
+
+                  const employeeDependents = dependents.filter(d =>
+                    d.employeeId === tax.employeeId &&
+                    d.status === 'Đang áp dụng'
+                  )
+                  const dependentDeduction = employeeDependents.length * TAX_CONFIG.DEPENDENT_DEDUCTION
+
+                  // BHXH Deduction (10.5% of Insurance Salary)
+                  const empInsurance = insuranceInfo.find(i => i.employeeId === tax.employeeId && i.status === 'Đang tham gia')
+                  const insuranceDeduction = empInsurance ? (Number(empInsurance.mucLuongDongBHXH || 0) * 0.105) : 0
+
+                  // 2. Calculate Assessable Income
+                  // Formula: Input - Personal - Dependent - Insurance
+                  const inputIncome = Number(tax.thuNhapTinhThue || 0)
+                  const assessableIncome = Math.max(0, inputIncome - personalDeduction - dependentDeduction - insuranceDeduction)
+
+                  // 3. Calculate Tax using progressive formula
+                  const taxAmount = calculateProgressiveTax(assessableIncome)
+
                   return (
                     <tr key={tax.id}>
                       <td>{idx + 1}</td>
                       <td>{employee ? (employee.id || '-') : '-'}</td>
                       <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
                       <td>{tax.maSoThue || tax.mst || '-'}</td>
-                      <td>{formatMoney(tax.thuNhapTinhThue || 0)}</td>
-                      <td>{formatMoney(tax.giamTruBanThan || 15500000)}</td>
-                      <td>{formatMoney(tax.tongGiamTruNguoiPhuThuoc || 0)}</td>
-                      <td>{formatMoney(tax.thuNhapChiuThue || 0)}</td>
+                      <td>{formatMoney(inputIncome)}</td>
+                      <td>{formatMoney(personalDeduction)}</td>
+                      <td>{formatMoney(dependentDeduction)}</td>
+                      <td>{formatMoney(assessableIncome)}</td>
                       <td>{tax.bieuThue || 'Lũy tiến'}</td>
-                      <td style={{ fontWeight: 700, color: 'var(--danger)' }}>{formatMoney(tax.thuePhaiNop || 0)}</td>
+                      <td style={{ fontWeight: 700, color: 'var(--danger)' }}>{formatMoney(taxAmount)}</td>
                       <td>{tax.kyApDung || tax.period || '-'}</td>
                       <td>
                         <div className="actions">

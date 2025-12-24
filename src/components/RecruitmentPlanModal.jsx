@@ -1,7 +1,81 @@
 import { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
 
-function RecruitmentPlanModal({ plan, isOpen, onClose, onSave, readOnly = false }) {
+// Internal component for searchable input
+const SearchableInput = ({ label, name, value, onChange, options = [], disabled, placeholder, required }) => {
+  const [showSuggestions, setShowSuggestions] = useState(false)
+
+  // Filter options based on input
+  // Display all options if input is empty, or filter by includes
+  const filteredOptions = options.filter(opt =>
+    !value || opt.toLowerCase().includes(value.toLowerCase())
+  )
+
+  return (
+    <div className="form-group" style={{ position: 'relative' }}>
+      <label>{label}</label>
+      <input
+        type="text"
+        name={name}
+        value={value}
+        onChange={onChange}
+        required={required}
+        disabled={disabled}
+        placeholder={placeholder}
+        onFocus={() => setShowSuggestions(true)}
+        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} // Delay to allow click
+        autoComplete="off"
+      />
+
+      {/* Custom Dropdown */}
+      {showSuggestions && !disabled && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '0 0 6px 6px',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+          zIndex: 1000,
+          maxHeight: '200px',
+          overflowY: 'auto',
+          marginTop: '-1px'
+        }}>
+          {filteredOptions.length > 0 ? (
+            filteredOptions.map((opt, idx) => (
+              <div
+                key={idx}
+                onClick={() => {
+                  // Simulate change event
+                  onChange({ target: { name, value: opt } })
+                  setShowSuggestions(false)
+                }}
+                style={{
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                  borderBottom: idx === filteredOptions.length - 1 ? 'none' : '1px solid #f1f5f9',
+                  color: '#334155',
+                  transition: 'background 0.2s',
+                  fontSize: '14px'
+                }}
+                onMouseEnter={(e) => e.target.style.background = '#f8fafc'}
+                onMouseLeave={(e) => e.target.style.background = '#fff'}
+              >
+                {opt}
+              </div>
+            ))
+          ) : (
+            null
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RecruitmentPlanModal({ plan, isOpen, onClose, onSave, readOnly = false, departments = [], positions = [] }) {
   const [formData, setFormData] = useState({
     bo_phan: '',
     vi_tri: '',
@@ -93,28 +167,26 @@ function RecruitmentPlanModal({ plan, isOpen, onClose, onSave, readOnly = false 
         <div className="modal-body">
           <form onSubmit={handleSubmit}>
             <div className="form-row">
-              <div className="form-group">
-                <label>Bộ phận *</label>
-                <input
-                  type="text"
-                  name="bo_phan"
-                  value={formData.bo_phan}
-                  onChange={handleChange}
-                  required
-                  disabled={readOnly}
-                />
-              </div>
-              <div className="form-group">
-                <label>Vị trí *</label>
-                <input
-                  type="text"
-                  name="vi_tri"
-                  value={formData.vi_tri}
-                  onChange={handleChange}
-                  required
-                  disabled={readOnly}
-                />
-              </div>
+              <SearchableInput
+                label="Bộ phận *"
+                name="bo_phan"
+                value={formData.bo_phan}
+                onChange={handleChange}
+                options={departments}
+                disabled={readOnly}
+                required
+                placeholder="Nhập hoặc chọn bộ phận"
+              />
+              <SearchableInput
+                label="Vị trí *"
+                name="vi_tri"
+                value={formData.vi_tri}
+                onChange={handleChange}
+                options={positions}
+                disabled={readOnly}
+                required
+                placeholder="Nhập hoặc chọn vị trí"
+              />
             </div>
 
             <div className="form-row">

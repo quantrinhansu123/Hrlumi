@@ -754,6 +754,8 @@ function Recruitment() {
         }}
         onSave={loadData}
         readOnly={isPlanReadOnly}
+        departments={[...new Set(employees.map(e => e.bo_phan || e.department).filter(Boolean))].sort()}
+        positions={[...new Set(employees.map(e => e.vi_tri || e.position).filter(Boolean))].sort()}
       />
 
       <CandidateModal
