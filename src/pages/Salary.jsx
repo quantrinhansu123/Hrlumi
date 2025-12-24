@@ -35,6 +35,7 @@ function Salary() {
   const [selectedEmployeeForHistory, setSelectedEmployeeForHistory] = useState(null)
   const [selectedInsurance, setSelectedInsurance] = useState(null)
   const [selectedTax, setSelectedTax] = useState(null)
+  const [isTaxReadOnly, setIsTaxReadOnly] = useState(false)
 
   // Excel Import/Export states for Insurance
   const [isInsuranceImportModalOpen, setIsInsuranceImportModalOpen] = useState(false)
@@ -917,6 +918,7 @@ function Salary() {
                             title="Xem chi tiết"
                             onClick={() => {
                               setSelectedTax(tax)
+                              setIsTaxReadOnly(true)
                               setIsTaxModalOpen(true)
                             }}
                           >
@@ -926,6 +928,7 @@ function Salary() {
                             className="edit"
                             onClick={() => {
                               setSelectedTax(tax)
+                              setIsTaxReadOnly(false)
                               setIsTaxModalOpen(true)
                             }}
                           >
@@ -1012,8 +1015,10 @@ function Salary() {
         onClose={() => {
           setIsTaxModalOpen(false)
           setSelectedTax(null)
+          setIsTaxReadOnly(false)
         }}
         onSave={loadData}
+        readOnly={isTaxReadOnly}
       />
 
       {/* Import Excel Modal for Insurance */}

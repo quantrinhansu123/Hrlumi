@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
 
-function CandidateModal({ candidate, isOpen, onClose, onSave }) {
+function CandidateModal({ candidate, isOpen, onClose, onSave, readOnly = false }) {
   const [formData, setFormData] = useState({
     ho_ten: '',
     vi_tri_ung_tuyen: '',
@@ -93,6 +93,8 @@ function CandidateModal({ candidate, isOpen, onClose, onSave }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (readOnly) return
+
     try {
       if (!formData.ho_ten || !formData.vi_tri_ung_tuyen || !formData.bo_phan) {
         alert('Vui lòng nhập Họ tên, Vị trí ứng tuyển và Bộ phận')
@@ -145,13 +147,18 @@ function CandidateModal({ candidate, isOpen, onClose, onSave }) {
 
   if (!isOpen) return null
 
+  const getTitle = () => {
+    if (readOnly) return 'Chi tiết hồ sơ ứng viên'
+    return candidate ? 'Sửa CV ứng viên' : 'Tạo mới CV ứng viên'
+  }
+
   return (
     <div className="modal show" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px' }}>
         <div className="modal-header">
           <h3>
-            <i className="fas fa-user-tie"></i>
-            {candidate ? 'Sửa CV ứng viên' : 'Tạo mới CV ứng viên'}
+            <i className={readOnly ? "fas fa-eye" : "fas fa-user-tie"}></i>
+            {getTitle()}
           </h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
@@ -166,6 +173,7 @@ function CandidateModal({ candidate, isOpen, onClose, onSave }) {
                   value={formData.ho_ten}
                   onChange={handleChange}
                   required
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -176,6 +184,7 @@ function CandidateModal({ candidate, isOpen, onClose, onSave }) {
                   value={formData.vi_tri_ung_tuyen}
                   onChange={handleChange}
                   required
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -189,6 +198,7 @@ function CandidateModal({ candidate, isOpen, onClose, onSave }) {
                   value={formData.bo_phan}
                   onChange={handleChange}
                   required
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -199,6 +209,7 @@ function CandidateModal({ candidate, isOpen, onClose, onSave }) {
                   value={formData.nguon_cv}
                   onChange={handleChange}
                   placeholder="VD: Facebook, Giới thiệu, Website..."
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -211,6 +222,7 @@ function CandidateModal({ candidate, isOpen, onClose, onSave }) {
                   name="sdt"
                   value={formData.sdt}
                   onChange={handleChange}
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -220,6 +232,7 @@ function CandidateModal({ candidate, isOpen, onClose, onSave }) {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -231,6 +244,7 @@ function CandidateModal({ candidate, isOpen, onClose, onSave }) {
                   name="trang_thai"
                   value={formData.trang_thai}
                   onChange={handleChange}
+                  disabled={readOnly}
                 >
                   <option value="CV tiếp nhận">CV tiếp nhận</option>
                   <option value="CV đã liên hệ">CV đã liên hệ</option>
@@ -246,6 +260,7 @@ function CandidateModal({ candidate, isOpen, onClose, onSave }) {
                   name="ngay_tiep_nhan"
                   value={formData.ngay_tiep_nhan}
                   onChange={handleChange}
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -274,6 +289,7 @@ function CandidateModal({ candidate, isOpen, onClose, onSave }) {
                           }`} style={{ color: file.type?.includes('pdf') ? '#d32f2f' : '#2196f3' }}></i>
                         <span style={{ flex: 1 }}>{file.name || `File ${idx + 1}`}</span>
                       </div>
+
                       <div style={{ display: 'flex', gap: '5px' }}>
                         <button
                           type="button"
@@ -296,48 +312,54 @@ function CandidateModal({ candidate, isOpen, onClose, onSave }) {
                         >
                           <i className="fas fa-download"></i>
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => removeFile(idx)}
-                          style={{
-                            background: 'var(--danger)',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            padding: '4px 8px',
-                            cursor: 'pointer',
-                            fontSize: '12px'
-                          }}
-                          title="Xóa"
-                        >
-                          <i className="fas fa-trash"></i>
-                        </button>
+                        {!readOnly && (
+                          <button
+                            type="button"
+                            onClick={() => removeFile(idx)}
+                            style={{
+                              background: 'var(--danger)',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              padding: '4px 8px',
+                              cursor: 'pointer',
+                              fontSize: '12px'
+                            }}
+                            title="Xóa"
+                          >
+                            <i className="fas fa-trash"></i>
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-              <input
-                type="file"
-                multiple
-                onChange={handleFilesChange}
-                accept=".pdf,.doc,.docx"
-              />
+              {!readOnly && (
+                <input
+                  type="file"
+                  multiple
+                  onChange={handleFilesChange}
+                  accept=".pdf,.doc,.docx"
+                />
+              )}
             </div>
 
             <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button type="button" className="btn" onClick={onClose}>
-                Hủy
+                {readOnly ? 'Đóng' : 'Hủy'}
               </button>
-              <button type="submit" className="btn btn-primary">
-                <i className="fas fa-save"></i>
-                Lưu
-              </button>
+              {!readOnly && (
+                <button type="submit" className="btn btn-primary">
+                  <i className="fas fa-save"></i>
+                  Lưu
+                </button>
+              )}
             </div>
           </form>
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   )
 }
 

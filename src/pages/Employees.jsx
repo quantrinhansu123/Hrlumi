@@ -14,6 +14,7 @@ function Employees() {
   const [filterStatus, setFilterStatus] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState(null)
+  const [isReadOnly, setIsReadOnly] = useState(false)
   const fileInputRef = useRef(null)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
@@ -528,6 +529,7 @@ function Employees() {
                           title="Xem"
                           onClick={() => {
                             setSelectedEmployee(emp)
+                            setIsReadOnly(true)
                             setIsModalOpen(true)
                           }}
                         >
@@ -538,6 +540,7 @@ function Employees() {
                           title="Sửa"
                           onClick={() => {
                             setSelectedEmployee(emp)
+                            setIsReadOnly(false)
                             setIsModalOpen(true)
                           }}
                         >
@@ -572,8 +575,10 @@ function Employees() {
         onClose={() => {
           setIsModalOpen(false)
           setSelectedEmployee(null)
+          setIsReadOnly(false)
         }}
         onSave={loadEmployees}
+        readOnly={isReadOnly}
       />
 
       {isImportModalOpen && (

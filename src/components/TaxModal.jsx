@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
 import { formatMoney } from '../utils/helpers'
 
-function TaxModal({ tax, employees, dependents, insuranceList, isOpen, onClose, onSave }) {
+function TaxModal({ tax, employees, dependents, insuranceList, isOpen, onClose, onSave, readOnly = false }) {
   const [formData, setFormData] = useState({
     employeeId: '',
     maSoThue: '',
@@ -92,6 +92,7 @@ function TaxModal({ tax, employees, dependents, insuranceList, isOpen, onClose, 
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (readOnly) return
     try {
       const employeeDependents = formData.employeeId ? dependents.filter(d => d.employeeId === formData.employeeId && d.status === 'Đang áp dụng') : []
       const totalDependentDeduction = employeeDependents.length * 6200000
@@ -152,8 +153,8 @@ function TaxModal({ tax, employees, dependents, insuranceList, isOpen, onClose, 
       <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px' }}>
         <div className="modal-header">
           <h3>
-            <i className="fas fa-file-invoice-dollar"></i>
-            {tax ? 'Sửa thông tin Thuế TNCN' : 'Thêm thông tin Thuế TNCN'}
+            <i className={`fas ${readOnly ? 'fa-eye' : 'fa-file-invoice-dollar'}`}></i>
+            {readOnly ? 'Chi tiết Thuế TNCN' : (tax ? 'Sửa thông tin Thuế TNCN' : 'Thêm thông tin Thuế TNCN')}
           </h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
@@ -166,6 +167,7 @@ function TaxModal({ tax, employees, dependents, insuranceList, isOpen, onClose, 
                 value={formData.employeeId}
                 onChange={handleChange}
                 required
+                disabled={readOnly}
               >
                 <option value="">Chọn nhân viên</option>
                 {employees.map(emp => (
@@ -185,6 +187,7 @@ function TaxModal({ tax, employees, dependents, insuranceList, isOpen, onClose, 
                   value={formData.maSoThue}
                   onChange={handleChange}
                   placeholder="..."
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -195,6 +198,7 @@ function TaxModal({ tax, employees, dependents, insuranceList, isOpen, onClose, 
                   value={formData.kyApDung}
                   onChange={handleChange}
                   required
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -209,6 +213,7 @@ function TaxModal({ tax, employees, dependents, insuranceList, isOpen, onClose, 
                   onChange={handleChange}
                   required
                   min="0"
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -219,6 +224,7 @@ function TaxModal({ tax, employees, dependents, insuranceList, isOpen, onClose, 
                   value={formData.giamTruBanThan}
                   onChange={handleChange}
                   min="0"
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -229,6 +235,7 @@ function TaxModal({ tax, employees, dependents, insuranceList, isOpen, onClose, 
                 name="bieuThue"
                 value={formData.bieuThue}
                 onChange={handleChange}
+                disabled={readOnly}
               >
                 <option value="Lũy tiến">Lũy tiến</option>
                 <option value="Toàn phần">Toàn phần (10%)</option>
@@ -273,12 +280,14 @@ function TaxModal({ tax, employees, dependents, insuranceList, isOpen, onClose, 
 
             <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button type="button" className="btn" onClick={onClose}>
-                Hủy
+                {readOnly ? 'Đóng' : 'Hủy'}
               </button>
-              <button type="submit" className="btn btn-primary">
-                <i className="fas fa-save"></i>
-                Lưu
-              </button>
+              {!readOnly && (
+                <button type="submit" className="btn btn-primary">
+                  <i className="fas fa-save"></i>
+                  Lưu
+                </button>
+              )}
             </div>
           </form>
         </div>

@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
 
-function RecruitmentPlanModal({ plan, isOpen, onClose, onSave }) {
+function RecruitmentPlanModal({ plan, isOpen, onClose, onSave, readOnly = false }) {
   const [formData, setFormData] = useState({
     bo_phan: '',
     vi_tri: '',
@@ -43,6 +43,8 @@ function RecruitmentPlanModal({ plan, isOpen, onClose, onSave }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (readOnly) return
+
     try {
       const payload = {
         bo_phan: formData.bo_phan.trim(),
@@ -73,13 +75,18 @@ function RecruitmentPlanModal({ plan, isOpen, onClose, onSave }) {
 
   if (!isOpen) return null
 
+  const getTitle = () => {
+    if (readOnly) return 'Chi tiết định biên nhân sự'
+    return plan ? 'Sửa định biên nhân sự' : 'Tạo mới định biên nhân sự'
+  }
+
   return (
     <div className="modal show" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>
-            <i className="fas fa-users-cog"></i>
-            {plan ? 'Sửa định biên nhân sự' : 'Tạo mới định biên nhân sự'}
+            <i className={readOnly ? "fas fa-eye" : "fas fa-users-cog"}></i>
+            {getTitle()}
           </h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
@@ -94,6 +101,7 @@ function RecruitmentPlanModal({ plan, isOpen, onClose, onSave }) {
                   value={formData.bo_phan}
                   onChange={handleChange}
                   required
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -104,6 +112,7 @@ function RecruitmentPlanModal({ plan, isOpen, onClose, onSave }) {
                   value={formData.vi_tri}
                   onChange={handleChange}
                   required
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -117,6 +126,7 @@ function RecruitmentPlanModal({ plan, isOpen, onClose, onSave }) {
                   value={formData.nhan_su_hien_co}
                   onChange={handleChange}
                   min="0"
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -127,6 +137,7 @@ function RecruitmentPlanModal({ plan, isOpen, onClose, onSave }) {
                   value={formData.dinh_bien}
                   onChange={handleChange}
                   min="0"
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -139,17 +150,20 @@ function RecruitmentPlanModal({ plan, isOpen, onClose, onSave }) {
                 onChange={handleChange}
                 rows="3"
                 placeholder="VD: Mở rộng thị trường, bổ sung nhân sự Ads cứng..."
+                disabled={readOnly}
               />
             </div>
 
             <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button type="button" className="btn" onClick={onClose}>
-                Hủy
+                {readOnly ? 'Đóng' : 'Hủy'}
               </button>
-              <button type="submit" className="btn btn-primary">
-                <i className="fas fa-save"></i>
-                Lưu
-              </button>
+              {!readOnly && (
+                <button type="submit" className="btn btn-primary">
+                  <i className="fas fa-save"></i>
+                  Lưu
+                </button>
+              )}
             </div>
           </form>
         </div>

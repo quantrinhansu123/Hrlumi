@@ -13,9 +13,11 @@ function Recruitment() {
 
   const [selectedPlan, setSelectedPlan] = useState(null)
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false)
+  const [isPlanReadOnly, setIsPlanReadOnly] = useState(false)
 
   const [selectedCandidate, setSelectedCandidate] = useState(null)
   const [isCandidateModalOpen, setIsCandidateModalOpen] = useState(false)
+  const [isCandidateReadOnly, setIsCandidateReadOnly] = useState(false)
 
   const [filterPosition, setFilterPosition] = useState('')
 
@@ -564,10 +566,22 @@ function Recruitment() {
                     <td>
                       <div className="actions">
                         <button
+                          className="view"
+                          title="Xem"
+                          onClick={() => {
+                            setSelectedPlan(plan)
+                            setIsPlanReadOnly(true)
+                            setIsPlanModalOpen(true)
+                          }}
+                        >
+                          <i className="fas fa-eye"></i>
+                        </button>
+                        <button
                           className="edit"
                           title="Sửa"
                           onClick={() => {
                             setSelectedPlan(plan)
+                            setIsPlanReadOnly(false)
                             setIsPlanModalOpen(true)
                           }}
                         >
@@ -676,13 +690,25 @@ function Recruitment() {
                       <div className="actions">
                         <button
                           className="view"
-                          title="Xem / Sửa"
+                          title="Xem"
                           onClick={() => {
                             setSelectedCandidate(c)
+                            setIsCandidateReadOnly(true)
                             setIsCandidateModalOpen(true)
                           }}
                         >
                           <i className="fas fa-eye"></i>
+                        </button>
+                        <button
+                          className="edit"
+                          title="Sửa"
+                          onClick={() => {
+                            setSelectedCandidate(c)
+                            setIsCandidateReadOnly(false)
+                            setIsCandidateModalOpen(true)
+                          }}
+                        >
+                          <i className="fas fa-edit"></i>
                         </button>
                         {showConvert && (
                           <button
@@ -724,8 +750,10 @@ function Recruitment() {
         onClose={() => {
           setIsPlanModalOpen(false)
           setSelectedPlan(null)
+          setIsPlanReadOnly(false)
         }}
         onSave={loadData}
+        readOnly={isPlanReadOnly}
       />
 
       <CandidateModal
@@ -734,8 +762,10 @@ function Recruitment() {
         onClose={() => {
           setIsCandidateModalOpen(false)
           setSelectedCandidate(null)
+          setIsCandidateReadOnly(false)
         }}
         onSave={loadData}
+        readOnly={isCandidateReadOnly}
       />
 
       {/* Import Excel Modal for Candidates */}

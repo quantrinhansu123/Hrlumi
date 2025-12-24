@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
 
-function EmployeeModal({ employee, isOpen, onClose, onSave }) {
+function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) {
   const [formData, setFormData] = useState({
     ho_va_ten: '',
     email: '',
@@ -89,7 +89,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
   const handleAvatarChange = async (e) => {
     const file = e.target.files[0]
     if (!file) return
-    
+
     if (file.type.startsWith('image/')) {
       const reader = new FileReader()
       reader.onload = (e) => {
@@ -104,7 +104,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
   const handleImagesChange = async (e) => {
     const files = Array.from(e.target.files)
     const newImages = []
-    
+
     for (const file of files) {
       if (file.type.startsWith('image/')) {
         const reader = new FileReader()
@@ -112,9 +112,9 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
           newImages.push(e.target.result)
           if (newImages.length === files.length) {
             setImagesPreview([...imagesPreview, ...newImages])
-            setFormData({ 
-              ...formData, 
-              images: [...formData.images, ...newImages] 
+            setFormData({
+              ...formData,
+              images: [...formData.images, ...newImages]
             })
           }
         }
@@ -126,7 +126,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
   const handleFilesChange = async (e) => {
     const files = Array.from(e.target.files)
     const newFiles = []
-    
+
     for (const file of files) {
       const reader = new FileReader()
       reader.onload = (e) => {
@@ -137,9 +137,9 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
         })
         if (newFiles.length === files.length) {
           setFilesPreview([...filesPreview, ...newFiles])
-          setFormData({ 
-            ...formData, 
-            files: [...formData.files, ...newFiles] 
+          setFormData({
+            ...formData,
+            files: [...formData.files, ...newFiles]
           })
         }
       }
@@ -161,6 +161,8 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (readOnly) return
+
     try {
       const oldStatus = employee ? (employee.trang_thai || employee.status || '') : ''
       const newStatus = formData.trang_thai
@@ -194,13 +196,18 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
 
   if (!isOpen) return null
 
+  const getTitle = () => {
+    if (readOnly) return 'Chi tiết hồ sơ nhân viên'
+    return employee ? 'Sửa nhân viên' : 'Thêm nhân viên mới'
+  }
+
   return (
     <div className="modal show" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>
-            <i className="fas fa-user"></i>
-            {employee ? 'Sửa nhân viên' : 'Thêm nhân viên mới'}
+            <i className={readOnly ? "fas fa-eye" : "fas fa-user"}></i>
+            {getTitle()}
           </h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
@@ -215,6 +222,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
                   value={formData.ho_va_ten}
                   onChange={handleChange}
                   required
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -224,6 +232,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -236,6 +245,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
                   name="sđt"
                   value={formData.sđt}
                   onChange={handleChange}
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -244,6 +254,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
                   name="chi_nhanh"
                   value={formData.chi_nhanh}
                   onChange={handleChange}
+                  disabled={readOnly}
                 >
                   <option value="HCM">HCM</option>
                   <option value="Hà Nội">Hà Nội</option>
@@ -259,6 +270,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
                   name="bo_phan"
                   value={formData.bo_phan}
                   onChange={handleChange}
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -268,6 +280,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
                   name="vi_tri"
                   value={formData.vi_tri}
                   onChange={handleChange}
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -279,6 +292,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
                   name="trang_thai"
                   value={formData.trang_thai}
                   onChange={handleChange}
+                  disabled={readOnly}
                 >
                   <option value="Thử việc">Thử việc</option>
                   <option value="Chính thức">Chính thức</option>
@@ -293,6 +307,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
                   name="ngay_vao_lam"
                   value={formData.ngay_vao_lam}
                   onChange={handleChange}
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -306,6 +321,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
                   value={formData.cccd}
                   onChange={handleChange}
                   placeholder="Số CCCD/CMND"
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -315,6 +331,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
                   name="ngay_cap"
                   value={formData.ngay_cap}
                   onChange={handleChange}
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -328,6 +345,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
                   value={formData.noi_cap}
                   onChange={handleChange}
                   placeholder="Nơi cấp CCCD/CMND"
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -338,6 +356,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
                   value={formData.que_quan}
                   onChange={handleChange}
                   placeholder="Quê quán"
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -349,6 +368,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
                   name="gioi_tinh"
                   value={formData.gioi_tinh}
                   onChange={handleChange}
+                  disabled={readOnly}
                 >
                   <option value="">-- Chọn giới tính --</option>
                   <option value="Nam">Nam</option>
@@ -362,6 +382,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
                   name="tinh_trang_hon_nhan"
                   value={formData.tinh_trang_hon_nhan}
                   onChange={handleChange}
+                  disabled={readOnly}
                 >
                   <option value="">-- Chọn tình trạng --</option>
                   <option value="Độc thân">Độc thân</option>
@@ -377,8 +398,8 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
               <label>Ảnh đại diện</label>
               {avatarPreview && (
                 <div style={{ marginBottom: '10px' }}>
-                  <img 
-                    src={avatarPreview} 
+                  <img
+                    src={avatarPreview}
                     alt="Avatar"
                     style={{
                       width: '100px',
@@ -389,11 +410,13 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
                   />
                 </div>
               )}
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarChange}
-              />
+              {!readOnly && (
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                />
+              )}
             </div>
 
             {/* Multiple Images */}
@@ -403,8 +426,8 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
                   {imagesPreview.map((img, idx) => (
                     <div key={idx} style={{ position: 'relative' }}>
-                      <img 
-                        src={img} 
+                      <img
+                        src={img}
                         alt={`Preview ${idx}`}
                         style={{
                           width: '80px',
@@ -413,33 +436,37 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
                           borderRadius: '4px'
                         }}
                       />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(idx)}
-                        style={{
-                          position: 'absolute',
-                          top: '4px',
-                          right: '4px',
-                          background: 'var(--danger)',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '4px',
-                          padding: '2px 6px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        ×
-                      </button>
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          style={{
+                            position: 'absolute',
+                            top: '4px',
+                            right: '4px',
+                            background: 'var(--danger)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '2px 6px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ×
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
               )}
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleImagesChange}
-              />
+              {!readOnly && (
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImagesChange}
+                />
+              )}
             </div>
 
             {/* Multiple Files */}
@@ -448,8 +475,8 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
               {filesPreview.length > 0 && (
                 <div style={{ marginBottom: '10px' }}>
                   {filesPreview.map((file, idx) => (
-                    <div key={idx} style={{ 
-                      display: 'flex', 
+                    <div key={idx} style={{
+                      display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       padding: '5px',
@@ -458,39 +485,45 @@ function EmployeeModal({ employee, isOpen, onClose, onSave }) {
                       marginBottom: '5px'
                     }}>
                       <span>{file.name || `File ${idx + 1}`}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeFile(idx)}
-                        style={{
-                          background: 'var(--danger)',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '4px',
-                          padding: '2px 6px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        ×
-                      </button>
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          onClick={() => removeFile(idx)}
+                          style={{
+                            background: 'var(--danger)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '2px 6px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ×
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
               )}
-              <input
-                type="file"
-                multiple
-                onChange={handleFilesChange}
-              />
+              {!readOnly && (
+                <input
+                  type="file"
+                  multiple
+                  onChange={handleFilesChange}
+                />
+              )}
             </div>
 
             <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button type="button" className="btn" onClick={onClose}>
-                Hủy
+                {readOnly ? 'Đóng' : 'Hủy'}
               </button>
-              <button type="submit" className="btn btn-primary">
-                <i className="fas fa-save"></i>
-                Lưu
-              </button>
+              {!readOnly && (
+                <button type="submit" className="btn btn-primary">
+                  <i className="fas fa-save"></i>
+                  Lưu
+                </button>
+              )}
             </div>
           </form>
         </div>
