@@ -108,6 +108,19 @@ function Attendance() {
     }
   }
 
+  const handleDeleteAllAttendance = async () => {
+    if (!confirm('CẢNH BÁO: Bạn có chắc chắn muốn XÓA TOÀN BỘ dữ liệu chấm công không? Hành động này không thể hoàn tác!')) return
+    try {
+      setLoading(true)
+      await fbDelete('hr/attendanceLogs')
+      loadData()
+      alert('Đã xóa toàn bộ dữ liệu chấm công thành công!')
+    } catch (error) {
+      alert('Lỗi khi xóa dữ liệu: ' + error.message)
+      setLoading(false)
+    }
+  }
+
   const handleDeleteInsurance = async (id) => {
     if (!confirm('Bạn có chắc muốn xóa thông tin BHXH này?')) return
     try {
@@ -280,6 +293,14 @@ function Attendance() {
               <i className="fas fa-plus"></i>
               Thêm chấm công
             </button>
+            <button
+              className="btn btn-danger"
+              onClick={handleDeleteAllAttendance}
+              title="Xóa tất cả dữ liệu chấm công"
+            >
+              <i className="fas fa-trash-alt"></i>
+              Xóa tất cả
+            </button>
             <SeedAttendanceDataButton employees={employees} onComplete={loadData} />
           </>
         )}
@@ -397,7 +418,9 @@ function Attendance() {
                   <th>Họ và tên</th>
                   <th>Ngày</th>
                   <th>Check-in đầu</th>
+                  <th>Đi muộn (phút)</th>
                   <th>Check-out cuối</th>
+                  <th>Về sớm (phút)</th>
                   <th>Số giờ làm</th>
                   <th>Trạng thái</th>
                   <th>Thao tác</th>
@@ -411,6 +434,22 @@ function Attendance() {
                       const date = new Date(log.date || log.timestamp)
                       const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
                       return monthStr === filterAttendanceMonth
+                    })
+                    .sort((a, b) => {
+                      // Sort by employee name first
+                      const empA = employees.find(e => e.id === a.employeeId)
+                      const empB = employees.find(e => e.id === b.employeeId)
+                      const nameA = empA?.ho_va_ten || empA?.name || a.employeeId || ''
+                      const nameB = empB?.ho_va_ten || empB?.name || b.employeeId || ''
+
+                      if (nameA !== nameB) {
+                        return nameA.localeCompare(nameB, 'vi')
+                      }
+
+                      // Then sort by date
+                      const dateA = new Date(a.date || a.timestamp).getTime()
+                      const dateB = new Date(b.date || b.timestamp).getTime()
+                      return dateA - dateB
                     })
                     .map((log, idx) => {
                       const employee = employees.find(e => e.id === log.employeeId)
@@ -430,7 +469,13 @@ function Attendance() {
                           <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
                           <td>{log.date ? new Date(log.date).toLocaleDateString('vi-VN') : '-'}</td>
                           <td>{checkIn}</td>
+                          <td style={{ color: log.lateMinutes > 0 ? '#dc3545' : '#6c757d' }}>
+                            {log.lateMinutes > 0 ? `${log.lateMinutes}p` : '-'}
+                          </td>
                           <td>{checkOut}</td>
+                          <td style={{ color: log.earlyMinutes > 0 ? '#ffc107' : '#6c757d' }}>
+                            {log.earlyMinutes > 0 ? `${log.earlyMinutes}p` : '-'}
+                          </td>
                           <td>{typeof hours === 'number' && !isNaN(hours) ? hours.toFixed(1) + 'h' : '0.0h'}</td>
                           <td>
                             <span className={`badge ${log.status === 'Đủ' ? 'badge-success' :
