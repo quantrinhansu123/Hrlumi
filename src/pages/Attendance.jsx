@@ -36,6 +36,12 @@ function Attendance() {
   const [selectedDependent, setSelectedDependent] = useState(null)
   const [selectedPayslip, setSelectedPayslip] = useState(null)
 
+  // Read-only states
+  const [isPayrollReadOnly, setIsPayrollReadOnly] = useState(false)
+  const [isInsuranceReadOnly, setIsInsuranceReadOnly] = useState(false)
+  const [isDependentReadOnly, setIsDependentReadOnly] = useState(false)
+  const [isTaxReadOnly, setIsTaxReadOnly] = useState(false)
+
   // Filters
   const [filterPayrollPeriod, setFilterPayrollPeriod] = useState('')
   const [filterPayrollDept, setFilterPayrollDept] = useState('')
@@ -513,6 +519,7 @@ function Attendance() {
                               className="view"
                               onClick={() => {
                                 setSelectedPayroll(payroll)
+                                setIsPayrollReadOnly(true)
                                 setIsPayrollDetailModalOpen(true)
                               }}
                             >
@@ -523,6 +530,7 @@ function Attendance() {
                                 className="edit"
                                 onClick={() => {
                                   setSelectedPayroll(payroll)
+                                  setIsPayrollReadOnly(false)
                                   setIsPayrollDetailModalOpen(true)
                                 }}
                               >
@@ -605,6 +613,7 @@ function Attendance() {
                             className="view"
                             onClick={() => {
                               setSelectedInsurance(insurance)
+                              setIsInsuranceReadOnly(true)
                               setIsInsuranceModalOpen(true)
                             }}
                           >
@@ -614,6 +623,7 @@ function Attendance() {
                             className="edit"
                             onClick={() => {
                               setSelectedInsurance(insurance)
+                              setIsInsuranceReadOnly(false)
                               setIsInsuranceModalOpen(true)
                             }}
                           >
@@ -687,6 +697,7 @@ function Attendance() {
                               className="view"
                               onClick={() => {
                                 setSelectedTax(tax)
+                                setIsTaxReadOnly(true)
                                 setIsTaxModalOpen(true)
                               }}
                             >
@@ -696,6 +707,7 @@ function Attendance() {
                               className="edit"
                               onClick={() => {
                                 setSelectedTax(tax)
+                                setIsTaxReadOnly(false)
                                 setIsTaxModalOpen(true)
                               }}
                             >
@@ -768,6 +780,7 @@ function Attendance() {
                               className="view"
                               onClick={() => {
                                 setSelectedDependent(dependent)
+                                setIsDependentReadOnly(true)
                                 setIsDependentModalOpen(true)
                               }}
                             >
@@ -777,6 +790,7 @@ function Attendance() {
                               className="edit"
                               onClick={() => {
                                 setSelectedDependent(dependent)
+                                setIsDependentReadOnly(false)
                                 setIsDependentModalOpen(true)
                               }}
                             >
@@ -819,8 +833,10 @@ function Attendance() {
         onClose={() => {
           setIsPayrollDetailModalOpen(false)
           setSelectedPayroll(null)
+          setIsPayrollReadOnly(false)
         }}
         onSave={loadData}
+        readOnly={isPayrollReadOnly}
       />
 
       <InsuranceModal
@@ -830,8 +846,10 @@ function Attendance() {
         onClose={() => {
           setIsInsuranceModalOpen(false)
           setSelectedInsurance(null)
+          setIsInsuranceReadOnly(false)
         }}
         onSave={loadData}
+        readOnly={isInsuranceReadOnly}
       />
 
       <TaxModal
@@ -842,8 +860,10 @@ function Attendance() {
         onClose={() => {
           setIsTaxModalOpen(false)
           setSelectedTax(null)
+          setIsTaxReadOnly(false)
         }}
         onSave={loadData}
+        readOnly={isTaxReadOnly}
       />
 
       <DependentModal
@@ -853,8 +873,10 @@ function Attendance() {
         onClose={() => {
           setIsDependentModalOpen(false)
           setSelectedDependent(null)
+          setIsDependentReadOnly(false)
         }}
         onSave={loadData}
+        readOnly={isDependentReadOnly}
       />
 
       <PayslipModal

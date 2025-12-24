@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
 import { formatMoney } from '../utils/helpers'
 
-function InsuranceModal({ insurance, employees, employeeSalaries, salaryGrades, isOpen, onClose, onSave }) {
+function InsuranceModal({ insurance, employees, employeeSalaries, salaryGrades, isOpen, onClose, onSave, readOnly = false }) {
   const [formData, setFormData] = useState({
     employeeId: '',
     soSoBHXH: '',
@@ -76,6 +76,7 @@ function InsuranceModal({ insurance, employees, employeeSalaries, salaryGrades, 
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (readOnly) return
     try {
       if (insurance && insurance.id) {
         await fbUpdate(`hr/insuranceInfo/${insurance.id}`, formData)
@@ -97,8 +98,8 @@ function InsuranceModal({ insurance, employees, employeeSalaries, salaryGrades, 
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>
-            <i className="fas fa-hospital"></i>
-            {insurance ? 'Sửa thông tin BHXH' : 'Thêm thông tin BHXH'}
+            <i className={`fas ${readOnly ? 'fa-eye' : 'fa-hospital'}`}></i>
+            {readOnly ? 'Chi tiết thông tin BHXH' : (insurance ? 'Sửa thông tin BHXH' : 'Thêm thông tin BHXH')}
           </h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
@@ -111,6 +112,7 @@ function InsuranceModal({ insurance, employees, employeeSalaries, salaryGrades, 
                 value={formData.employeeId}
                 onChange={handleChange}
                 required
+                disabled={readOnly}
               >
                 <option value="">Chọn nhân viên</option>
                 {employees.map(emp => (
@@ -131,6 +133,7 @@ function InsuranceModal({ insurance, employees, employeeSalaries, salaryGrades, 
                   onChange={handleChange}
                   required
                   placeholder="VD: 123456789"
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -141,6 +144,7 @@ function InsuranceModal({ insurance, employees, employeeSalaries, salaryGrades, 
                   value={formData.ngayThamGia}
                   onChange={handleChange}
                   required
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -155,6 +159,7 @@ function InsuranceModal({ insurance, employees, employeeSalaries, salaryGrades, 
                   onChange={handleChange}
                   required
                   min="0"
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -212,12 +217,14 @@ function InsuranceModal({ insurance, employees, employeeSalaries, salaryGrades, 
 
             <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button type="button" className="btn" onClick={onClose}>
-                Hủy
+                {readOnly ? 'Đóng' : 'Hủy'}
               </button>
-              <button type="submit" className="btn btn-primary">
-                <i className="fas fa-save"></i>
-                Lưu
-              </button>
+              {!readOnly && (
+                <button type="submit" className="btn btn-primary">
+                  <i className="fas fa-save"></i>
+                  Lưu
+                </button>
+              )}
             </div>
           </form>
         </div>

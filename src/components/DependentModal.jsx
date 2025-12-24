@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
 
-function DependentModal({ dependent, employees, isOpen, onClose, onSave }) {
+function DependentModal({ dependent, employees, isOpen, onClose, onSave, readOnly = false }) {
   const [formData, setFormData] = useState({
     employeeId: '',
     hoTen: '',
@@ -53,6 +53,7 @@ function DependentModal({ dependent, employees, isOpen, onClose, onSave }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (readOnly) return
     try {
       if (dependent && dependent.id) {
         await fbUpdate(`hr/dependents/${dependent.id}`, formData)
@@ -74,8 +75,8 @@ function DependentModal({ dependent, employees, isOpen, onClose, onSave }) {
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>
-            <i className="fas fa-users"></i>
-            {dependent ? 'Sửa người phụ thuộc' : 'Thêm người phụ thuộc'}
+            <i className={`fas ${readOnly ? 'fa-eye' : 'fa-users'}`}></i>
+            {readOnly ? 'Chi tiết người phụ thuộc' : (dependent ? 'Sửa người phụ thuộc' : 'Thêm người phụ thuộc')}
           </h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
@@ -88,6 +89,7 @@ function DependentModal({ dependent, employees, isOpen, onClose, onSave }) {
                 value={formData.employeeId}
                 onChange={handleChange}
                 required
+                disabled={readOnly}
               >
                 <option value="">Chọn nhân viên</option>
                 {employees.map(emp => (
@@ -107,6 +109,7 @@ function DependentModal({ dependent, employees, isOpen, onClose, onSave }) {
                   value={formData.hoTen}
                   onChange={handleChange}
                   required
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -116,6 +119,7 @@ function DependentModal({ dependent, employees, isOpen, onClose, onSave }) {
                   value={formData.quanHe}
                   onChange={handleChange}
                   required
+                  disabled={readOnly}
                 >
                   <option value="">Chọn quan hệ</option>
                   <option value="Con">Con</option>
@@ -137,6 +141,7 @@ function DependentModal({ dependent, employees, isOpen, onClose, onSave }) {
                   value={formData.ngaySinh}
                   onChange={handleChange}
                   required
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -147,6 +152,7 @@ function DependentModal({ dependent, employees, isOpen, onClose, onSave }) {
                   value={formData.cccd}
                   onChange={handleChange}
                   placeholder="..."
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -160,6 +166,7 @@ function DependentModal({ dependent, employees, isOpen, onClose, onSave }) {
                   value={formData.tuNgay}
                   onChange={handleChange}
                   required
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -169,6 +176,7 @@ function DependentModal({ dependent, employees, isOpen, onClose, onSave }) {
                   name="denNgay"
                   value={formData.denNgay}
                   onChange={handleChange}
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -179,6 +187,7 @@ function DependentModal({ dependent, employees, isOpen, onClose, onSave }) {
                 name="status"
                 value={formData.status}
                 onChange={handleChange}
+                disabled={readOnly}
               >
                 <option value="Đang áp dụng">Đang áp dụng</option>
                 <option value="Ngừng áp dụng">Ngừng áp dụng</option>
@@ -191,12 +200,14 @@ function DependentModal({ dependent, employees, isOpen, onClose, onSave }) {
 
             <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button type="button" className="btn" onClick={onClose}>
-                Hủy
+                {readOnly ? 'Đóng' : 'Hủy'}
               </button>
-              <button type="submit" className="btn btn-primary">
-                <i className="fas fa-save"></i>
-                Lưu
-              </button>
+              {!readOnly && (
+                <button type="submit" className="btn btn-primary">
+                  <i className="fas fa-save"></i>
+                  Lưu
+                </button>
+              )}
             </div>
           </form>
         </div>

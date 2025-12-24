@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
 import { formatMoney } from '../utils/helpers'
 
-function PayrollDetailModal({ payroll, employees, isOpen, onClose, onSave }) {
+function PayrollDetailModal({ payroll, employees, isOpen, onClose, onSave, readOnly = false }) {
   const [formData, setFormData] = useState({
     employeeId: '',
     period: '',
@@ -98,6 +98,7 @@ function PayrollDetailModal({ payroll, employees, isOpen, onClose, onSave }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (readOnly) return
     try {
       if (payroll && payroll.id) {
         await fbUpdate(`hr/payrolls/${payroll.id}`, formData)
@@ -119,8 +120,8 @@ function PayrollDetailModal({ payroll, employees, isOpen, onClose, onSave }) {
       <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px' }}>
         <div className="modal-header">
           <h3>
-            <i className="fas fa-money-bill-wave"></i>
-            {payroll ? 'Sửa bảng lương' : 'Thêm bảng lương'}
+            <i className={`fas ${readOnly ? 'fa-eye' : 'fa-money-bill-wave'}`}></i>
+            {readOnly ? 'Chi tiết bảng lương' : (payroll ? 'Sửa bảng lương' : 'Thêm bảng lương')}
           </h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
@@ -134,6 +135,7 @@ function PayrollDetailModal({ payroll, employees, isOpen, onClose, onSave }) {
                   value={formData.employeeId}
                   onChange={handleChange}
                   required
+                  disabled={readOnly}
                 >
                   <option value="">Chọn nhân viên</option>
                   {employees.map(emp => (
@@ -151,6 +153,7 @@ function PayrollDetailModal({ payroll, employees, isOpen, onClose, onSave }) {
                   value={formData.period}
                   onChange={handleChange}
                   required
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -165,6 +168,7 @@ function PayrollDetailModal({ payroll, employees, isOpen, onClose, onSave }) {
                   onChange={handleChange}
                   min="0"
                   step="0.5"
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -175,6 +179,7 @@ function PayrollDetailModal({ payroll, employees, isOpen, onClose, onSave }) {
                   value={formData.luongP1}
                   onChange={handleChange}
                   min="0"
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -188,6 +193,7 @@ function PayrollDetailModal({ payroll, employees, isOpen, onClose, onSave }) {
                   value={formData.ketQuaP3}
                   onChange={handleChange}
                   placeholder="100%"
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -213,6 +219,7 @@ function PayrollDetailModal({ payroll, employees, isOpen, onClose, onSave }) {
                   value={formData.luongNgayCong}
                   onChange={handleChange}
                   min="0"
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -223,6 +230,7 @@ function PayrollDetailModal({ payroll, employees, isOpen, onClose, onSave }) {
                   value={formData.thuongNong}
                   onChange={handleChange}
                   min="0"
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -238,6 +246,7 @@ function PayrollDetailModal({ payroll, employees, isOpen, onClose, onSave }) {
                     value={formData.bhxh}
                     onChange={handleChange}
                     min="0"
+                    disabled={readOnly}
                   />
                 </div>
                 <div className="form-group">
@@ -248,6 +257,7 @@ function PayrollDetailModal({ payroll, employees, isOpen, onClose, onSave }) {
                     value={formData.thueTNCN}
                     onChange={handleChange}
                     min="0"
+                    disabled={readOnly}
                   />
                 </div>
               </div>
@@ -260,6 +270,7 @@ function PayrollDetailModal({ payroll, employees, isOpen, onClose, onSave }) {
                     value={formData.tamUng}
                     onChange={handleChange}
                     min="0"
+                    disabled={readOnly}
                   />
                 </div>
                 <div className="form-group">
@@ -270,6 +281,7 @@ function PayrollDetailModal({ payroll, employees, isOpen, onClose, onSave }) {
                     value={formData.khac}
                     onChange={handleChange}
                     min="0"
+                    disabled={readOnly}
                   />
                 </div>
               </div>
@@ -296,6 +308,7 @@ function PayrollDetailModal({ payroll, employees, isOpen, onClose, onSave }) {
                 name="status"
                 value={formData.status}
                 onChange={handleChange}
+                disabled={readOnly}
               >
                 <option value="Đang tính">Đang tính</option>
                 <option value="Đã chốt">Đã chốt</option>
@@ -304,12 +317,14 @@ function PayrollDetailModal({ payroll, employees, isOpen, onClose, onSave }) {
 
             <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button type="button" className="btn" onClick={onClose}>
-                Hủy
+                {readOnly ? 'Đóng' : 'Hủy'}
               </button>
-              <button type="submit" className="btn btn-primary">
-                <i className="fas fa-save"></i>
-                Lưu
-              </button>
+              {!readOnly && (
+                <button type="submit" className="btn btn-primary">
+                  <i className="fas fa-save"></i>
+                  Lưu
+                </button>
+              )}
             </div>
           </form>
         </div>
