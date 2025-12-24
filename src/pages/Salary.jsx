@@ -33,9 +33,12 @@ function Salary() {
   const [selectedGrade, setSelectedGrade] = useState(null)
   const [selectedEmployeeSalary, setSelectedEmployeeSalary] = useState(null)
   const [selectedEmployeeForHistory, setSelectedEmployeeForHistory] = useState(null)
+  const [selectedPromotion, setSelectedPromotion] = useState(null)
   const [selectedInsurance, setSelectedInsurance] = useState(null)
   const [selectedTax, setSelectedTax] = useState(null)
+  const [isGradeReadOnly, setIsGradeReadOnly] = useState(false)
   const [isTaxReadOnly, setIsTaxReadOnly] = useState(false)
+  const [isEmployeeSalaryReadOnly, setIsEmployeeSalaryReadOnly] = useState(false)
   const [isInsuranceReadOnly, setIsInsuranceReadOnly] = useState(false)
 
   // Excel Import/Export states for Insurance
@@ -121,6 +124,30 @@ function Salary() {
       await fbDelete(`hr/employeeSalaries/${id}`)
       loadData()
       alert('Đã xóa bậc lương nhân viên')
+    } catch (error) {
+      alert('Lỗi khi xóa: ' + error.message)
+    }
+  }
+
+
+  const handleDeleteInsurance = async (id) => {
+    if (!confirm('Bạn có chắc muốn xóa thông tin bảo hiểm này?')) return
+    try {
+      await fbDelete(`hr/insuranceInfo/${id}`)
+      loadData()
+      alert('Đã xóa thông tin bảo hiểm')
+    } catch (error) {
+      alert('Lỗi khi xóa: ' + error.message)
+    }
+  }
+
+
+  const handleDeletePromotionHistory = async (id) => {
+    if (!confirm('Bạn có chắc muốn xóa lịch sử thăng tiến này?')) return
+    try {
+      await fbDelete(`hr/promotionHistory/${id}`)
+      loadData()
+      alert('Đã xóa lịch sử thăng tiến')
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)
     }
@@ -256,6 +283,18 @@ function Salary() {
       alert('Lỗi khi import: ' + error.message)
     } finally {
       setIsInsuranceImporting(false)
+    }
+  }
+
+
+  const handleDeleteTax = async (id) => {
+    if (!confirm('Bạn có chắc muốn xóa thông tin thuế này?')) return
+    try {
+      await fbDelete(`hr/taxInfo/${id}`)
+      loadData()
+      alert('Đã xóa thông tin thuế')
+    } catch (error) {
+      alert('Lỗi khi xóa: ' + error.message)
     }
   }
 
@@ -475,6 +514,7 @@ function Salary() {
             <button
               className="btn btn-primary"
               onClick={() => {
+                setSelectedPromotion(null)
                 setIsPromotionModalOpen(true)
               }}
             >
@@ -623,13 +663,24 @@ function Salary() {
                       <td>
                         <div className="actions">
                           <button
-                            className="edit"
+                            className="view"
                             onClick={() => {
                               setSelectedGrade(grade)
+                              setIsGradeReadOnly(true)
                               setIsGradeModalOpen(true)
                             }}
                           >
-                            <i className="fas fa-edit"></i>
+                            <i className="fas fa-eye"></i>
+                          </button>
+                          <button
+                            className="edit"
+                            onClick={() => {
+                              setSelectedGrade(grade)
+                              setIsGradeReadOnly(false)
+                              setIsGradeModalOpen(true)
+                            }}
+                          >
+                            <i className="fas fa-pencil-alt"></i>
                           </button>
                           <button
                             className="delete"
@@ -690,9 +741,20 @@ function Salary() {
                       <td>
                         <div className="actions">
                           <button
+                            className="view"
+                            onClick={() => {
+                              setSelectedEmployeeSalary(empSal)
+                              setIsEmployeeSalaryReadOnly(true)
+                              setIsEmployeeSalaryModalOpen(true)
+                            }}
+                          >
+                            <i className="fas fa-eye"></i>
+                          </button>
+                          <button
                             className="edit"
                             onClick={() => {
                               setSelectedEmployeeSalary(empSal)
+                              setIsEmployeeSalaryReadOnly(false)
                               setIsEmployeeSalaryModalOpen(true)
                             }}
                           >
@@ -766,15 +828,32 @@ function Salary() {
                         <td>{escapeHtml(history.type || history.hinhThuc || '-')}</td>
                         <td>{escapeHtml(history.reason || history.lyDo || '-')}</td>
                         <td>
-                          <button
-                            className="view"
-                            onClick={() => {
-                              setSelectedEmployeeForHistory(history)
-                              setIsHistoryModalOpen(true)
-                            }}
-                          >
-                            <i className="fas fa-eye"></i>
-                          </button>
+                          <div className="actions">
+                            <button
+                              className="view"
+                              onClick={() => {
+                                setSelectedEmployeeForHistory(history)
+                                setIsHistoryModalOpen(true)
+                              }}
+                            >
+                              <i className="fas fa-eye"></i>
+                            </button>
+                            <button
+                              className="edit"
+                              onClick={() => {
+                                setSelectedPromotion(history)
+                                setIsPromotionModalOpen(true)
+                              }}
+                            >
+                              <i className="fas fa-pencil-alt"></i>
+                            </button>
+                            <button
+                              className="delete"
+                              onClick={() => handleDeletePromotionHistory(history.id)}
+                            >
+                              <i className="fas fa-trash"></i>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -875,6 +954,12 @@ function Salary() {
                           >
                             <i className="fas fa-pencil-alt"></i>
                           </button>
+                          <button
+                            className="delete"
+                            onClick={() => handleDeleteInsurance(ins.id)}
+                          >
+                            <i className="fas fa-trash"></i>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -949,6 +1034,12 @@ function Salary() {
                           >
                             <i className="fas fa-pencil-alt"></i>
                           </button>
+                          <button
+                            className="delete"
+                            onClick={() => handleDeleteTax(tax.id)}
+                          >
+                            <i className="fas fa-trash"></i>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -970,8 +1061,10 @@ function Salary() {
         onClose={() => {
           setIsGradeModalOpen(false)
           setSelectedGrade(null)
+          setIsGradeReadOnly(false)
         }}
         onSave={loadData}
+        readOnly={isGradeReadOnly}
       />
 
       <EmployeeSalaryModal
@@ -982,8 +1075,10 @@ function Salary() {
         onClose={() => {
           setIsEmployeeSalaryModalOpen(false)
           setSelectedEmployeeSalary(null)
+          setIsEmployeeSalaryReadOnly(false)
         }}
         onSave={loadData}
+        readOnly={isEmployeeSalaryReadOnly}
       />
 
       <PromotionHistoryModal
@@ -999,11 +1094,13 @@ function Salary() {
       />
 
       <PromotionModal
+        promotion={selectedPromotion}
         employees={employees}
         salaryGrades={salaryGrades}
         isOpen={isPromotionModalOpen}
         onClose={() => {
           setIsPromotionModalOpen(false)
+          setSelectedPromotion(null)
         }}
         onSave={loadData}
       />

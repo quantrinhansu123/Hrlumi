@@ -551,9 +551,8 @@ function Employees() {
                             setIsReadOnly(true)
                             setIsModalOpen(true)
                           }}
-                          style={{ padding: '4px 8px' }}
                         >
-                          <i className="fas fa-eye" style={{ fontSize: '12px' }}></i>
+                          <i className="fas fa-eye"></i>
                         </button>
                         <button
                           className="edit"
@@ -563,17 +562,15 @@ function Employees() {
                             setIsReadOnly(false)
                             setIsModalOpen(true)
                           }}
-                          style={{ padding: '4px 8px' }}
                         >
-                          <i className="fas fa-edit" style={{ fontSize: '12px' }}></i>
+                          <i className="fas fa-edit"></i>
                         </button>
                         <button
                           className="delete"
                           title="Xóa"
                           onClick={() => handleDelete(emp.id, name)}
-                          style={{ padding: '4px 8px' }}
                         >
-                          <i className="fas fa-trash" style={{ fontSize: '12px' }}></i>
+                          <i className="fas fa-trash"></i>
                         </button>
                       </div>
                     </td>

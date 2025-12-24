@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import * as XLSX from 'xlsx'
 import AttendanceImportModal from '../components/AttendanceImportModal'
+import AttendanceModal from '../components/AttendanceModal'
 import DependentModal from '../components/DependentModal'
 import InsuranceModal from '../components/InsuranceModal'
 import PayrollDetailModal from '../components/PayrollDetailModal'
@@ -22,6 +23,7 @@ function Attendance() {
   const [loading, setLoading] = useState(true)
 
   // Modal states
+  const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isPayrollDetailModalOpen, setIsPayrollDetailModalOpen] = useState(false)
   const [isInsuranceModalOpen, setIsInsuranceModalOpen] = useState(false)
@@ -35,8 +37,10 @@ function Attendance() {
   const [selectedTax, setSelectedTax] = useState(null)
   const [selectedDependent, setSelectedDependent] = useState(null)
   const [selectedPayslip, setSelectedPayslip] = useState(null)
+  const [selectedAttendance, setSelectedAttendance] = useState(null)
 
   // Read-only states
+  const [isAttendanceReadOnly, setIsAttendanceReadOnly] = useState(false)
   const [isPayrollReadOnly, setIsPayrollReadOnly] = useState(false)
   const [isInsuranceReadOnly, setIsInsuranceReadOnly] = useState(false)
   const [isDependentReadOnly, setIsDependentReadOnly] = useState(false)
@@ -93,6 +97,17 @@ function Attendance() {
     }
   }
 
+  const handleDeleteAttendance = async (id) => {
+    if (!confirm('Bạn có chắc muốn xóa bản ghi chấm công này?')) return
+    try {
+      await fbDelete(`hr/attendanceLogs/${id}`)
+      loadData()
+      alert('Đã xóa bản ghi chấm công')
+    } catch (error) {
+      alert('Lỗi khi xóa: ' + error.message)
+    }
+  }
+
   const handleDeleteInsurance = async (id) => {
     if (!confirm('Bạn có chắc muốn xóa thông tin BHXH này?')) return
     try {
@@ -130,6 +145,17 @@ function Attendance() {
   const getEmployeeName = (employeeId) => {
     const emp = employees.find(e => e.id === employeeId)
     return emp ? (emp.ho_va_ten || emp.name || 'N/A') : employeeId || 'N/A'
+  }
+
+  const handleDeletePayroll = async (id) => {
+    if (!confirm('Bạn có chắc muốn xóa bảng lương này?')) return
+    try {
+      await fbDelete(`hr/payrolls/${id}`)
+      loadData()
+      alert('Đã xóa bảng lương')
+    } catch (error) {
+      alert('Lỗi khi xóa: ' + error.message)
+    }
   }
 
   // Filter payrolls
@@ -243,6 +269,16 @@ function Attendance() {
             >
               <i className="fas fa-file-import"></i>
               Import chấm công
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setSelectedAttendance(null)
+                setIsAttendanceModalOpen(true)
+              }}
+            >
+              <i className="fas fa-plus"></i>
+              Thêm chấm công
             </button>
             <SeedAttendanceDataButton employees={employees} onComplete={loadData} />
           </>
@@ -405,14 +441,35 @@ function Attendance() {
                             </span>
                           </td>
                           <td>
-                            <button
-                              className="edit"
-                              onClick={() => {
-                                // Edit attendance
-                              }}
-                            >
-                              <i className="fas fa-edit"></i>
-                            </button>
+                            <div className="actions">
+                              <button
+                                className="view"
+                                onClick={() => {
+                                  setSelectedAttendance(log)
+                                  setIsAttendanceReadOnly(true)
+                                  setIsAttendanceModalOpen(true)
+                                }}
+                                title="Xem chi tiết"
+                              >
+                                <i className="fas fa-eye"></i>
+                              </button>
+                              <button
+                                className="edit"
+                                onClick={() => {
+                                  setSelectedAttendance(log)
+                                  setIsAttendanceReadOnly(false)
+                                  setIsAttendanceModalOpen(true)
+                                }}
+                              >
+                                <i className="fas fa-edit"></i>
+                              </button>
+                              <button
+                                className="delete"
+                                onClick={() => handleDeleteAttendance(log.id)}
+                              >
+                                <i className="fas fa-trash"></i>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       )
@@ -547,6 +604,12 @@ function Attendance() {
                             >
                               <i className="fas fa-file-invoice-dollar"></i>
                             </button>
+                            <button
+                              className="delete"
+                              onClick={() => handleDeletePayroll(payroll.id)}
+                            >
+                              <i className="fas fa-trash"></i>
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -628,6 +691,12 @@ function Attendance() {
                             }}
                           >
                             <i className="fas fa-edit"></i>
+                          </button>
+                          <button
+                            className="delete"
+                            onClick={() => handleDeleteInsurance(insurance.id)}
+                          >
+                            <i className="fas fa-trash"></i>
                           </button>
                         </div>
                       </td>
@@ -712,6 +781,12 @@ function Attendance() {
                               }}
                             >
                               <i className="fas fa-edit"></i>
+                            </button>
+                            <button
+                              className="delete"
+                              onClick={() => handleDeleteTax(tax.id)}
+                            >
+                              <i className="fas fa-trash"></i>
                             </button>
                           </div>
                         </td>
@@ -824,6 +899,19 @@ function Attendance() {
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         onSave={loadData}
+      />
+
+      <AttendanceModal
+        attendance={selectedAttendance}
+        employees={employees}
+        isOpen={isAttendanceModalOpen}
+        onClose={() => {
+          setIsAttendanceModalOpen(false)
+          setSelectedAttendance(null)
+          setIsAttendanceReadOnly(false)
+        }}
+        onSave={loadData}
+        readOnly={isAttendanceReadOnly}
       />
 
       <PayrollDetailModal

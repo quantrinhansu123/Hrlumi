@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 
+import CompetencyFrameworkModal from '../components/CompetencyFrameworkModal'
 import EvaluationDetailModal from '../components/EvaluationDetailModal'
 import SeedCompetencyDataButton from '../components/SeedCompetencyDataButton'
 import TrainingParticipantModal from '../components/TrainingParticipantModal'
@@ -19,17 +20,22 @@ function Competency() {
 
   // Modal states
 
-
-  const [isTrainingModalOpen, setIsTrainingModalOpen] = useState(false)
-  const [isParticipantModalOpen, setIsParticipantModalOpen] = useState(false)
   const [isEvaluationDetailModalOpen, setIsEvaluationDetailModalOpen] = useState(false)
+
+  // Training Modal State
+  const [isTrainingModalOpen, setIsTrainingModalOpen] = useState(false)
+  const [selectedTraining, setSelectedTraining] = useState(null)
+
+  // Participant Modal State
+  const [isParticipantModalOpen, setIsParticipantModalOpen] = useState(false)
+  const [participantInitialView, setParticipantInitialView] = useState('participants')
+  const [isParticipantReadOnly, setIsParticipantReadOnly] = useState(false)
+
 
   // Selected items
   const [selectedFramework, setSelectedFramework] = useState(null)
   const [selectedEvaluation, setSelectedEvaluation] = useState(null)
-  const [selectedTraining, setSelectedTraining] = useState(null)
   const [selectedEvaluationDetail, setSelectedEvaluationDetail] = useState(null)
-  const [participantInitialView, setParticipantInitialView] = useState('participants')
 
   // Filters
   const [filterDept, setFilterDept] = useState('')
@@ -51,6 +57,10 @@ function Competency() {
   const [isSaving, setIsSaving] = useState(false)
 
   // Bảng 1: Khai báo khung năng lực state
+  const [isFrameworkModalOpen, setIsFrameworkModalOpen] = useState(false)
+  const [isFrameworkReadOnly, setIsFrameworkReadOnly] = useState(false)
+
+  // Bảng 1: Khai báo khung năng lực state (Inline Form)
   const [frameworkForm, setFrameworkForm] = useState({
     id: null,
     department: '',
@@ -326,10 +336,10 @@ function Competency() {
     }
   }
 
-  // Khung năng lực Logic
+  // Khung năng lực Logic (Inline Form)
   const handleFrameworkFormChange = (e) => {
     const { name, value } = e.target
-    const val = name === 'level' ? parseInt(value) || 1 : value
+    const val = name === 'level' ? (parseInt(value) || 1) : value
     setFrameworkForm(prev => ({ ...prev, [name]: val }))
   }
 
@@ -345,6 +355,7 @@ function Competency() {
       const { id, ...dataToSave } = frameworkForm
 
       if (id) {
+        // Nếu có ID (trường hợp sửa từ Bảng 1 - dù hiện tại ưu tiên Modal cho sửa)
         await fbUpdate(`hr/competencyFramework/${id}`, dataToSave)
         alert('Cập nhật năng lực thành công')
       } else {
@@ -424,6 +435,7 @@ function Competency() {
       {/* Tab 1: Khung năng lực */}
       {activeTab === 'framework' && (
         <>
+
           {/* Bảng 1: Khai báo khung năng lực theo vị trí (Inline) */}
           <div className="card" style={{ marginBottom: '20px' }}>
             <div className="card-header">
@@ -451,7 +463,6 @@ function Competency() {
                     </select>
                   </div>
 
-                  {/* Position Combobox */}
                   <div className="form-group" style={{ flex: '1', minWidth: '200px', position: 'relative' }}>
                     <label>Vị trí *</label>
                     <input
@@ -460,7 +471,7 @@ function Competency() {
                       value={frameworkForm.position}
                       onChange={handleFrameworkFormChange}
                       onFocus={() => setShowPositionDropdown(true)}
-                      onBlur={() => setTimeout(() => setShowPositionDropdown(false), 200)} // Delay to allow click
+                      onBlur={() => setTimeout(() => setShowPositionDropdown(false), 200)}
                       placeholder="VD: MKT 1, Sale 1..."
                       style={{ width: '100%', padding: '8px' }}
                       required
@@ -491,7 +502,7 @@ function Competency() {
                             key={idx}
                             onClick={() => setFrameworkForm(prev => ({ ...prev, position: pos }))}
                             style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #eee' }}
-                            onMouseDown={(e) => e.preventDefault()} // Prevent blur before click
+                            onMouseDown={(e) => e.preventDefault()}
                           >
                             {pos}
                           </li>
@@ -517,7 +528,6 @@ function Competency() {
                 </div>
 
                 <div className="form-row" style={{ display: 'flex', gap: '15px', marginBottom: '15px', flexWrap: 'wrap' }}>
-                  {/* Competency Name Combobox */}
                   <div className="form-group" style={{ flex: '2', minWidth: '300px', position: 'relative' }}>
                     <label>Tên năng lực *</label>
                     <input
@@ -629,6 +639,7 @@ function Competency() {
             </div>
           </div>
 
+
           {/* Bảng 2: Danh mục khung năng lực theo bộ phận (Ma trận) */}
           <div className="card" style={{ marginBottom: '20px' }}>
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -735,12 +746,24 @@ function Competency() {
                         <td>
                           <div className="actions">
                             <button
+                              className="view"
+                              onClick={() => {
+                                setSelectedFramework(c)
+                                setIsFrameworkReadOnly(true)
+                                setIsFrameworkModalOpen(true)
+                              }}
+                              title="Xem chi tiết"
+                            >
+                              <i className="fas fa-eye"></i>
+                            </button>
+                            <button
                               className="edit"
                               onClick={() => {
-                                setFrameworkForm({ ...c })
-                                window.scrollTo({ top: 0, behavior: 'smooth' })
+                                setSelectedFramework(c)
+                                setIsFrameworkReadOnly(false)
+                                setIsFrameworkModalOpen(true)
                               }}
-                              title="Sửa (Load lên Bảng 1)"
+                              title="Sửa"
                             >
                               <i className="fas fa-edit"></i>
                             </button>
@@ -764,310 +787,508 @@ function Competency() {
             </div>
           </div>
         </>
-      )}
+      )
+      }
 
       {/* Tab 2: Đánh giá năng lực */}
-      {activeTab === 'evaluation' && (
-        <>
-          {/* Bảng 1: Nhập kết quả đánh giá năng lực cho 1 nhân sự */}
-          <div className="card" style={{ marginBottom: '20px' }}>
-            <div className="card-header">
-              <h3 className="card-title">Bảng 1: HR nhập kết quả đánh giá năng lực cho 1 nhân sự</h3>
-            </div>
-            <div style={{ padding: '15px' }}>
-              <div className="form-row" style={{ display: 'flex', gap: '15px', marginBottom: '15px', flexWrap: 'wrap' }}>
-                <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
-                  <label>Chọn Bộ phận</label>
-                  <select
-                    value={inputFilterDept}
-                    onChange={(e) => setInputFilterDept(e.target.value)}
-                    style={{ width: '100%', padding: '8px' }}
-                  >
-                    <option value="">Tất cả bộ phận</option>
-                    {[...new Set(employees.map(e => e.bo_phan || e.department).filter(Boolean))].sort().map(d => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
-                  <label>Nhân sự *</label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="text"
-                      placeholder={inputFilterDept ? `Tìm nhân viên ${inputFilterDept}...` : "Tìm kiếm nhân viên..."}
-                      value={searchTerm}
-                      onChange={(e) => {
-                        setSearchTerm(e.target.value)
-                        setShowDropdown(true)
-                        if (assessmentForm.employeeId) {
-                          // Clear selection if user types (optional, strictly forcing re-select)
-                          handleAssessmentFormChange({ target: { name: 'employeeId', value: '' } })
-                        }
-                      }}
-                      onFocus={() => setShowDropdown(true)}
+      {
+        activeTab === 'evaluation' && (
+          <>
+            {/* Bảng 1: Nhập kết quả đánh giá năng lực cho 1 nhân sự */}
+            <div className="card" style={{ marginBottom: '20px' }}>
+              <div className="card-header">
+                <h3 className="card-title">Bảng 1: HR nhập kết quả đánh giá năng lực cho 1 nhân sự</h3>
+              </div>
+              <div style={{ padding: '15px' }}>
+                <div className="form-row" style={{ display: 'flex', gap: '15px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                  <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
+                    <label>Chọn Bộ phận</label>
+                    <select
+                      value={inputFilterDept}
+                      onChange={(e) => setInputFilterDept(e.target.value)}
                       style={{ width: '100%', padding: '8px' }}
-                    />
-                    {showDropdown && (
-                      <ul style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        maxHeight: '200px',
-                        overflowY: 'auto',
-                        background: '#fff',
-                        border: '1px solid #ccc',
-                        borderRadius: '0 0 4px 4px',
-                        zIndex: 1000,
-                        margin: 0,
-                        padding: 0,
-                        listStyle: 'none',
-                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                      }}>
-                        {employees
-                          .filter(e => {
+                    >
+                      <option value="">Tất cả bộ phận</option>
+                      {[...new Set(employees.map(e => e.bo_phan || e.department).filter(Boolean))].sort().map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
+                    <label>Nhân sự *</label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="text"
+                        placeholder={inputFilterDept ? `Tìm nhân viên ${inputFilterDept}...` : "Tìm kiếm nhân viên..."}
+                        value={searchTerm}
+                        onChange={(e) => {
+                          setSearchTerm(e.target.value)
+                          setShowDropdown(true)
+                          if (assessmentForm.employeeId) {
+                            // Clear selection if user types (optional, strictly forcing re-select)
+                            handleAssessmentFormChange({ target: { name: 'employeeId', value: '' } })
+                          }
+                        }}
+                        onFocus={() => setShowDropdown(true)}
+                        style={{ width: '100%', padding: '8px' }}
+                      />
+                      {showDropdown && (
+                        <ul style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          maxHeight: '200px',
+                          overflowY: 'auto',
+                          background: '#fff',
+                          border: '1px solid #ccc',
+                          borderRadius: '0 0 4px 4px',
+                          zIndex: 1000,
+                          margin: 0,
+                          padding: 0,
+                          listStyle: 'none',
+                          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                        }}>
+                          {employees
+                            .filter(e => {
+                              const matchDept = !inputFilterDept || (e.bo_phan || e.department) === inputFilterDept
+                              const matchName = normalizeString(e.ho_va_ten || e.name || '').includes(normalizeString(searchTerm))
+                              return matchDept && matchName
+                            })
+                            .map(e => (
+                              <li
+                                key={e.id}
+                                onClick={() => {
+                                  handleAssessmentFormChange({ target: { name: 'employeeId', value: e.id } })
+                                  setSearchTerm(e.ho_va_ten || e.name || '')
+                                  setShowDropdown(false)
+                                }}
+                                style={{
+                                  padding: '10px',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid #eee',
+                                  transition: 'background 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                                onMouseLeave={(e) => e.target.style.background = '#fff'}
+                              >
+                                <strong>{e.ho_va_ten || e.name || 'N/A'}</strong>
+                                <br />
+                                <small style={{ color: '#666' }}>{e.vi_tri || '-'} | {e.bo_phan || '-'}</small>
+                              </li>
+                            ))}
+                          {employees.filter(e => {
                             const matchDept = !inputFilterDept || (e.bo_phan || e.department) === inputFilterDept
                             const matchName = normalizeString(e.ho_va_ten || e.name || '').includes(normalizeString(searchTerm))
                             return matchDept && matchName
-                          })
-                          .map(e => (
-                            <li
-                              key={e.id}
-                              onClick={() => {
-                                handleAssessmentFormChange({ target: { name: 'employeeId', value: e.id } })
-                                setSearchTerm(e.ho_va_ten || e.name || '')
-                                setShowDropdown(false)
-                              }}
-                              style={{
-                                padding: '10px',
-                                cursor: 'pointer',
-                                borderBottom: '1px solid #eee',
-                                transition: 'background 0.2s'
-                              }}
-                              onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
-                              onMouseLeave={(e) => e.target.style.background = '#fff'}
-                            >
-                              <strong>{e.ho_va_ten || e.name || 'N/A'}</strong>
-                              <br />
-                              <small style={{ color: '#666' }}>{e.vi_tri || '-'} | {e.bo_phan || '-'}</small>
-                            </li>
-                          ))}
-                        {employees.filter(e => {
-                          const matchDept = !inputFilterDept || (e.bo_phan || e.department) === inputFilterDept
-                          const matchName = normalizeString(e.ho_va_ten || e.name || '').includes(normalizeString(searchTerm))
-                          return matchDept && matchName
-                        }).length === 0 && (
-                            <li style={{ padding: '10px', color: '#999', textAlign: 'center' }}>
-                              Không tìm thấy nhân viên
-                            </li>
-                          )}
-                      </ul>
-                    )}
-                    {/* Overlay to close dropdown */}
-                    {showDropdown && (
-                      <div
-                        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
-                        onClick={() => setShowDropdown(false)}
-                      />
-                    )}
+                          }).length === 0 && (
+                              <li style={{ padding: '10px', color: '#999', textAlign: 'center' }}>
+                                Không tìm thấy nhân viên
+                              </li>
+                            )}
+                        </ul>
+                      )}
+                      {/* Overlay to close dropdown */}
+                      {showDropdown && (
+                        <div
+                          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
+                          onClick={() => setShowDropdown(false)}
+                        />
+                      )}
+                    </div>
+                  </div>
+                  <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
+                    <label>Vị trí áp dụng KHNL *</label>
+                    <select
+                      name="position"
+                      value={assessmentForm.position}
+                      onChange={handleAssessmentFormChange}
+                      style={{ width: '100%', padding: '8px' }}
+                    >
+                      <option value="">Chọn vị trí KHNL</option>
+                      {[...new Set(competencyFramework
+                        .filter(c => !inputFilterDept || c.department === inputFilterDept)
+                        .map(c => c.position)
+                      )].sort().map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
+                    <label>Kỳ đánh giá (Tháng) *</label>
+                    <input
+                      type="month"
+                      name="period"
+                      value={assessmentForm.period}
+                      onChange={handleAssessmentFormChange}
+                      style={{ width: '100%', padding: '8px' }}
+                    />
+                  </div>
+                  <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
+                    <label>Ngày đánh giá</label>
+                    <input
+                      type="date"
+                      name="evaluationDate"
+                      value={assessmentForm.evaluationDate}
+                      onChange={handleAssessmentFormChange}
+                      style={{ width: '100%', padding: '8px' }}
+                    />
                   </div>
                 </div>
-                <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
-                  <label>Vị trí áp dụng KHNL *</label>
-                  <select
-                    name="position"
-                    value={assessmentForm.position}
-                    onChange={handleAssessmentFormChange}
-                    style={{ width: '100%', padding: '8px' }}
+
+                {assessmentForm.items.length > 0 ? (
+                  <div style={{ overflowX: 'auto', marginBottom: '15px' }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>STT</th>
+                          <th>Nhóm năng lực</th>
+                          <th>Tên năng lực</th>
+                          <th>Level yêu cầu</th>
+                          <th>Level đạt được</th>
+                          <th>Điểm chênh lệch</th>
+                          <th>Nhận xét</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {assessmentForm.items.map((item, idx) => (
+                          <tr key={idx}>
+                            <td>{idx + 1}</td>
+                            <td>{escapeHtml(item.group || '-')}</td>
+                            <td>{escapeHtml(item.competencyName || '-')}</td>
+                            <td style={{ textAlign: 'center' }}>{item.requiredLevel}</td>
+                            <td>
+                              <select
+                                value={item.achievedLevel}
+                                onChange={(e) => handleAssessmentItemChange(idx, 'achievedLevel', e.target.value)}
+                                style={{ width: '100%', padding: '5px' }}
+                              >
+                                {[1, 2, 3, 4, 5].map(v => (
+                                  <option key={v} value={v}>{v}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td style={{
+                              textAlign: 'center',
+                              fontWeight: 'bold',
+                              color: item.difference > 0 ? 'var(--success)' : item.difference < 0 ? 'var(--danger)' : 'inherit'
+                            }}>
+                              {item.difference > 0 ? `+${item.difference}` : item.difference}
+                            </td>
+                            <td>
+                              <input
+                                type="text"
+                                value={item.comment}
+                                onChange={(e) => handleAssessmentItemChange(idx, 'comment', e.target.value)}
+                                placeholder="Nhập nhận xét..."
+                                style={{ width: '100%', padding: '5px' }}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : assessmentForm.employeeId && (
+                  <p style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                    Nhân sự này chưa được cài đặt Khung năng lực cho vị trí: <strong>{assessmentForm.position}</strong>. <br />
+                    Vui lòng qua tab <strong>Khung năng lực</strong> để thiết lập trước.
+                  </p>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                  <button
+                    className="btn"
+                    onClick={() => setAssessmentForm({
+                      employeeId: '',
+                      employeeCode: '',
+                      position: '',
+                      department: '',
+                      period: '',
+                      evaluationDate: new Date().toISOString().split('T')[0],
+                      items: []
+                    })}
+                  >Hủy</button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleSaveAssessment}
+                    disabled={isSaving || assessmentForm.items.length === 0}
                   >
-                    <option value="">Chọn vị trí KHNL</option>
-                    {[...new Set(competencyFramework
-                      .filter(c => !inputFilterDept || c.department === inputFilterDept)
-                      .map(c => c.position)
-                    )].sort().map(p => (
-                      <option key={p} value={p}>{p}</option>
+                    {isSaving ? 'Đang lưu...' : (assessmentForm.id ? 'Cập nhật kết quả' : 'Lưu kết quả')}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="card" style={{ marginBottom: '20px' }}>
+              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 className="card-title">Bảng 2: Kết quả đánh giá năng lực</h3>
+                <div className="search-box" style={{ display: 'flex', gap: '10px' }}>
+                  <select
+                    value={filterEvaluationDept}
+                    onChange={(e) => setFilterEvaluationDept(e.target.value)}
+                    style={{ padding: '8px', borderRadius: '4px' }}
+                  >
+                    <option value="">Tất cả bộ phận</option>
+                    {[...new Set(evaluations.map(e => e.department).filter(Boolean))].sort().map(dept => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={filterEvaluationPeriod}
+                    onChange={(e) => setFilterEvaluationPeriod(e.target.value)}
+                    style={{ padding: '8px', borderRadius: '4px' }}
+                  >
+                    <option value="">Tất cả kỳ</option>
+                    {[...new Set(evaluations.map(e => e.period).filter(Boolean))].sort().map(period => (
+                      <option key={period} value={period}>{period}</option>
                     ))}
                   </select>
                 </div>
-                <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
-                  <label>Kỳ đánh giá (Tháng) *</label>
-                  <input
-                    type="month"
-                    name="period"
-                    value={assessmentForm.period}
-                    onChange={handleAssessmentFormChange}
-                    style={{ width: '100%', padding: '8px' }}
-                  />
-                </div>
-                <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
-                  <label>Ngày đánh giá</label>
-                  <input
-                    type="date"
-                    name="evaluationDate"
-                    value={assessmentForm.evaluationDate}
-                    onChange={handleAssessmentFormChange}
-                    style={{ width: '100%', padding: '8px' }}
-                  />
-                </div>
               </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>STT</th>
+                      <th>Kỳ đánh giá</th>
+                      <th>Mã NV</th>
+                      <th>Họ và tên</th>
+                      <th>Bộ phận</th>
+                      <th>Vị trí</th>
+                      <th>Điểm YC</th>
+                      <th>Điểm KQ</th>
+                      <th>Kết quả</th>
+                      <th>Ngày đánh giá</th>
+                      <th>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredEvaluations.length > 0 ? (
+                      filteredEvaluations.map((evaluation, idx) => {
+                        const employee = employees.find(e => e.id === evaluation.employeeId)
+                        const avgRequired = evaluation.diemYC || evaluation.avgRequired || 0
+                        const avgAchieved = evaluation.diemKQ || evaluation.avgAchieved || 0
+                        const result = avgAchieved >= avgRequired ? 'Đạt' : 'Cần cải thiện'
 
-              {assessmentForm.items.length > 0 ? (
-                <div style={{ overflowX: 'auto', marginBottom: '15px' }}>
-                  <table>
-                    <thead>
+                        return (
+                          <tr key={evaluation.id}>
+                            <td>{idx + 1}</td>
+                            <td>{escapeHtml(evaluation.period || '-')}</td>
+                            <td>{evaluation.employeeCode || evaluation.employeeId || '-'}</td>
+                            <td>{employee ? (employee.ho_va_ten || employee.name || '-') : (evaluation.employeeName || '-')}</td>
+                            <td>{escapeHtml(evaluation.department || '-')}</td>
+                            <td>{escapeHtml(evaluation.position || '-')}</td>
+                            <td style={{ fontWeight: 'bold' }}>{avgRequired.toFixed(1)}</td>
+                            <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{avgAchieved.toFixed(1)}</td>
+                            <td>
+                              <span className={`badge ${result === 'Đạt' ? 'badge-success' : 'badge-warning'}`}>
+                                {result}
+                              </span>
+                            </td>
+                            <td>{evaluation.evaluationDate ? new Date(evaluation.evaluationDate).toLocaleDateString('vi-VN') : '-'}</td>
+                            <td>
+                              <div className="actions">
+                                <button
+                                  className="view"
+                                  onClick={() => {
+                                    setSelectedEvaluationDetail(evaluation)
+                                    setIsEvaluationDetailModalOpen(true)
+                                  }}
+                                  title="Xem chi tiết"
+                                >
+                                  <i className="fas fa-eye"></i>
+                                </button>
+                                <button
+                                  className="edit"
+                                  onClick={() => {
+                                    const emp = employees.find(e => e.id === evaluation.employeeId)
+                                    setAssessmentForm({ ...evaluation })
+                                    // Load items based on the saved position (or employee position if missing) and department
+                                    loadAssessmentItems(evaluation.position || (emp ? emp.vi_tri : ''), evaluation.department, evaluation.items)
+                                    // Scroll to top to see Bảng 1
+                                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                                  }}
+                                  title="Sửa (Load lên Bảng 1)"
+                                >
+                                  <i className="fas fa-edit"></i>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })
+                    ) : (
                       <tr>
-                        <th>STT</th>
-                        <th>Nhóm năng lực</th>
-                        <th>Tên năng lực</th>
-                        <th>Level yêu cầu</th>
-                        <th>Level đạt được</th>
-                        <th>Điểm chênh lệch</th>
-                        <th>Nhận xét</th>
+                        <td colSpan="11" className="empty-state">Chưa có đánh giá năng lượng</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {assessmentForm.items.map((item, idx) => (
-                        <tr key={idx}>
-                          <td>{idx + 1}</td>
-                          <td>{escapeHtml(item.group || '-')}</td>
-                          <td>{escapeHtml(item.competencyName || '-')}</td>
-                          <td style={{ textAlign: 'center' }}>{item.requiredLevel}</td>
-                          <td>
-                            <select
-                              value={item.achievedLevel}
-                              onChange={(e) => handleAssessmentItemChange(idx, 'achievedLevel', e.target.value)}
-                              style={{ width: '100%', padding: '5px' }}
-                            >
-                              {[1, 2, 3, 4, 5].map(v => (
-                                <option key={v} value={v}>{v}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td style={{
-                            textAlign: 'center',
-                            fontWeight: 'bold',
-                            color: item.difference > 0 ? 'var(--success)' : item.difference < 0 ? 'var(--danger)' : 'inherit'
-                          }}>
-                            {item.difference > 0 ? `+${item.difference}` : item.difference}
-                          </td>
-                          <td>
-                            <input
-                              type="text"
-                              value={item.comment}
-                              onChange={(e) => handleAssessmentItemChange(idx, 'comment', e.target.value)}
-                              placeholder="Nhập nhận xét..."
-                              style={{ width: '100%', padding: '5px' }}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : assessmentForm.employeeId && (
-                <p style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-                  Nhân sự này chưa được cài đặt Khung năng lực cho vị trí: <strong>{assessmentForm.position}</strong>. <br />
-                  Vui lòng qua tab <strong>Khung năng lực</strong> để thiết lập trước.
-                </p>
-              )}
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )
+      }
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button
-                  className="btn"
-                  onClick={() => setAssessmentForm({
-                    employeeId: '',
-                    employeeCode: '',
-                    position: '',
-                    department: '',
-                    period: '',
-                    evaluationDate: new Date().toISOString().split('T')[0],
-                    items: []
-                  })}
-                >Hủy</button>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleSaveAssessment}
-                  disabled={isSaving || assessmentForm.items.length === 0}
-                >
-                  {isSaving ? 'Đang lưu...' : (assessmentForm.id ? 'Cập nhật kết quả' : 'Lưu kết quả')}
-                </button>
+      {/* Tab 3: Đào tạo nội bộ */}
+      {
+        activeTab === 'training' && (
+          <>
+            <div className="card" style={{ marginBottom: '20px' }}>
+              <div className="card-header">
+                <h3 className="card-title">Bảng 1: Danh sách chương trình đào tạo</h3>
               </div>
-            </div>
-          </div>
-          <div className="card" style={{ marginBottom: '20px' }}>
-            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 className="card-title">Bảng 2: Kết quả đánh giá năng lực</h3>
-              <div className="search-box" style={{ display: 'flex', gap: '10px' }}>
-                <select
-                  value={filterEvaluationDept}
-                  onChange={(e) => setFilterEvaluationDept(e.target.value)}
-                  style={{ padding: '8px', borderRadius: '4px' }}
-                >
-                  <option value="">Tất cả bộ phận</option>
-                  {[...new Set(evaluations.map(e => e.department).filter(Boolean))].sort().map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
-                <select
-                  value={filterEvaluationPeriod}
-                  onChange={(e) => setFilterEvaluationPeriod(e.target.value)}
-                  style={{ padding: '8px', borderRadius: '4px' }}
-                >
-                  <option value="">Tất cả kỳ</option>
-                  {[...new Set(evaluations.map(e => e.period).filter(Boolean))].sort().map(period => (
-                    <option key={period} value={period}>{period}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div style={{ overflowX: 'auto' }}>
               <table>
                 <thead>
                   <tr>
                     <th>STT</th>
-                    <th>Kỳ đánh giá</th>
-                    <th>Mã NV</th>
-                    <th>Họ và tên</th>
-                    <th>Bộ phận</th>
-                    <th>Vị trí</th>
-                    <th>Điểm YC</th>
-                    <th>Điểm KQ</th>
-                    <th>Kết quả</th>
-                    <th>Ngày đánh giá</th>
+                    <th>Mã chương trình</th>
+                    <th>Tên chương trình đào tạo</th>
+                    <th>Hình thức đào tạo</th>
+                    <th>Đơn vị đào tạo</th>
+                    <th>Thời gian bắt đầu</th>
+                    <th>Thời gian kết thúc</th>
+                    <th>Mục tiêu đào tạo</th>
+                    <th>Trạng thái</th>
                     <th>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredEvaluations.length > 0 ? (
-                    filteredEvaluations.map((evaluation, idx) => {
-                      const employee = employees.find(e => e.id === evaluation.employeeId)
-                      const avgRequired = evaluation.diemYC || evaluation.avgRequired || 0
-                      const avgAchieved = evaluation.diemKQ || evaluation.avgAchieved || 0
-                      const result = avgAchieved >= avgRequired ? 'Đạt' : 'Cần cải thiện'
+                  {trainingPrograms.length > 0 ? (
+                    trainingPrograms.map((training, idx) => (
+                      <tr key={training.id}>
+                        <td>{idx + 1}</td>
+                        <td>{escapeHtml(training.code || training.id || '-')}</td>
+                        <td>{escapeHtml(training.name || '-')}</td>
+                        <td>{escapeHtml(training.format || training.hinhThuc || '-')}</td>
+                        <td>{escapeHtml(training.provider || training.donVi || '-')}</td>
+                        <td>{training.startDate ? new Date(training.startDate).toLocaleDateString('vi-VN') : '-'}</td>
+                        <td>{training.endDate ? new Date(training.endDate).toLocaleDateString('vi-VN') : '-'}</td>
+                        <td>{escapeHtml(training.objective || training.mucTieu || '-')}</td>
+                        <td>
+                          <span className={`badge ${training.status === 'Đã kết thúc' ? 'badge-success' :
+                            training.status === 'Đang diễn ra' ? 'badge-info' :
+                              training.status === 'Sắp diễn ra' ? 'badge-warning' :
+                                'badge-danger'
+                            }`}>
+                            {escapeHtml(training.status || '-')}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="actions">
+                            <button
+                              className="edit"
+                              onClick={() => {
+                                setSelectedTraining(training)
+                                setIsTrainingModalOpen(true)
+                              }}
+                            >
+                              <i className="fas fa-edit"></i>
+                            </button>
+                            <button
+                              className="delete"
+                              onClick={() => handleDeleteTraining(training.id)}
+                            >
+                              <i className="fas fa-trash"></i>
+                            </button>
+                            <button
+                              className="view"
+                              onClick={() => {
+                                setSelectedTraining(training)
+                                setParticipantInitialView('participants')
+                                setIsParticipantModalOpen(true)
+                              }}
+                              title="Gán học viên"
+                            >
+                              <i className="fas fa-user-plus"></i>
+                            </button>
+                            {training.status === 'Đã kết thúc' && (
+                              <button
+                                className="view"
+                                onClick={() => {
+                                  setSelectedTraining(training)
+                                  setParticipantInitialView('results')
+                                  setIsParticipantModalOpen(true)
+                                }}
+                                title="Xem chi tiết & kết quả"
+                              >
+                                <i className="fas fa-eye"></i>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="10" className="empty-state">Chưa có chương trình đào tạo</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
+            {/* Bảng 2: Danh sách học viên tham gia */}
+            <div className="card">
+              <div className="card-header">
+                <h3 className="card-title">Bảng 2: Danh sách học viên tham gia</h3>
+                <select
+                  value={filterTrainingProgram}
+                  onChange={(e) => setFilterTrainingProgram(e.target.value)}
+                  style={{ padding: '8px', borderRadius: '4px' }}
+                >
+                  <option value="">Tất cả chương trình</option>
+                  {trainingPrograms.map(t => (
+                    <option key={t.id} value={t.id}>{t.name || t.code}</option>
+                  ))}
+                </select>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>STT</th>
+                    <th>Mã NV</th>
+                    <th>Họ và tên</th>
+                    <th>Bộ phận</th>
+                    <th>Vị trí</th>
+                    <th>Chương trình đào tạo</th>
+                    <th>Tình trạng tham gia</th>
+                    <th>Tỷ lệ tham dự (%)</th>
+                    <th>Ghi chú</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredParticipants.length > 0 ? (
+                    filteredParticipants.map((participant, idx) => {
+                      const employee = employees.find(e => e.id === participant.employeeId)
+                      const training = trainingPrograms.find(t => t.id === participant.trainingProgramId)
                       return (
-                        <tr key={evaluation.id}>
+                        <tr key={participant.id}>
                           <td>{idx + 1}</td>
-                          <td>{escapeHtml(evaluation.period || '-')}</td>
-                          <td>{evaluation.employeeCode || evaluation.employeeId || '-'}</td>
-                          <td>{employee ? (employee.ho_va_ten || employee.name || '-') : (evaluation.employeeName || '-')}</td>
-                          <td>{escapeHtml(evaluation.department || '-')}</td>
-                          <td>{escapeHtml(evaluation.position || '-')}</td>
-                          <td style={{ fontWeight: 'bold' }}>{avgRequired.toFixed(1)}</td>
-                          <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{avgAchieved.toFixed(1)}</td>
+                          <td>{participant.employeeId || '-'}</td>
+                          <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
+                          <td>{employee ? (employee.bo_phan || '-') : '-'}</td>
+                          <td>{employee ? (employee.vi_tri || '-') : '-'}</td>
+                          <td>{training ? (training.name || '-') : '-'}</td>
                           <td>
-                            <span className={`badge ${result === 'Đạt' ? 'badge-success' : 'badge-warning'}`}>
-                              {result}
+                            <span className={`badge ${participant.status === 'Đã tham gia' ? 'badge-success' :
+                              participant.status === 'Vắng' ? 'badge-danger' :
+                                'badge-warning'
+                              }`}>
+                              {escapeHtml(participant.status || '-')}
                             </span>
                           </td>
-                          <td>{evaluation.evaluationDate ? new Date(evaluation.evaluationDate).toLocaleDateString('vi-VN') : '-'}</td>
+                          <td>{participant.attendanceRate || participant.tyLeThamDu || 0}%</td>
+                          <td>{escapeHtml(participant.note || participant.ghiChu || '-')}</td>
                           <td>
                             <div className="actions">
                               <button
                                 className="view"
                                 onClick={() => {
-                                  setSelectedEvaluationDetail(evaluation)
-                                  setIsEvaluationDetailModalOpen(true)
+                                  setSelectedTraining(training)
+                                  setIsParticipantReadOnly(true)
+                                  setIsParticipantModalOpen(true)
                                 }}
                                 title="Xem chi tiết"
                               >
@@ -1076,16 +1297,27 @@ function Competency() {
                               <button
                                 className="edit"
                                 onClick={() => {
-                                  const emp = employees.find(e => e.id === evaluation.employeeId)
-                                  setAssessmentForm({ ...evaluation })
-                                  // Load items based on the saved position (or employee position if missing) and department
-                                  loadAssessmentItems(evaluation.position || (emp ? emp.vi_tri : ''), evaluation.department, evaluation.items)
-                                  // Scroll to top to see Bảng 1
-                                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                                  setSelectedTraining(training)
+                                  setIsParticipantReadOnly(false)
+                                  setIsParticipantModalOpen(true)
                                 }}
-                                title="Sửa (Load lên Bảng 1)"
+                                title="Cập nhật trạng thái"
                               >
                                 <i className="fas fa-edit"></i>
+                              </button>
+                              <button
+                                className="delete"
+                                onClick={() => {
+                                  if (confirm('Bạn có chắc muốn xóa học viên này khỏi chương trình đào tạo?')) {
+                                    fbDelete(`hr/trainingParticipants/${participant.id}`).then(() => {
+                                      loadData()
+                                      alert('Đã xóa học viên khỏi chương trình')
+                                    }).catch(err => alert('Lỗi: ' + err.message))
+                                  }
+                                }}
+                                title="Xóa học viên"
+                              >
+                                <i className="fas fa-trash"></i>
                               </button>
                             </div>
                           </td>
@@ -1094,190 +1326,15 @@ function Competency() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan="11" className="empty-state">Chưa có đánh giá năng lượng</td>
+                      <td colSpan="10" className="empty-state">Chưa có học viên tham gia</td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
-          </div>
-        </>
-      )}
-
-      {/* Tab 3: Đào tạo nội bộ */}
-      {activeTab === 'training' && (
-        <>
-          <div className="card" style={{ marginBottom: '20px' }}>
-            <div className="card-header">
-              <h3 className="card-title">Bảng 1: Danh sách chương trình đào tạo</h3>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>STT</th>
-                  <th>Mã chương trình</th>
-                  <th>Tên chương trình đào tạo</th>
-                  <th>Hình thức đào tạo</th>
-                  <th>Đơn vị đào tạo</th>
-                  <th>Thời gian bắt đầu</th>
-                  <th>Thời gian kết thúc</th>
-                  <th>Mục tiêu đào tạo</th>
-                  <th>Trạng thái</th>
-                  <th>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {trainingPrograms.length > 0 ? (
-                  trainingPrograms.map((training, idx) => (
-                    <tr key={training.id}>
-                      <td>{idx + 1}</td>
-                      <td>{escapeHtml(training.code || training.id || '-')}</td>
-                      <td>{escapeHtml(training.name || '-')}</td>
-                      <td>{escapeHtml(training.format || training.hinhThuc || '-')}</td>
-                      <td>{escapeHtml(training.provider || training.donVi || '-')}</td>
-                      <td>{training.startDate ? new Date(training.startDate).toLocaleDateString('vi-VN') : '-'}</td>
-                      <td>{training.endDate ? new Date(training.endDate).toLocaleDateString('vi-VN') : '-'}</td>
-                      <td>{escapeHtml(training.objective || training.mucTieu || '-')}</td>
-                      <td>
-                        <span className={`badge ${training.status === 'Đã kết thúc' ? 'badge-success' :
-                          training.status === 'Đang diễn ra' ? 'badge-info' :
-                            training.status === 'Sắp diễn ra' ? 'badge-warning' :
-                              'badge-danger'
-                          }`}>
-                          {escapeHtml(training.status || '-')}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="actions">
-                          <button
-                            className="edit"
-                            onClick={() => {
-                              setSelectedTraining(training)
-                              setIsTrainingModalOpen(true)
-                            }}
-                          >
-                            <i className="fas fa-edit"></i>
-                          </button>
-                          <button
-                            className="delete"
-                            onClick={() => handleDeleteTraining(training.id)}
-                          >
-                            <i className="fas fa-trash"></i>
-                          </button>
-                          <button
-                            className="view"
-                            onClick={() => {
-                              setSelectedTraining(training)
-                              setParticipantInitialView('participants')
-                              setIsParticipantModalOpen(true)
-                            }}
-                            title="Gán học viên"
-                          >
-                            <i className="fas fa-user-plus"></i>
-                          </button>
-                          {training.status === 'Đã kết thúc' && (
-                            <button
-                              className="view"
-                              onClick={() => {
-                                setSelectedTraining(training)
-                                setParticipantInitialView('results')
-                                setIsParticipantModalOpen(true)
-                              }}
-                              title="Xem chi tiết & kết quả"
-                            >
-                              <i className="fas fa-eye"></i>
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="10" className="empty-state">Chưa có chương trình đào tạo</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Bảng 2: Danh sách học viên tham gia */}
-          <div className="card">
-            <div className="card-header">
-              <h3 className="card-title">Bảng 2: Danh sách học viên tham gia</h3>
-              <select
-                value={filterTrainingProgram}
-                onChange={(e) => setFilterTrainingProgram(e.target.value)}
-                style={{ padding: '8px', borderRadius: '4px' }}
-              >
-                <option value="">Tất cả chương trình</option>
-                {trainingPrograms.map(t => (
-                  <option key={t.id} value={t.id}>{t.name || t.code}</option>
-                ))}
-              </select>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>STT</th>
-                  <th>Mã NV</th>
-                  <th>Họ và tên</th>
-                  <th>Bộ phận</th>
-                  <th>Vị trí</th>
-                  <th>Chương trình đào tạo</th>
-                  <th>Tình trạng tham gia</th>
-                  <th>Tỷ lệ tham dự (%)</th>
-                  <th>Ghi chú</th>
-                  <th>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredParticipants.length > 0 ? (
-                  filteredParticipants.map((participant, idx) => {
-                    const employee = employees.find(e => e.id === participant.employeeId)
-                    const training = trainingPrograms.find(t => t.id === participant.trainingProgramId)
-                    return (
-                      <tr key={participant.id}>
-                        <td>{idx + 1}</td>
-                        <td>{participant.employeeId || '-'}</td>
-                        <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
-                        <td>{employee ? (employee.bo_phan || '-') : '-'}</td>
-                        <td>{employee ? (employee.vi_tri || '-') : '-'}</td>
-                        <td>{training ? (training.name || '-') : '-'}</td>
-                        <td>
-                          <span className={`badge ${participant.status === 'Đã tham gia' ? 'badge-success' :
-                            participant.status === 'Vắng' ? 'badge-danger' :
-                              'badge-warning'
-                            }`}>
-                            {escapeHtml(participant.status || '-')}
-                          </span>
-                        </td>
-                        <td>{participant.attendanceRate || participant.tyLeThamDu || 0}%</td>
-                        <td>{escapeHtml(participant.note || participant.ghiChu || '-')}</td>
-                        <td>
-                          <button
-                            className="edit"
-                            onClick={() => {
-                              setSelectedTraining(training)
-                              setIsParticipantModalOpen(true)
-                            }}
-                          >
-                            <i className="fas fa-edit"></i>
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan="10" className="empty-state">Chưa có học viên tham gia</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+          </>
+        )
+      }
 
       {/* Modals */}
 
@@ -1313,10 +1370,25 @@ function Competency() {
         onClose={() => {
           setIsParticipantModalOpen(false)
           setSelectedTraining(null)
+          setIsParticipantReadOnly(false)
         }}
         onSave={loadData}
+        readOnly={isParticipantReadOnly}
       />
-    </div>
+      <CompetencyFrameworkModal
+        framework={selectedFramework}
+        isOpen={isFrameworkModalOpen}
+        onClose={() => {
+          setIsFrameworkModalOpen(false)
+          setSelectedFramework(null)
+          setIsFrameworkReadOnly(false)
+        }}
+        onSave={loadData}
+        readOnly={isFrameworkReadOnly}
+        employees={employees}
+        competencyFramework={competencyFramework}
+      />
+    </div >
   )
 }
 

@@ -487,15 +487,15 @@ tr:hover {
 /* Actions */
 .actions {
   display: flex;
-  gap: 5px;
+  gap: 10px;
 }
 
 .actions button {
-  padding: 5px 10px;
+  padding: 8px 12px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
 }
 
 .actions .view {

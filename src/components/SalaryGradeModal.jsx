@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
 
-function SalaryGradeModal({ grade, isOpen, onClose, onSave }) {
+function SalaryGradeModal({ grade, isOpen, onClose, onSave, readOnly }) {
   const [formData, setFormData] = useState({
     position: '',
     shift: 'Ca ngày',
@@ -55,7 +55,7 @@ function SalaryGradeModal({ grade, isOpen, onClose, onSave }) {
         ...formData,
         revenueTo: formData.revenueTo === '' || formData.revenueTo === 'Không giới hạn' ? null : formData.revenueTo
       }
-      
+
       if (grade && grade.id) {
         await fbUpdate(`hr/salaryGrades/${grade.id}`, data)
       } else {
@@ -77,7 +77,7 @@ function SalaryGradeModal({ grade, isOpen, onClose, onSave }) {
         <div className="modal-header">
           <h3>
             <i className="fas fa-dollar-sign"></i>
-            {grade ? 'Sửa bậc lương' : 'Thêm bậc lương'}
+            {grade ? (readOnly ? 'Chi tiết bậc lương' : 'Sửa bậc lương') : 'Thêm bậc lương'}
           </h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
@@ -93,6 +93,7 @@ function SalaryGradeModal({ grade, isOpen, onClose, onSave }) {
                   onChange={handleChange}
                   required
                   placeholder="VD: Sale 1, MKT 2"
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -102,6 +103,7 @@ function SalaryGradeModal({ grade, isOpen, onClose, onSave }) {
                   value={formData.shift}
                   onChange={handleChange}
                   required
+                  disabled={readOnly}
                 >
                   <option value="Ca ngày">Ca ngày</option>
                   <option value="Ca đêm">Ca đêm</option>
@@ -119,6 +121,7 @@ function SalaryGradeModal({ grade, isOpen, onClose, onSave }) {
                   onChange={handleChange}
                   required
                   min="0"
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -129,6 +132,7 @@ function SalaryGradeModal({ grade, isOpen, onClose, onSave }) {
                   value={formData.revenueTo}
                   onChange={handleChange}
                   placeholder="Để trống hoặc 'Không giới hạn'"
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -143,6 +147,7 @@ function SalaryGradeModal({ grade, isOpen, onClose, onSave }) {
                   onChange={handleChange}
                   required
                   min="1"
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -154,6 +159,7 @@ function SalaryGradeModal({ grade, isOpen, onClose, onSave }) {
                   onChange={handleChange}
                   required
                   min="0"
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -164,6 +170,7 @@ function SalaryGradeModal({ grade, isOpen, onClose, onSave }) {
                 name="status"
                 value={formData.status}
                 onChange={handleChange}
+                disabled={readOnly}
               >
                 <option value="Đang áp dụng">Đang áp dụng</option>
                 <option value="Ngừng áp dụng">Ngừng áp dụng</option>
@@ -172,12 +179,14 @@ function SalaryGradeModal({ grade, isOpen, onClose, onSave }) {
 
             <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button type="button" className="btn" onClick={onClose}>
-                Hủy
+                {readOnly ? 'Đóng' : 'Hủy'}
               </button>
-              <button type="submit" className="btn btn-primary">
-                <i className="fas fa-save"></i>
-                Lưu
-              </button>
+              {!readOnly && (
+                <button type="submit" className="btn btn-primary">
+                  <i className="fas fa-save"></i>
+                  Lưu
+                </button>
+              )}
             </div>
           </form>
         </div>

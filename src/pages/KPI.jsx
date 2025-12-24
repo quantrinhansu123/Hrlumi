@@ -26,9 +26,11 @@ function KPI() {
   const [isAssignmentViewOpen, setIsAssignmentViewOpen] = useState(false)
   const [isResultImportModalOpen, setIsResultImportModalOpen] = useState(false)
   const [isResultDetailModalOpen, setIsResultDetailModalOpen] = useState(false)
+  const [isResultEditing, setIsResultEditing] = useState(false)
 
   // Selected items
   const [selectedTemplate, setSelectedTemplate] = useState(null)
+  const [isTemplateReadOnly, setIsTemplateReadOnly] = useState(false) // NEW State
   const [selectedEmployeeKPI, setSelectedEmployeeKPI] = useState(null)
   const [targetedKPIId, setTargetedKPIId] = useState(null) // NEW: For single KPI edit
   const [selectedKPIForConversion, setSelectedKPIForConversion] = useState(null)
@@ -390,7 +392,7 @@ function KPI() {
               style={{ marginLeft: '10px' }}
             >
               <i className="fas fa-upload"></i>
-              Import Kết quả (Giả lập Sales/MKT)
+              Import Kết quả (Excel)
             </button>
           </>
         )}
@@ -472,9 +474,21 @@ function KPI() {
                       <td>
                         <div className="actions">
                           <button
+                            className="view"
+                            onClick={() => {
+                              setSelectedTemplate(template)
+                              setIsTemplateReadOnly(true)
+                              setIsTemplateModalOpen(true)
+                            }}
+                            title="Xem chi tiết"
+                          >
+                            <i className="fas fa-eye"></i>
+                          </button>
+                          <button
                             className="edit"
                             onClick={() => {
                               setSelectedTemplate(template)
+                              setIsTemplateReadOnly(false)
                               setIsTemplateModalOpen(true)
                             }}
                           >
@@ -890,16 +904,46 @@ function KPI() {
                             </span>
                           </td>
                           <td>
-                            <button
-                              className="view"
-                              onClick={() => {
-                                setSelectedResultForDetail(result)
-                                setIsResultDetailModalOpen(true)
-                              }}
-                              title="Xem chi tiết tại Bảng 2"
-                            >
-                              <i className="fas fa-eye"></i>
-                            </button>
+                            <div className="actions">
+                              <button
+                                className="view"
+                                onClick={() => {
+                                  setSelectedResultForDetail(result)
+                                  setIsResultEditing(false)
+                                  setIsResultDetailModalOpen(true)
+                                }}
+                                title="Xem chi tiết"
+                              >
+                                <i className="fas fa-eye"></i>
+                              </button>
+                              <button
+                                className="edit"
+                                onClick={() => {
+                                  setSelectedResultForDetail(result)
+                                  setIsResultEditing(true)
+                                  setIsResultDetailModalOpen(true)
+                                }}
+                                title="Sửa kết quả"
+                              >
+                                <i className="fas fa-edit"></i>
+                              </button>
+                              <button
+                                className="delete"
+                                onClick={async () => {
+                                  if (confirm('Bạn có chắc muốn xóa kết quả đánh giá này?')) {
+                                    try {
+                                      await fbDelete(`hr/kpiResults/${result.id}`)
+                                      loadData()
+                                    } catch (error) {
+                                      alert('Lỗi khi xóa: ' + error.message)
+                                    }
+                                  }
+                                }}
+                                title="Xóa kết quả"
+                              >
+                                <i className="fas fa-trash"></i>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       )
@@ -966,9 +1010,11 @@ function KPI() {
       <KPITemplateModal
         template={selectedTemplate}
         isOpen={isTemplateModalOpen}
+        readOnly={isTemplateReadOnly}
         onClose={() => {
           setIsTemplateModalOpen(false)
           setSelectedTemplate(null)
+          setIsTemplateReadOnly(false)
         }}
         onSave={loadData}
       />
@@ -1192,7 +1238,11 @@ function KPI() {
         onClose={() => {
           setIsResultDetailModalOpen(false)
           setSelectedResultForDetail(null)
+          setIsResultEditing(false)
         }}
+        kpiConversions={kpiConversions}
+        isEditing={isResultEditing}
+        onSave={loadData}
       />
 
       <KPIResultImportModal

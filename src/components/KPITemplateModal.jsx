@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
 
-function KPITemplateModal({ template, isOpen, onClose, onSave }) {
+function KPITemplateModal({ template, isOpen, onClose, onSave, readOnly = false }) {
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -74,7 +74,7 @@ function KPITemplateModal({ template, isOpen, onClose, onSave }) {
         <div className="modal-header">
           <h3>
             <i className="fas fa-bullseye"></i>
-            {template ? 'Sửa danh mục KPI' : 'Thêm danh mục KPI'}
+            {readOnly ? 'Chi tiết danh mục KPI' : (template ? 'Sửa danh mục KPI' : 'Thêm danh mục KPI')}
           </h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
@@ -90,6 +90,7 @@ function KPITemplateModal({ template, isOpen, onClose, onSave }) {
                   onChange={handleChange}
                   required
                   placeholder="VD: KPI-M1"
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -101,6 +102,7 @@ function KPITemplateModal({ template, isOpen, onClose, onSave }) {
                   onChange={handleChange}
                   required
                   placeholder="VD: Doanh thu"
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -113,6 +115,7 @@ function KPITemplateModal({ template, isOpen, onClose, onSave }) {
                   value={formData.unit}
                   onChange={handleChange}
                   required
+                  disabled={readOnly}
                 >
                   <option value="VNĐ">VNĐ</option>
                   <option value="%">%</option>
@@ -130,6 +133,7 @@ function KPITemplateModal({ template, isOpen, onClose, onSave }) {
                   onChange={handleChange}
                   required
                   placeholder="VD: Cá nhân MKT"
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -146,6 +150,7 @@ function KPITemplateModal({ template, isOpen, onClose, onSave }) {
                   min="0"
                   max="100"
                   step="1"
+                  disabled={readOnly}
                 />
               </div>
               <div className="form-group">
@@ -156,6 +161,7 @@ function KPITemplateModal({ template, isOpen, onClose, onSave }) {
                   value={formData.month}
                   onChange={handleChange}
                   required
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -166,6 +172,7 @@ function KPITemplateModal({ template, isOpen, onClose, onSave }) {
                 name="status"
                 value={formData.status}
                 onChange={handleChange}
+                disabled={readOnly}
               >
                 <option value="Đang áp dụng">Đang áp dụng</option>
                 <option value="Ngừng áp dụng">Ngừng áp dụng</option>
@@ -174,12 +181,14 @@ function KPITemplateModal({ template, isOpen, onClose, onSave }) {
 
             <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button type="button" className="btn" onClick={onClose}>
-                Hủy
+                {readOnly ? 'Đóng' : 'Hủy'}
               </button>
-              <button type="submit" className="btn btn-primary">
-                <i className="fas fa-save"></i>
-                Lưu
-              </button>
+              {!readOnly && (
+                <button type="submit" className="btn btn-primary">
+                  <i className="fas fa-save"></i>
+                  Lưu
+                </button>
+              )}
             </div>
           </form>
         </div>

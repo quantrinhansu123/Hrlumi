@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react'
-import { fbPush } from '../services/firebase'
+import { useEffect, useState } from 'react'
+import { fbPush, fbUpdate } from '../services/firebase'
 
-function PromotionModal({ employee, employees, salaryGrades, isOpen, onClose, onSave }) {
+function PromotionModal({ promotion, employee, employees, salaryGrades, isOpen, onClose, onSave }) {
   const [formData, setFormData] = useState({
     employeeId: '',
     salaryGradeId: '',
@@ -12,7 +12,16 @@ function PromotionModal({ employee, employees, salaryGrades, isOpen, onClose, on
   })
 
   useEffect(() => {
-    if (employee) {
+    if (promotion) {
+      setFormData({
+        employeeId: promotion.employeeId || '',
+        salaryGradeId: promotion.salaryGradeId || '',
+        effectiveDate: promotion.effectiveDate ? new Date(promotion.effectiveDate).toISOString().split('T')[0] : '', // Format YYYY-MM-DD
+        type: promotion.type || promotion.hinhThuc || 'Thăng chức',
+        reason: promotion.reason || promotion.lyDo || '',
+        approvedBy: promotion.approvedBy || promotion.nguoiDuyet || 'HR'
+      })
+    } else if (employee) {
       setFormData({
         ...formData,
         employeeId: employee.id
@@ -20,7 +29,7 @@ function PromotionModal({ employee, employees, salaryGrades, isOpen, onClose, on
     } else {
       resetForm()
     }
-  }, [employee, isOpen])
+  }, [promotion, employee, isOpen])
 
   const resetForm = () => {
     setFormData({
@@ -43,11 +52,16 @@ function PromotionModal({ employee, employees, salaryGrades, isOpen, onClose, on
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      await fbPush('hr/promotionHistory', formData)
+      if (promotion && promotion.id) {
+        await fbUpdate(`hr/promotionHistory/${promotion.id}`, formData)
+        alert('Đã cập nhật lịch sử thăng tiến')
+      } else {
+        await fbPush('hr/promotionHistory', formData)
+        alert('Đã thêm lịch sử thăng tiến')
+      }
       onSave()
       onClose()
       resetForm()
-      alert('Đã thêm lịch sử thăng tiến')
     } catch (error) {
       alert('Lỗi khi lưu: ' + error.message)
     }
@@ -61,7 +75,7 @@ function PromotionModal({ employee, employees, salaryGrades, isOpen, onClose, on
         <div className="modal-header">
           <h3>
             <i className="fas fa-arrow-up"></i>
-            Thêm lịch sử thăng tiến
+            {promotion ? 'Cập nhật lịch sử thăng tiến' : 'Thêm lịch sử thăng tiến'}
           </h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>

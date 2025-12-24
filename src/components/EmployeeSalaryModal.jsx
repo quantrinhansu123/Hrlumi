@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
 
-function EmployeeSalaryModal({ employeeSalary, employees, salaryGrades, isOpen, onClose, onSave }) {
+function EmployeeSalaryModal({ employeeSalary, employees, salaryGrades, isOpen, onClose, onSave, readOnly }) {
   const [formData, setFormData] = useState({
     employeeId: '',
     salaryGradeId: '',
@@ -42,11 +42,11 @@ function EmployeeSalaryModal({ employeeSalary, employees, salaryGrades, isOpen, 
         await fbUpdate(`hr/employeeSalaries/${employeeSalary.id}`, formData)
       } else {
         await fbPush('hr/employeeSalaries', formData)
-        
+
         // Tự động tạo lịch sử thăng tiến
         const selectedGrade = salaryGrades.find(g => g.id === formData.salaryGradeId)
         const selectedEmployee = employees.find(e => e.id === formData.employeeId)
-        
+
         if (selectedGrade && selectedEmployee) {
           const historyData = {
             employeeId: formData.employeeId,
@@ -77,7 +77,7 @@ function EmployeeSalaryModal({ employeeSalary, employees, salaryGrades, isOpen, 
         <div className="modal-header">
           <h3>
             <i className="fas fa-user-tag"></i>
-            {employeeSalary ? 'Sửa bậc lương nhân viên' : 'Gán bậc lương nhân viên'}
+            {employeeSalary ? (readOnly ? 'Chi tiết bậc lương nhân viên' : 'Sửa bậc lương nhân viên') : 'Gán bậc lương nhân viên'}
           </h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
@@ -90,6 +90,7 @@ function EmployeeSalaryModal({ employeeSalary, employees, salaryGrades, isOpen, 
                 value={formData.employeeId}
                 onChange={handleChange}
                 required
+                disabled={readOnly}
               >
                 <option value="">Chọn nhân viên</option>
                 {employees.map(emp => (
@@ -107,6 +108,7 @@ function EmployeeSalaryModal({ employeeSalary, employees, salaryGrades, isOpen, 
                 value={formData.salaryGradeId}
                 onChange={handleChange}
                 required
+                disabled={readOnly}
               >
                 <option value="">Chọn bậc lương</option>
                 {salaryGrades
@@ -137,17 +139,20 @@ function EmployeeSalaryModal({ employeeSalary, employees, salaryGrades, isOpen, 
                 value={formData.effectiveDate}
                 onChange={handleChange}
                 required
+                disabled={readOnly}
               />
             </div>
 
             <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button type="button" className="btn" onClick={onClose}>
-                Hủy
+                {readOnly ? 'Đóng' : 'Hủy'}
               </button>
-              <button type="submit" className="btn btn-primary">
-                <i className="fas fa-save"></i>
-                Lưu
-              </button>
+              {!readOnly && (
+                <button type="submit" className="btn btn-primary">
+                  <i className="fas fa-save"></i>
+                  Lưu
+                </button>
+              )}
             </div>
           </form>
         </div>

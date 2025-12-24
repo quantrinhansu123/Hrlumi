@@ -195,7 +195,7 @@ function KPIResultImportModal({ employees, kpiTemplates, employeeKPIs, kpiConver
         <div className="modal show" onClick={onClose}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px' }}>
                 <div className="modal-header">
-                    <h3><i className="fas fa-upload"></i> Import Kết quả Thực tế (Giả lập Hệ thống)</h3>
+                    <h3><i className="fas fa-upload"></i> Import Kết quả KPI từ Excel</h3>
                     <button className="modal-close" onClick={onClose}>&times;</button>
                 </div>
                 <div className="modal-body">
