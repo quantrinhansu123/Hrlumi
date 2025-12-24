@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
+import { normalizeString } from '../utils/helpers'
 
 function DependentModal({ dependent, employees, isOpen, onClose, onSave, readOnly = false }) {
   const [formData, setFormData] = useState({
@@ -12,6 +13,22 @@ function DependentModal({ dependent, employees, isOpen, onClose, onSave, readOnl
     denNgay: '',
     status: 'Đang áp dụng'
   })
+
+  // Searchable Select State
+  const [searchTerm, setSearchTerm] = useState('')
+  const [showDropdown, setShowDropdown] = useState(false)
+
+  // Sync search term with formData.employeeId
+  useEffect(() => {
+    if (formData.employeeId) {
+      const emp = employees.find(e => e.id === formData.employeeId)
+      if (emp) {
+        setSearchTerm(emp.ho_va_ten || emp.name || '')
+      }
+    } else {
+      setSearchTerm('')
+    }
+  }, [formData.employeeId, employees])
 
   useEffect(() => {
     if (dependent) {
@@ -84,20 +101,83 @@ function DependentModal({ dependent, employees, isOpen, onClose, onSave, readOnl
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label>Nhân viên *</label>
-              <select
-                name="employeeId"
-                value={formData.employeeId}
-                onChange={handleChange}
-                required
-                disabled={readOnly}
-              >
-                <option value="">Chọn nhân viên</option>
-                {employees.map(emp => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.ho_va_ten || emp.name || 'N/A'} - {emp.vi_tri || '-'}
-                  </option>
-                ))}
-              </select>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm nhân viên..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value)
+                    setShowDropdown(true)
+                    // Clear ID if text changes (force re-select)
+                    if (formData.employeeId) {
+                      handleChange({ target: { name: 'employeeId', value: '' } })
+                    }
+                  }}
+                  onFocus={() => setShowDropdown(true)}
+                  disabled={readOnly}
+                  style={{ width: '100%' }}
+                />
+
+                {showDropdown && !readOnly && (
+                  <ul style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    background: '#fff',
+                    border: '1px solid #ccc',
+                    borderRadius: '0 0 4px 4px',
+                    zIndex: 1000,
+                    margin: 0,
+                    padding: 0,
+                    listStyle: 'none',
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                  }}>
+                    {employees
+                      .filter(emp => {
+                        const name = emp.ho_va_ten || emp.name || ''
+                        return normalizeString(name).includes(normalizeString(searchTerm))
+                      })
+                      .map(emp => (
+                        <li
+                          key={emp.id}
+                          onClick={() => {
+                            handleChange({ target: { name: 'employeeId', value: emp.id } })
+                            setSearchTerm(emp.ho_va_ten || emp.name || '')
+                            setShowDropdown(false)
+                          }}
+                          style={{
+                            padding: '10px',
+                            cursor: 'pointer',
+                            borderBottom: '1px solid #eee',
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                          onMouseLeave={(e) => e.target.style.background = '#fff'}
+                        >
+                          <strong>{emp.ho_va_ten || emp.name || 'N/A'}</strong>
+                          <br />
+                          <small style={{ color: '#666' }}>{emp.vi_tri || '-'} | {emp.bo_phan || '-'}</small>
+                        </li>
+                      ))}
+                    {employees.filter(emp => normalizeString(emp.ho_va_ten || emp.name || '').includes(normalizeString(searchTerm))).length === 0 && (
+                      <li style={{ padding: '10px', color: '#999', textAlign: 'center' }}>
+                        Không tìm thấy nhân viên
+                      </li>
+                    )}
+                  </ul>
+                )}
+                {/* Overlay to close dropdown */}
+                {showDropdown && (
+                  <div
+                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
+                    onClick={() => setShowDropdown(false)}
+                  />
+                )}
+              </div>
             </div>
 
             <div className="form-row">
@@ -195,7 +275,7 @@ function DependentModal({ dependent, employees, isOpen, onClose, onSave, readOnl
             </div>
 
             <div style={{ marginTop: '15px', padding: '10px', background: '#f0f8ff', borderRadius: '4px', fontSize: '0.9rem' }}>
-              <strong>Lưu ý:</strong> Mỗi người phụ thuộc được giảm trừ 4.400.000 VNĐ/tháng trong tính thuế TNCN.
+              <strong>Lưu ý:</strong> Mỗi người phụ thuộc được giảm trừ 6.200.000 VNĐ/tháng trong tính thuế TNCN.
             </div>
 
             <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>

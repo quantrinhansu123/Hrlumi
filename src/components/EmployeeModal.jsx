@@ -11,10 +11,12 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
     vi_tri: '',
     trang_thai: 'Thử việc',
     ngay_vao_lam: '',
+    ngay_lam_chinh_thuc: '',
     cccd: '',
     ngay_cap: '',
     noi_cap: '',
     que_quan: '',
+    ngay_sinh: '',
     gioi_tinh: '',
     tinh_trang_hon_nhan: '',
     avatarDataUrl: '',
@@ -24,6 +26,10 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
   const [avatarPreview, setAvatarPreview] = useState('')
   const [imagesPreview, setImagesPreview] = useState([])
   const [filesPreview, setFilesPreview] = useState([])
+
+  // State for URL inputs
+  const [avatarUrlInput, setAvatarUrlInput] = useState('')
+  const [galleryUrlInput, setGalleryUrlInput] = useState('')
 
   useEffect(() => {
     if (employee) {
@@ -36,17 +42,28 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
         vi_tri: employee.vi_tri || '',
         trang_thai: employee.trang_thai || employee.status || 'Thử việc',
         ngay_vao_lam: employee.ngay_vao_lam || '',
+        ngay_lam_chinh_thuc: employee.ngay_lam_chinh_thuc || '',
         cccd: employee.cccd || '',
         ngay_cap: employee.ngay_cap || '',
         noi_cap: employee.noi_cap || '',
         que_quan: employee.que_quan || '',
+        ngay_sinh: employee.ngay_sinh || employee.dob || '',
         gioi_tinh: employee.gioi_tinh || '',
         tinh_trang_hon_nhan: employee.tinh_trang_hon_nhan || '',
         avatarDataUrl: employee.avatarDataUrl || employee.avatarUrl || employee.avatar || '',
         images: employee.images || [],
         files: employee.files || []
       })
-      setAvatarPreview(employee.avatarDataUrl || employee.avatarUrl || employee.avatar || '')
+
+      const initialAvatar = employee.avatarDataUrl || employee.avatarUrl || employee.avatar || ''
+      setAvatarPreview(initialAvatar)
+      // If the initial avatar is a URL (starts with http), set it to the input too
+      if (initialAvatar.startsWith('http')) {
+        setAvatarUrlInput(initialAvatar)
+      } else {
+        setAvatarUrlInput('')
+      }
+
       setImagesPreview(employee.images || [])
       setFilesPreview(employee.files || [])
     } else {
@@ -64,10 +81,12 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
       vi_tri: '',
       trang_thai: 'Thử việc',
       ngay_vao_lam: '',
+      ngay_lam_chinh_thuc: '',
       cccd: '',
       ngay_cap: '',
       noi_cap: '',
       que_quan: '',
+      ngay_sinh: '',
       gioi_tinh: '',
       tinh_trang_hon_nhan: '',
       avatarDataUrl: '',
@@ -77,6 +96,8 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
     setAvatarPreview('')
     setImagesPreview([])
     setFilesPreview([])
+    setAvatarUrlInput('')
+    setGalleryUrlInput('')
   }
 
   const handleChange = (e) => {
@@ -157,6 +178,55 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
     const newFiles = filesPreview.filter((_, i) => i !== index)
     setFilesPreview(newFiles)
     setFormData({ ...formData, files: newFiles })
+  }
+
+
+
+  // Helper to process image URLs (supports Google Drive)
+  const processImageUrl = (url) => {
+    if (!url) return ''
+
+    // Check for Google Drive share links
+    // Formats: 
+    // https://drive.google.com/file/d/FILE_ID/view
+    // https://drive.google.com/open?id=FILE_ID
+    // https://drive.google.com/uc?id=FILE_ID
+    const driveRegex = /\/d\/([^/?]+)|id=([^&]+)/
+    const match = url.match(driveRegex)
+
+    if (match) {
+      const id = match[1] || match[2]
+      if (id) {
+        // Use lh3.googleusercontent.com which is more reliable for embedding images
+        return `https://lh3.googleusercontent.com/d/${id}`
+      }
+    }
+
+    return url
+  }
+
+  // Handle Avatar URL Input
+  const handleAvatarUrlChange = (e) => {
+    const rawUrl = e.target.value
+    setAvatarUrlInput(rawUrl)
+
+    const displayUrl = processImageUrl(rawUrl)
+    setAvatarPreview(displayUrl)
+    setFormData({ ...formData, avatarDataUrl: displayUrl })
+  }
+
+  // Handle Gallery URL Add
+  const handleAddGalleryUrl = () => {
+    if (!galleryUrlInput) return
+
+    const displayUrl = processImageUrl(galleryUrlInput)
+    const newImages = [...imagesPreview, displayUrl]
+    setImagesPreview(newImages)
+    setFormData({
+      ...formData,
+      images: [...formData.images, displayUrl]
+    })
+    setGalleryUrlInput('')
   }
 
   const handleSubmit = async (e) => {
@@ -314,6 +384,19 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
 
             <div className="form-row">
               <div className="form-group">
+                <label>Ngày làm chính thức</label>
+                <input
+                  type="date"
+                  name="ngay_lam_chinh_thuc"
+                  value={formData.ngay_lam_chinh_thuc}
+                  onChange={handleChange}
+                  disabled={readOnly}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
                 <label>CCCD/CMND</label>
                 <input
                   type="text"
@@ -363,6 +446,16 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
 
             <div className="form-row">
               <div className="form-group">
+                <label>Ngày sinh</label>
+                <input
+                  type="date"
+                  name="ngay_sinh"
+                  value={formData.ngay_sinh}
+                  onChange={handleChange}
+                  disabled={readOnly}
+                />
+              </div>
+              <div className="form-group">
                 <label>Giới tính</label>
                 <select
                   name="gioi_tinh"
@@ -411,11 +504,23 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
                 </div>
               )}
               {!readOnly && (
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarChange}
-                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                  />
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.9em', color: '#666' }}>Hoặc nhập link ảnh:</span>
+                    <input
+                      type="text"
+                      placeholder="https://example.com/avatar.jpg"
+                      value={avatarUrlInput}
+                      onChange={handleAvatarUrlChange}
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+                </div>
               )}
             </div>
 
@@ -460,12 +565,31 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
                 </div>
               )}
               {!readOnly && (
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleImagesChange}
-                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImagesChange}
+                  />
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      placeholder="Nhập link ảnh..."
+                      value={galleryUrlInput}
+                      onChange={(e) => setGalleryUrlInput(e.target.value)}
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={handleAddGalleryUrl}
+                      style={{ padding: '8px 15px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                      Thêm
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
 

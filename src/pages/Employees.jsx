@@ -353,6 +353,7 @@ function Employees() {
           vi_tri: rowObj['vi_tri'] || rowObj['chuc_vu'] || rowObj['position'] || '',
           trang_thai: rowObj['trang_thai'] || rowObj['status'] || '',
           ngay_vao_lam: rowObj['ngay_vao_lam'] || rowObj['ngay_bat_dau'] || '',
+          ngay_lam_chinh_thuc: rowObj['ngay_chinh_thuc'] || rowObj['ngay_lam_chinh_thuc'] || '',
           cccd: rowObj['cccd'] || rowObj['cmnd'] || '',
           ngay_cap: rowObj['ngay_cap'] || '',
           noi_cap: rowObj['noi_cap'] || '',
@@ -470,19 +471,28 @@ function Employees() {
         </select>
       </div>
 
-      <div className="card">
-        <table>
+      <div className="card" style={{ overflowX: 'auto' }}>
+        <table style={{ minWidth: 'max-content' }}>
           <thead>
             <tr>
-              <th>STT</th>
-              <th>Ảnh</th>
-              <th>Họ và tên</th>
-              <th>Email</th>
-              <th>SĐT</th>
-              <th>Chi nhánh</th>
-              <th>Bộ phận</th>
-              <th>Vị trí</th>
-              <th>Thao tác</th>
+              <th style={{ width: '40px', whiteSpace: 'nowrap', padding: '4px 8px' }}>STT</th>
+              <th style={{ width: '50px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Ảnh</th>
+              <th style={{ minWidth: '160px', position: 'sticky', left: 0, background: '#f8f9fa', zIndex: 2, whiteSpace: 'nowrap', padding: '4px 8px', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)' }}>Họ và tên</th>
+              <th style={{ minWidth: '160px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Email</th>
+              <th style={{ minWidth: '100px', whiteSpace: 'nowrap', padding: '4px 8px' }}>SĐT</th>
+              <th style={{ minWidth: '100px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Ngày sinh</th>
+              <th style={{ minWidth: '110px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Ngày vào làm</th>
+              <th style={{ minWidth: '110px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Ngày chính thức</th>
+              <th style={{ minWidth: '110px', whiteSpace: 'nowrap', padding: '4px 8px' }}>CCCD</th>
+              <th style={{ minWidth: '100px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Ngày cấp</th>
+              <th style={{ minWidth: '120px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Nơi cấp</th>
+              <th style={{ minWidth: '120px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Quê quán</th>
+              <th style={{ minWidth: '70px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Giới tính</th>
+              <th style={{ minWidth: '100px', whiteSpace: 'nowrap', padding: '4px 8px' }}>TT Hôn nhân</th>
+              <th style={{ minWidth: '100px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Chi nhánh</th>
+              <th style={{ minWidth: '120px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Bộ phận</th>
+              <th style={{ minWidth: '120px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Vị trí</th>
+              <th style={{ width: '80px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -492,15 +502,15 @@ function Employees() {
                 const avatar = emp.avatarDataUrl || emp.avatarUrl || emp.avatar || ''
                 return (
                   <tr key={emp.id || idx}>
-                    <td>{idx + 1}</td>
-                    <td>
+                    <td style={{ textAlign: 'center', padding: '4px 8px' }}>{idx + 1}</td>
+                    <td style={{ textAlign: 'center', padding: '4px 8px' }}>
                       {avatar ? (
                         <img
                           src={avatar}
                           alt={name}
                           style={{
-                            width: '40px',
-                            height: '40px',
+                            width: '32px',
+                            height: '32px',
                             borderRadius: '50%',
                             objectFit: 'cover'
                           }}
@@ -508,22 +518,31 @@ function Employees() {
                         />
                       ) : (
                         <span style={{
-                          width: '40px',
-                          height: '40px',
+                          width: '32px',
+                          height: '32px',
                           borderRadius: '50%',
                           background: 'var(--primary)',
                           display: 'inline-block'
                         }}></span>
                       )}
                     </td>
-                    <td>{escapeHtml(name)}</td>
-                    <td>{escapeHtml(emp.email || '-')}</td>
-                    <td>{escapeHtml(emp.sđt || emp.sdt || '-')}</td>
-                    <td>{escapeHtml(emp.chi_nhanh || '-')}</td>
-                    <td>{escapeHtml(emp.bo_phan || '-')}</td>
-                    <td>{escapeHtml(emp.vi_tri || '-')}</td>
-                    <td>
-                      <div className="actions">
+                    <td style={{ fontWeight: '500', position: 'sticky', left: 0, background: 'white', zIndex: 1, padding: '4px 8px', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)' }}>{escapeHtml(name)}</td>
+                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.email || '-')}</td>
+                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.sđt || emp.sdt || '-')}</td>
+                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.ngay_sinh || emp.dob || '-')}</td>
+                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.ngay_vao_lam || '-')}</td>
+                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.ngay_lam_chinh_thuc || '-')}</td>
+                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.cccd || '-')}</td>
+                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.ngay_cap || '-')}</td>
+                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.noi_cap || '-')}</td>
+                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.que_quan || '-')}</td>
+                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.gioi_tinh || '-')}</td>
+                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.tinh_trang_hon_nhan || '-')}</td>
+                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.chi_nhanh || '-')}</td>
+                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.bo_phan || '-')}</td>
+                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.vi_tri || '-')}</td>
+                    <td style={{ padding: '4px 8px' }}>
+                      <div className="actions" style={{ justifyContent: 'center' }}>
                         <button
                           className="view"
                           title="Xem"
@@ -532,8 +551,9 @@ function Employees() {
                             setIsReadOnly(true)
                             setIsModalOpen(true)
                           }}
+                          style={{ padding: '4px 8px' }}
                         >
-                          <i className="fas fa-eye"></i>
+                          <i className="fas fa-eye" style={{ fontSize: '12px' }}></i>
                         </button>
                         <button
                           className="edit"
@@ -543,15 +563,17 @@ function Employees() {
                             setIsReadOnly(false)
                             setIsModalOpen(true)
                           }}
+                          style={{ padding: '4px 8px' }}
                         >
-                          <i className="fas fa-edit"></i>
+                          <i className="fas fa-edit" style={{ fontSize: '12px' }}></i>
                         </button>
                         <button
                           className="delete"
                           title="Xóa"
                           onClick={() => handleDelete(emp.id, name)}
+                          style={{ padding: '4px 8px' }}
                         >
-                          <i className="fas fa-trash"></i>
+                          <i className="fas fa-trash" style={{ fontSize: '12px' }}></i>
                         </button>
                       </div>
                     </td>
@@ -560,7 +582,7 @@ function Employees() {
               })
             ) : (
               <tr>
-                <td colSpan="9" className="empty-state">
+                <td colSpan="17" className="empty-state">
                   {employees.length === 0 ? 'Chưa có dữ liệu nhân sự' : 'Không tìm thấy kết quả'}
                 </td>
               </tr>
@@ -615,6 +637,7 @@ function Employees() {
                   <li>Vị trí</li>
                   <li>Trạng thái</li>
                   <li>Ngày vào làm</li>
+                  <li>Ngày chính thức</li>
                   <li>CCCD</li>
                   <li>Ngày cấp</li>
                   <li>Nơi cấp</li>

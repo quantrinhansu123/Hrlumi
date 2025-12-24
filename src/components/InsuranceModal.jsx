@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
-import { formatMoney } from '../utils/helpers'
+import { formatMoney, normalizeString } from '../utils/helpers'
 
 function InsuranceModal({ insurance, employees, employeeSalaries, salaryGrades, isOpen, onClose, onSave, readOnly = false }) {
   const [formData, setFormData] = useState({
@@ -12,6 +12,8 @@ function InsuranceModal({ insurance, employees, employeeSalaries, salaryGrades, 
     tyLeDN: 21.5,
     status: 'Đang tham gia'
   })
+  const [searchTerm, setSearchTerm] = useState('')
+  const [showDropdown, setShowDropdown] = useState(false)
 
   useEffect(() => {
     if (insurance) {
@@ -24,6 +26,12 @@ function InsuranceModal({ insurance, employees, employeeSalaries, salaryGrades, 
         tyLeDN: insurance.tyLeDN || insurance.tyLeDoanhNghiep || 21.5,
         status: insurance.status || 'Đang tham gia'
       })
+      if (insurance.employeeId) {
+        const emp = employees.find(e => e.id === insurance.employeeId)
+        if (emp) {
+          setSearchTerm(emp.ho_va_ten || emp.name || '')
+        }
+      }
     } else {
       resetForm()
     }
@@ -39,6 +47,8 @@ function InsuranceModal({ insurance, employees, employeeSalaries, salaryGrades, 
       tyLeDN: 21.5,
       status: 'Đang tham gia'
     })
+    setSearchTerm('')
+    setShowDropdown(false)
   }
 
   const handleChange = (e) => {
@@ -107,20 +117,90 @@ function InsuranceModal({ insurance, employees, employeeSalaries, salaryGrades, 
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label>Nhân viên *</label>
-              <select
-                name="employeeId"
-                value={formData.employeeId}
-                onChange={handleChange}
-                required
-                disabled={readOnly}
-              >
-                <option value="">Chọn nhân viên</option>
-                {employees.map(emp => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.ho_va_ten || emp.name || 'N/A'} - {emp.vi_tri || '-'}
-                  </option>
-                ))}
-              </select>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm nhân viên..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value)
+                    setShowDropdown(true)
+                    if (formData.employeeId) setFormData(prev => ({ ...prev, employeeId: '' }))
+                  }}
+                  onFocus={() => setShowDropdown(true)}
+                  disabled={readOnly}
+                  style={{ width: '100%' }}
+                />
+
+                {showDropdown && !readOnly && (
+                  <ul style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    background: '#fff',
+                    border: '1px solid #ccc',
+                    borderRadius: '0 0 4px 4px',
+                    zIndex: 1000,
+                    margin: 0,
+                    padding: 0,
+                    listStyle: 'none',
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                  }}>
+                    {employees
+                      .filter(emp => normalizeString(emp.ho_va_ten || emp.name || '').includes(normalizeString(searchTerm)))
+                      .map(emp => (
+                        <li
+                          key={emp.id}
+                          onClick={() => {
+                            // Update State
+                            setFormData(prev => {
+                              const newData = { ...prev, employeeId: emp.id }
+
+                              // Logic auto-fill Salary like in handleChange
+                              const empSalaryRecord = employeeSalaries?.find(es => es.employeeId === emp.id)
+                              if (empSalaryRecord) {
+                                const grade = salaryGrades?.find(g => g.id === empSalaryRecord.salaryGradeId)
+                                if (grade && grade.salary > 0) {
+                                  newData.mucLuongDong = grade.salary
+                                }
+                              }
+                              return newData
+                            })
+                            setSearchTerm(emp.ho_va_ten || emp.name || 'N/A')
+                            setShowDropdown(false)
+                          }}
+                          style={{
+                            padding: '10px',
+                            cursor: 'pointer',
+                            borderBottom: '1px solid #eee',
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                          onMouseLeave={(e) => e.target.style.background = '#fff'}
+                        >
+                          <strong>{emp.ho_va_ten || emp.name || 'N/A'}</strong>
+                          <br />
+                          <small style={{ color: '#666' }}>{emp.vi_tri || '-'} | {emp.bo_phan || '-'}</small>
+                        </li>
+                      ))}
+                    {employees.filter(emp => normalizeString(emp.ho_va_ten || emp.name || '').includes(normalizeString(searchTerm))).length === 0 && (
+                      <li style={{ padding: '10px', color: '#999', textAlign: 'center' }}>
+                        Không tìm thấy nhân viên
+                      </li>
+                    )}
+                  </ul>
+                )}
+              </div>
+
+              {showDropdown && (
+                <div
+                  style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
+                  onClick={() => setShowDropdown(false)}
+                />
+              )}
             </div>
 
             <div className="form-row">

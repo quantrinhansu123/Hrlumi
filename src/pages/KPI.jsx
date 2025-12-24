@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import EmployeeKPIModal from '../components/EmployeeKPIModal'
 import KPIConversionModal from '../components/KPIConversionModal'
 
@@ -30,6 +30,7 @@ function KPI() {
   // Selected items
   const [selectedTemplate, setSelectedTemplate] = useState(null)
   const [selectedEmployeeKPI, setSelectedEmployeeKPI] = useState(null)
+  const [targetedKPIId, setTargetedKPIId] = useState(null) // NEW: For single KPI edit
   const [selectedKPIForConversion, setSelectedKPIForConversion] = useState(null)
   const [selectedResultForDetail, setSelectedResultForDetail] = useState(null)
   const [selectedEmployeeKPIView, setSelectedEmployeeKPIView] = useState(null)
@@ -365,33 +366,12 @@ function KPI() {
         </h1>
         {activeTab === 'assignment' && (
           <>
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                setSelectedTemplate(null)
-                setIsTemplateModalOpen(true)
-              }}
-            >
-              <i className="fas fa-plus"></i>
-              Thêm danh mục KPI
-            </button>
+
             <SeedKPIDataButton onComplete={loadData} />
 
           </>
         )}
-        {activeTab === 'assignment' && (
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              setSelectedEmployeeKPI(null)
-              setIsEmployeeKPIModalOpen(true)
-            }}
-            style={{ marginLeft: '10px' }}
-          >
-            <i className="fas fa-plus"></i>
-            Gán KPI cho nhân viên
-          </button>
-        )}
+
         {activeTab === 'results' && (
           <>
             <button
@@ -438,14 +418,26 @@ function KPI() {
           <div className="card" style={{ marginBottom: '20px' }}>
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 className="card-title">Bảng 1: Quản lý danh mục KPI</h3>
-              <button
-                className="btn btn-info"
-                onClick={() => setIsTemplateImportModalOpen(true)}
-                title="Import Excel"
-              >
-                <i className="fas fa-file-import"></i>
-                Import Excel
-              </button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setSelectedTemplate(null)
+                    setIsTemplateModalOpen(true)
+                  }}
+                >
+                  <i className="fas fa-plus"></i>
+                  Thêm danh mục KPI
+                </button>
+                <button
+                  className="btn btn-info"
+                  onClick={() => setIsTemplateImportModalOpen(true)}
+                  title="Import Excel"
+                >
+                  <i className="fas fa-file-import"></i>
+                  Import Excel
+                </button>
+              </div>
             </div>
             <table>
               <thead>
@@ -513,6 +505,17 @@ function KPI() {
               <h3 className="card-title">Bảng 2: Nhập KPI cho từng cá nhân</h3>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setSelectedEmployeeKPI(null)
+                    setIsEmployeeKPIModalOpen(true)
+                  }}
+                  style={{ marginTop: '-20px' }}
+                >
+                  <i className="fas fa-plus"></i>
+                  Gán KPI
+                </button>
+                <button
                   className="btn btn-info"
                   onClick={() => setIsEmployeeKPIImportModalOpen(true)}
                   title="Import Excel"
@@ -546,91 +549,127 @@ function KPI() {
               </div>
             </div>
             <div style={{ overflowX: 'auto' }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>STT</th>
-                    <th>Họ và tên</th>
-                    <th>Ca</th>
-                    <th>Vị trí</th>
-                    {kpiTemplates.filter(t => t.status === 'Đang áp dụng').map(template => (
-                      <th key={template.id}>{escapeHtml(template.code || template.id)}</th>
-                    ))}
-                    <th>Tổng trọng số</th>
-                    <th>Trạng thái</th>
-                    <th>Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredEmployeeKPIs.length > 0 ? (
-                    filteredEmployeeKPIs.map((empKPI, idx) => {
-                      const employee = employees.find(e => e.id === empKPI.employeeId)
-                      const totalWeight = calculateTotalWeight(empKPI)
-                      return (
-                        <tr key={empKPI.id}>
-                          <td>{idx + 1}</td>
-                          <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
-                          <td>{employee ? (employee.shift || 'Ngày') : '-'}</td>
-                          <td>{employee ? (employee.vi_tri || '-') : '-'}</td>
-                          {kpiTemplates.filter(t => t.status === 'Đang áp dụng').map(template => {
-                            const kpiValue = empKPI.kpiValues?.[template.id] || empKPI.kpiValues?.[template.code]
-                            return (
-                              <td key={template.id}>
-                                {kpiValue ? (
-                                  <span style={{ color: 'var(--primary)', cursor: 'pointer' }}>Nhập</span>
-                                ) : (
-                                  <span style={{ color: '#999' }}>-</span>
-                                )}
+              {(() => {
+                // Calculate max KPI count to expand columns dynamically
+                const maxKpiCount = Math.max(
+                  ...filteredEmployeeKPIs.map(e => Object.keys(e.kpiValues || {}).length),
+                  1 // Minimum 1 slot pair
+                )
+
+                return (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>STT</th>
+                        <th>Họ và tên</th>
+                        <th>Ca</th>
+                        <th>Vị trí</th>
+                        {Array.from({ length: maxKpiCount }).map((_, i) => (
+                          <React.Fragment key={i}>
+                            <th>Mã KPI {i + 1}</th>
+                            <th>KPI {i + 1}</th>
+                          </React.Fragment>
+                        ))}
+                        <th>Tổng trọng số</th>
+                        <th>Trạng thái</th>
+                        <th>Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredEmployeeKPIs.length > 0 ? (
+                        filteredEmployeeKPIs.map((empKPI, idx) => {
+                          const employee = employees.find(e => e.id === empKPI.employeeId)
+                          const totalWeight = calculateTotalWeight(empKPI)
+
+                          // Get assigned KPIs as array [ {id, val}, ... ]
+                          const assignedKPIs = Object.entries(empKPI.kpiValues || {}).map(([kId, val]) => {
+                            const template = kpiTemplates.find(t => t.id === kId || t.code === kId)
+                            return {
+                              id: kId,
+                              code: template ? (template.code || template.id) : kId,
+                              ...val
+                            }
+                          })
+
+                          return (
+                            <tr key={empKPI.id}>
+                              <td>{idx + 1}</td>
+                              <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
+                              <td>{employee ? (employee.shift || 'Ngày') : '-'}</td>
+                              <td>{employee ? (employee.vi_tri || '-') : '-'}</td>
+
+                              {Array.from({ length: maxKpiCount }).map((_, i) => {
+                                const kpi = assignedKPIs[i]
+                                return (
+                                  <React.Fragment key={i}>
+                                    <td>{kpi ? escapeHtml(kpi.code) : ''}</td>
+                                    <td>
+                                      {kpi ? (
+                                        <span
+                                          style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: 'bold' }}
+                                          onClick={() => {
+                                            setSelectedEmployeeKPI(empKPI)
+                                            setTargetedKPIId(kpi.id)
+                                            setIsEmployeeKPIModalOpen(true)
+                                          }}
+                                        >
+                                          Nhập
+                                        </span>
+                                      ) : ''}
+                                    </td>
+                                  </React.Fragment>
+                                )
+                              })}
+
+                              <td>{totalWeight}%</td>
+                              <td>
+                                <span className={`badge ${empKPI.status === 'Đã giao' ? 'badge-success' :
+                                  empKPI.status === 'Chưa chốt' ? 'badge-warning' :
+                                    'badge-secondary'
+                                  }`}>
+                                  {escapeHtml(empKPI.status || 'Chưa chốt')}
+                                </span>
                               </td>
-                            )
-                          })}
-                          <td>{totalWeight}%</td>
-                          <td>
-                            <span className={`badge ${empKPI.status === 'Đã giao' ? 'badge-success' :
-                              empKPI.status === 'Chưa chốt' ? 'badge-warning' :
-                                'badge-secondary'
-                              }`}>
-                              {escapeHtml(empKPI.status || 'Chưa chốt')}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="actions">
-                              <button
-                                className="edit"
-                                onClick={() => {
-                                  setSelectedEmployeeKPI(empKPI)
-                                  setIsEmployeeKPIModalOpen(true)
-                                }}
-                              >
-                                <i className="fas fa-edit"></i>
-                              </button>
-                              {empKPI.status === 'Đã giao' && (
-                                <button
-                                  className="view"
-                                  onClick={() => {
-                                    console.log('Viewing KPI:', empKPI)
-                                    setSelectedEmployeeKPIView(empKPI)
-                                    setIsAssignmentViewOpen(true)
-                                  }}
-                                  title="Xem chi tiết"
-                                >
-                                  <i className="fas fa-eye"></i>
-                                </button>
-                              )}
-                            </div>
+                              <td>
+                                <div className="actions">
+                                  <button
+                                    className="edit"
+                                    onClick={() => {
+                                      setSelectedEmployeeKPI(empKPI)
+                                      setIsEmployeeKPIModalOpen(true)
+                                    }}
+                                  >
+                                    <i className="fas fa-edit"></i>
+                                  </button>
+                                  {empKPI.status === 'Đã giao' && (
+                                    <button
+                                      className="view"
+                                      onClick={() => {
+                                        console.log('Viewing KPI:', empKPI)
+                                        setSelectedEmployeeKPIView(empKPI)
+                                        setIsAssignmentViewOpen(true)
+                                      }}
+                                      title="Xem chi tiết"
+                                    >
+                                      <i className="fas fa-eye"></i>
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={7 + maxKpiCount * 2} className="empty-state">
+                            Chưa có KPI cho nhân viên
                           </td>
                         </tr>
-                      )
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={8 + kpiTemplates.filter(t => t.status === 'Đang áp dụng').length} className="empty-state">
-                        Chưa có KPI cho nhân viên
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                      )}
+                    </tbody>
+                  </table>
+                )
+              })()}
             </div>
           </div>
 
@@ -792,6 +831,7 @@ function KPI() {
                 <thead>
                   <tr>
                     <th>STT</th>
+                    <th>Mã NV</th>
                     <th>Họ và tên</th>
                     <th>Bộ phận</th>
                     <th>Vị trí</th>
@@ -817,6 +857,7 @@ function KPI() {
                       return (
                         <tr key={result.id}>
                           <td>{idx + 1}</td>
+                          <td>{employee ? (employee.ma_nhan_vien || employee.employeeCode || employee.code || '-') : '-'}</td>
                           <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
                           <td>{escapeHtml(result.department || '-')}</td>
                           <td>{employee ? (employee.vi_tri || '-') : '-'}</td>
@@ -866,7 +907,7 @@ function KPI() {
 
                   ) : (
                     <tr>
-                      <td colSpan={11 + kpiTemplates.filter(t => t.status === 'Đang áp dụng').length * 2} className="empty-state">
+                      <td colSpan={12 + kpiTemplates.filter(t => t.status === 'Đang áp dụng').length * 2} className="empty-state">
                         Chưa có kết quả KPI
                       </td>
                     </tr>
@@ -936,10 +977,12 @@ function KPI() {
         employeeKPI={selectedEmployeeKPI}
         employees={employees}
         kpiTemplates={kpiTemplates}
+        targetedKPIId={targetedKPIId} // NEW prop
         isOpen={isEmployeeKPIModalOpen}
         onClose={() => {
           setIsEmployeeKPIModalOpen(false)
           setSelectedEmployeeKPI(null)
+          setTargetedKPIId(null) // Reset
         }}
         onSave={loadData}
       />

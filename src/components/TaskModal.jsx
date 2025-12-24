@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
+import { normalizeString } from '../utils/helpers'
 
 function TaskModal({ task, employees, isOpen, onClose, onSave }) {
   const [formData, setFormData] = useState({
@@ -13,8 +14,24 @@ function TaskModal({ task, employees, isOpen, onClose, onSave }) {
     deadline: '',
     status: 'Chưa bắt đầu',
     description: '',
+
     resultFileLink: ''
   })
+
+  // Searchable state for Assigner
+  const [assignerSearchTerm, setAssignerSearchTerm] = useState('')
+  const [showAssignerDropdown, setShowAssignerDropdown] = useState(false)
+
+  useEffect(() => {
+    if (formData.assignerId) {
+      const emp = employees.find(e => e.id === formData.assignerId)
+      if (emp) {
+        setAssignerSearchTerm(emp.ho_va_ten || emp.name || '')
+      }
+    } else {
+      setAssignerSearchTerm('')
+    }
+  }, [formData.assignerId, employees])
 
   useEffect(() => {
     if (task) {
@@ -74,16 +91,16 @@ function TaskModal({ task, employees, isOpen, onClose, onSave }) {
       const data = {
         ...formData,
         code: formData.code || generateTaskCode(),
-        assignerName: employees.find(e => e.id === formData.assignerId)?.ho_va_ten || 
-                     employees.find(e => e.id === formData.assignerId)?.name || 
-                     formData.assignerId
+        assignerName: employees.find(e => e.id === formData.assignerId)?.ho_va_ten ||
+          employees.find(e => e.id === formData.assignerId)?.name ||
+          formData.assignerId
       }
 
       if (task && task.id) {
         await fbUpdate(`hr/tasks/${task.id}`, data)
       } else {
         await fbPush('hr/tasks', data)
-        
+
         // Create initial log
         await fbPush('hr/taskLogs', {
           taskId: data.code,
@@ -93,7 +110,7 @@ function TaskModal({ task, employees, isOpen, onClose, onSave }) {
           createdAt: new Date().toISOString()
         })
       }
-      
+
       onSave()
       onClose()
       resetForm()
@@ -150,10 +167,14 @@ function TaskModal({ task, employees, isOpen, onClose, onSave }) {
                   required
                 >
                   <option value="">Chọn bộ phận</option>
-                  <option value="MKT">Marketing</option>
-                  <option value="Sale">Sale</option>
-                  <option value="Vận đơn">Vận đơn</option>
-                  <option value="CSKH">CSKH</option>
+                  {[...new Set(employees.map(e => e.bo_phan || e.department || e.division).filter(Boolean))].sort().map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                  {/* Fallback hardcoded if no employees yet, or just keep dynamic? Dynamic is better. 
+                      If user wants to add new dept not in employees yet? 
+                      Usually dept comes from employees. 
+                      Let's stick to dynamic from employees to match "sync" request. 
+                  */}
                 </select>
               </div>
               <div className="form-group">
@@ -174,19 +195,87 @@ function TaskModal({ task, employees, isOpen, onClose, onSave }) {
             <div className="form-row">
               <div className="form-group">
                 <label>Người giao *</label>
-                <select
-                  name="assignerId"
-                  value={formData.assignerId}
-                  onChange={handleChange}
-                  required
-                >
-                  <option value="">Chọn người giao</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.ho_va_ten || emp.name || 'N/A'}
-                    </option>
-                  ))}
-                </select>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    placeholder="Tìm kiếm người giao..."
+                    value={assignerSearchTerm}
+                    onChange={(e) => {
+                      setAssignerSearchTerm(e.target.value)
+                      setShowAssignerDropdown(true)
+                      handleChange({ target: { name: 'assignerId', value: '' } }) // Clear ID on type
+                    }}
+                    onFocus={() => setShowAssignerDropdown(true)}
+                    style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    required // Visual requirement, real validation via formData
+                  />
+                  {/* Hidden input for HTML5 validation if needed, or rely on formData check */}
+                  <input
+                    type="text"
+                    style={{ display: 'none' }}
+                    name="assignerId"
+                    value={formData.assignerId}
+                    onChange={() => { }}
+                    required
+                  />
+
+                  {showAssignerDropdown && (
+                    <React.Fragment>
+                      <div
+                        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
+                        onClick={() => setShowAssignerDropdown(false)}
+                      />
+                      <ul style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        background: '#fff',
+                        border: '1px solid #ccc',
+                        borderRadius: '0 0 4px 4px',
+                        zIndex: 1000,
+                        margin: 0,
+                        padding: 0,
+                        listStyle: 'none',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                      }}>
+                        {employees
+                          .filter(emp => {
+                            const name = emp.ho_va_ten || emp.name || ''
+                            return normalizeString(name).includes(normalizeString(assignerSearchTerm))
+                          })
+                          .map(emp => (
+                            <li
+                              key={emp.id}
+                              onClick={() => {
+                                handleChange({ target: { name: 'assignerId', value: emp.id } })
+                                setAssignerSearchTerm(emp.ho_va_ten || emp.name || '')
+                                setShowAssignerDropdown(false)
+                              }}
+                              style={{
+                                padding: '10px',
+                                cursor: 'pointer',
+                                borderBottom: '1px solid #eee'
+                              }}
+                              onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                              onMouseLeave={(e) => e.target.style.background = '#fff'}
+                            >
+                              <strong>{emp.ho_va_ten || emp.name || 'N/A'}</strong>
+                              <br />
+                              <small style={{ color: '#666' }}>{emp.vi_tri || '-'} | {emp.bo_phan || '-'}</small>
+                            </li>
+                          ))}
+                        {employees.filter(emp => normalizeString(emp.ho_va_ten || emp.name || '').includes(normalizeString(assignerSearchTerm))).length === 0 && (
+                          <li style={{ padding: '10px', color: '#999', textAlign: 'center' }}>
+                            Không tìm thấy nhân viên
+                          </li>
+                        )}
+                      </ul>
+                    </React.Fragment>
+                  )}
+                </div>
               </div>
               <div className="form-group">
                 <label>Người nhận *</label>

@@ -6,7 +6,7 @@ import SeedCompetencyDataButton from '../components/SeedCompetencyDataButton'
 import TrainingParticipantModal from '../components/TrainingParticipantModal'
 import TrainingProgramModal from '../components/TrainingProgramModal'
 import { fbDelete, fbGet, fbPush, fbUpdate } from '../services/firebase'
-import { escapeHtml } from '../utils/helpers'
+import { escapeHtml, normalizeString } from '../utils/helpers'
 
 function Competency() {
   const [activeTab, setActiveTab] = useState('framework')
@@ -62,6 +62,26 @@ function Competency() {
     note: ''
   })
   const [isFrameworkSaving, setIsFrameworkSaving] = useState(false)
+
+  // Searchable Select State
+  const [searchTerm, setSearchTerm] = useState('')
+  const [showDropdown, setShowDropdown] = useState(false)
+
+  // Framework Form Dropdown States
+  const [showPositionDropdown, setShowPositionDropdown] = useState(false)
+  const [showNameDropdown, setShowNameDropdown] = useState(false)
+
+  // Sync search term with assessmentForm.employeeId
+  useEffect(() => {
+    if (assessmentForm.employeeId) {
+      const emp = employees.find(e => e.id === assessmentForm.employeeId)
+      if (emp) {
+        setSearchTerm(emp.ho_va_ten || emp.name || '')
+      }
+    } else {
+      setSearchTerm('')
+    }
+  }, [assessmentForm.employeeId, employees])
 
   useEffect(() => {
     loadData()
@@ -430,18 +450,56 @@ function Competency() {
                       ))}
                     </select>
                   </div>
-                  <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
+
+                  {/* Position Combobox */}
+                  <div className="form-group" style={{ flex: '1', minWidth: '200px', position: 'relative' }}>
                     <label>Vị trí *</label>
                     <input
                       type="text"
                       name="position"
                       value={frameworkForm.position}
                       onChange={handleFrameworkFormChange}
-                      placeholder="VD: MKT 1, Sale 1, Trưởng team 1..."
+                      onFocus={() => setShowPositionDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowPositionDropdown(false), 200)} // Delay to allow click
+                      placeholder="VD: MKT 1, Sale 1..."
                       style={{ width: '100%', padding: '8px' }}
                       required
+                      autoComplete="off"
                     />
+                    {showPositionDropdown && (
+                      <ul style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        background: '#fff',
+                        border: '1px solid #ccc',
+                        borderRadius: '0 0 4px 4px',
+                        zIndex: 1000,
+                        margin: 0,
+                        padding: 0,
+                        listStyle: 'none',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                      }}>
+                        {[...new Set([
+                          ...competencyFramework.map(c => c.position),
+                          ...employees.map(e => e.vi_tri || e.position)
+                        ].filter(Boolean))].sort().filter(p => normalizeString(p).includes(normalizeString(frameworkForm.position || ''))).map((pos, idx) => (
+                          <li
+                            key={idx}
+                            onClick={() => setFrameworkForm(prev => ({ ...prev, position: pos }))}
+                            style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #eee' }}
+                            onMouseDown={(e) => e.preventDefault()} // Prevent blur before click
+                          >
+                            {pos}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
+
                   <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
                     <label>Nhóm năng lực *</label>
                     <select
@@ -459,18 +517,54 @@ function Competency() {
                 </div>
 
                 <div className="form-row" style={{ display: 'flex', gap: '15px', marginBottom: '15px', flexWrap: 'wrap' }}>
-                  <div className="form-group" style={{ flex: '2', minWidth: '300px' }}>
+                  {/* Competency Name Combobox */}
+                  <div className="form-group" style={{ flex: '2', minWidth: '300px', position: 'relative' }}>
                     <label>Tên năng lực *</label>
                     <input
                       type="text"
                       name="name"
                       value={frameworkForm.name}
                       onChange={handleFrameworkFormChange}
+                      onFocus={() => setShowNameDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowNameDropdown(false), 200)}
                       placeholder="VD: Lập kế hoạch & giám sát KPI"
                       style={{ width: '100%', padding: '8px' }}
                       required
+                      autoComplete="off"
                     />
+                    {showNameDropdown && (
+                      <ul style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        background: '#fff',
+                        border: '1px solid #ccc',
+                        borderRadius: '0 0 4px 4px',
+                        zIndex: 1000,
+                        margin: 0,
+                        padding: 0,
+                        listStyle: 'none',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                      }}>
+                        {[...new Set(competencyFramework.map(c => c.name).filter(Boolean))].sort()
+                          .filter(n => normalizeString(n).includes(normalizeString(frameworkForm.name || '')))
+                          .map((name, idx) => (
+                            <li
+                              key={idx}
+                              onClick={() => setFrameworkForm(prev => ({ ...prev, name: name }))}
+                              style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #eee' }}
+                              onMouseDown={(e) => e.preventDefault()}
+                            >
+                              {name}
+                            </li>
+                          ))}
+                      </ul>
+                    )}
                   </div>
+
                   <div className="form-group" style={{ flex: '1', minWidth: '150px' }}>
                     <label>Level yêu cầu (1-5) *</label>
                     <select
@@ -697,20 +791,86 @@ function Competency() {
                 </div>
                 <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
                   <label>Nhân sự *</label>
-                  <select
-                    name="employeeId"
-                    value={assessmentForm.employeeId}
-                    onChange={handleAssessmentFormChange}
-                    style={{ width: '100%', padding: '8px' }}
-                  >
-                    <option value="">Chọn nhân sự</option>
-                    {employees
-                      .filter(e => !inputFilterDept || (e.bo_phan || e.department) === inputFilterDept)
-                      .map(e => (
-                        <option key={e.id} value={e.id}>{e.ho_va_ten || e.name} ({e.vi_tri || '-'})</option>
-                      ))
-                    }
-                  </select>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      placeholder={inputFilterDept ? `Tìm nhân viên ${inputFilterDept}...` : "Tìm kiếm nhân viên..."}
+                      value={searchTerm}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value)
+                        setShowDropdown(true)
+                        if (assessmentForm.employeeId) {
+                          // Clear selection if user types (optional, strictly forcing re-select)
+                          handleAssessmentFormChange({ target: { name: 'employeeId', value: '' } })
+                        }
+                      }}
+                      onFocus={() => setShowDropdown(true)}
+                      style={{ width: '100%', padding: '8px' }}
+                    />
+                    {showDropdown && (
+                      <ul style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        background: '#fff',
+                        border: '1px solid #ccc',
+                        borderRadius: '0 0 4px 4px',
+                        zIndex: 1000,
+                        margin: 0,
+                        padding: 0,
+                        listStyle: 'none',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                      }}>
+                        {employees
+                          .filter(e => {
+                            const matchDept = !inputFilterDept || (e.bo_phan || e.department) === inputFilterDept
+                            const matchName = normalizeString(e.ho_va_ten || e.name || '').includes(normalizeString(searchTerm))
+                            return matchDept && matchName
+                          })
+                          .map(e => (
+                            <li
+                              key={e.id}
+                              onClick={() => {
+                                handleAssessmentFormChange({ target: { name: 'employeeId', value: e.id } })
+                                setSearchTerm(e.ho_va_ten || e.name || '')
+                                setShowDropdown(false)
+                              }}
+                              style={{
+                                padding: '10px',
+                                cursor: 'pointer',
+                                borderBottom: '1px solid #eee',
+                                transition: 'background 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                              onMouseLeave={(e) => e.target.style.background = '#fff'}
+                            >
+                              <strong>{e.ho_va_ten || e.name || 'N/A'}</strong>
+                              <br />
+                              <small style={{ color: '#666' }}>{e.vi_tri || '-'} | {e.bo_phan || '-'}</small>
+                            </li>
+                          ))}
+                        {employees.filter(e => {
+                          const matchDept = !inputFilterDept || (e.bo_phan || e.department) === inputFilterDept
+                          const matchName = normalizeString(e.ho_va_ten || e.name || '').includes(normalizeString(searchTerm))
+                          return matchDept && matchName
+                        }).length === 0 && (
+                            <li style={{ padding: '10px', color: '#999', textAlign: 'center' }}>
+                              Không tìm thấy nhân viên
+                            </li>
+                          )}
+                      </ul>
+                    )}
+                    {/* Overlay to close dropdown */}
+                    {showDropdown && (
+                      <div
+                        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
+                        onClick={() => setShowDropdown(false)}
+                      />
+                    )}
+                  </div>
                 </div>
                 <div className="form-group" style={{ flex: '1', minWidth: '200px' }}>
                   <label>Vị trí áp dụng KHNL *</label>

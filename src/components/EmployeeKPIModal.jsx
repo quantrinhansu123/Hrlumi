@@ -1,14 +1,30 @@
-import React, { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
-import { formatMoney } from '../utils/helpers'
+import { normalizeString } from '../utils/helpers'
 
-function EmployeeKPIModal({ employeeKPI, employees, kpiTemplates, isOpen, onClose, onSave }) {
+function EmployeeKPIModal({ employeeKPI, employees, kpiTemplates, targetedKPIId, isOpen, onClose, onSave }) {
   const [formData, setFormData] = useState({
     employeeId: '',
     month: '',
     status: 'Chưa chốt',
     kpiValues: {}
   })
+
+  // Searchable Select State
+  const [searchTerm, setSearchTerm] = useState('')
+  const [showDropdown, setShowDropdown] = useState(false)
+
+  // Sync search term with formData.employeeId
+  useEffect(() => {
+    if (formData.employeeId) {
+      const emp = employees.find(e => e.id === formData.employeeId)
+      if (emp) {
+        setSearchTerm(emp.ho_va_ten || emp.name || '')
+      }
+    } else {
+      setSearchTerm('')
+    }
+  }, [formData.employeeId, employees])
 
   useEffect(() => {
     if (employeeKPI) {
@@ -66,7 +82,7 @@ function EmployeeKPIModal({ employeeKPI, employees, kpiTemplates, isOpen, onClos
     e.preventDefault()
     try {
       const totalWeight = calculateTotalWeight()
-      if (totalWeight !== 100) {
+      if (totalWeight !== 100 && !targetedKPIId) {
         if (!confirm(`Tổng trọng số hiện tại là ${totalWeight}%. Bạn có muốn tiếp tục?`)) {
           return
         }
@@ -87,7 +103,10 @@ function EmployeeKPIModal({ employeeKPI, employees, kpiTemplates, isOpen, onClos
 
   if (!isOpen) return null
 
-  const activeTemplates = kpiTemplates.filter(t => t.status === 'Đang áp dụng')
+  // Filter templates: if targetedKPIId is present, show only that template
+  const activeTemplates = kpiTemplates
+    .filter(t => t.status === 'Đang áp dụng')
+    .filter(t => !targetedKPIId || t.id === targetedKPIId || t.code === targetedKPIId)
 
   return (
     <div className="modal show" onClick={onClose}>
@@ -95,44 +114,122 @@ function EmployeeKPIModal({ employeeKPI, employees, kpiTemplates, isOpen, onClos
         <div className="modal-header">
           <h3>
             <i className="fas fa-user-check"></i>
-            {employeeKPI ? 'Sửa KPI nhân viên' : 'Gán KPI cho nhân viên'}
+            {targetedKPIId ? 'Nhập kết quả KPI chi tiết' : (employeeKPI ? 'Sửa KPI nhân viên' : 'Gán KPI cho nhân viên')}
           </h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
         <div className="modal-body">
           <form onSubmit={handleSubmit}>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Nhân viên *</label>
-                <select
-                  name="employeeId"
-                  value={formData.employeeId}
-                  onChange={handleChange}
-                  required
-                >
-                  <option value="">Chọn nhân viên</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.ho_va_ten || emp.name || 'N/A'} - {emp.vi_tri || '-'}
-                    </option>
-                  ))}
-                </select>
+            {!targetedKPIId && (
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Nhân viên *</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      placeholder="Tìm kiếm nhân viên..."
+                      value={searchTerm}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value)
+                        setShowDropdown(true)
+                        // Clear ID if text changes (force re-select)
+                        if (formData.employeeId) {
+                          handleChange({ target: { name: 'employeeId', value: '' } })
+                        }
+                      }}
+                      onFocus={() => setShowDropdown(true)}
+                      style={{ width: '100%', padding: '8px' }}
+                      required // Input itself required if ID is empty? Form validation checks formData.employeeId mostly.
+                    />
+                    {/* Hidden select to satisfy required attribute if needed, or just rely on validation. 
+                       Here we ensure visual requirement. The actual validation checks formData.employeeId in handleSubmit usually or native form validation.
+                       For native form validation to work with custom input, we might need a hidden input being the specific one.
+                   */}
+                    <input
+                      type="text"
+                      style={{ display: 'none' }}
+                      name="employeeId"
+                      value={formData.employeeId}
+                      onChange={() => { }}
+                      required
+                    />
+
+                    {showDropdown && (
+                      <ul style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        background: '#fff',
+                        border: '1px solid #ccc',
+                        borderRadius: '0 0 4px 4px',
+                        zIndex: 1000,
+                        margin: 0,
+                        padding: 0,
+                        listStyle: 'none',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                      }}>
+                        {employees
+                          .filter(emp => {
+                            const name = emp.ho_va_ten || emp.name || ''
+                            return normalizeString(name).includes(normalizeString(searchTerm))
+                          })
+                          .map(emp => (
+                            <li
+                              key={emp.id}
+                              onClick={() => {
+                                handleChange({ target: { name: 'employeeId', value: emp.id } })
+                                setSearchTerm(emp.ho_va_ten || emp.name || '')
+                                setShowDropdown(false)
+                              }}
+                              style={{
+                                padding: '10px',
+                                cursor: 'pointer',
+                                borderBottom: '1px solid #eee',
+                                transition: 'background 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                              onMouseLeave={(e) => e.target.style.background = '#fff'}
+                            >
+                              <strong>{emp.ho_va_ten || emp.name || 'N/A'}</strong>
+                              <br />
+                              <small style={{ color: '#666' }}>{emp.vi_tri || '-'} | {emp.bo_phan || '-'}</small>
+                            </li>
+                          ))}
+                        {employees.filter(emp => normalizeString(emp.ho_va_ten || emp.name || '').includes(normalizeString(searchTerm))).length === 0 && (
+                          <li style={{ padding: '10px', color: '#999', textAlign: 'center' }}>
+                            Không tìm thấy nhân viên
+                          </li>
+                        )}
+                      </ul>
+                    )}
+                    {/* Overlay to close dropdown */}
+                    {showDropdown && (
+                      <div
+                        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
+                        onClick={() => setShowDropdown(false)}
+                      />
+                    )}
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Tháng *</label>
+                  <input
+                    type="month"
+                    name="month"
+                    value={formData.month}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
               </div>
-              <div className="form-group">
-                <label>Tháng *</label>
-                <input
-                  type="month"
-                  name="month"
-                  value={formData.month}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-            </div>
+            )}
 
             {activeTemplates.length > 0 && (
               <div style={{ marginTop: '20px' }}>
-                <h4>Nhập giá trị KPI</h4>
+                {!targetedKPIId && <h4>Nhập giá trị KPI</h4>}
                 <div style={{ overflowX: 'auto' }}>
                   <table>
                     <thead>

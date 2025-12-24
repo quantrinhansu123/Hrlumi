@@ -36,6 +36,7 @@ function Salary() {
   const [selectedInsurance, setSelectedInsurance] = useState(null)
   const [selectedTax, setSelectedTax] = useState(null)
   const [isTaxReadOnly, setIsTaxReadOnly] = useState(false)
+  const [isInsuranceReadOnly, setIsInsuranceReadOnly] = useState(false)
 
   // Excel Import/Export states for Insurance
   const [isInsuranceImportModalOpen, setIsInsuranceImportModalOpen] = useState(false)
@@ -851,10 +852,24 @@ function Salary() {
                       </td>
                       <td>
                         <div className="actions">
+                          {ins.status === 'Đang tham gia' && (
+                            <button
+                              className="view"
+                              title="Xem chi tiết"
+                              onClick={() => {
+                                setSelectedInsurance(ins)
+                                setIsInsuranceReadOnly(true)
+                                setIsInsuranceModalOpen(true)
+                              }}
+                            >
+                              <i className="fas fa-eye"></i>
+                            </button>
+                          )}
                           <button
                             className="edit"
                             onClick={() => {
                               setSelectedInsurance(ins)
+                              setIsInsuranceReadOnly(false)
                               setIsInsuranceModalOpen(true)
                             }}
                           >
@@ -1002,8 +1017,10 @@ function Salary() {
         onClose={() => {
           setIsInsuranceModalOpen(false)
           setSelectedInsurance(null)
+          setIsInsuranceReadOnly(false)
         }}
         onSave={loadData}
+        readOnly={isInsuranceReadOnly}
       />
 
       <TaxModal

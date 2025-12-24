@@ -1,28 +1,30 @@
-import React, { useState, useEffect } from 'react'
-import { fbGet, fbDelete } from '../services/firebase'
-import { escapeHtml } from '../utils/helpers'
-import TaskModal from '../components/TaskModal'
-import TaskDetailModal from '../components/TaskDetailModal'
+import React, { useEffect, useState } from 'react'
 import SeedTaskDataButton from '../components/SeedTaskDataButton'
+import TaskDetailModal from '../components/TaskDetailModal'
+import TaskModal from '../components/TaskModal'
+import { fbDelete, fbGet } from '../services/firebase'
+import { escapeHtml, normalizeString } from '../utils/helpers'
 
 function Tasks() {
   const [tasks, setTasks] = useState([])
   const [taskLogs, setTaskLogs] = useState([])
   const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(true)
-  
+
   // Modal states
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
   const [isTaskDetailModalOpen, setIsTaskDetailModalOpen] = useState(false)
-  
+
   // Selected items
   const [selectedTask, setSelectedTask] = useState(null)
   const [selectedTaskForDetail, setSelectedTaskForDetail] = useState(null)
-  
+
   // Filters
   const [filterDept, setFilterDept] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterAssignee, setFilterAssignee] = useState('')
+  const [filterAssigneeSearch, setFilterAssigneeSearch] = useState('') // NEW
+  const [showFilterAssigneeDropdown, setShowFilterAssigneeDropdown] = useState(false) // NEW
   const [filterPriority, setFilterPriority] = useState('')
 
   useEffect(() => {
@@ -32,7 +34,7 @@ function Tasks() {
   const loadData = async () => {
     try {
       setLoading(true)
-      
+
       // Load employees
       const empData = await fbGet('employees')
       let empList = []
@@ -41,19 +43,19 @@ function Tasks() {
           empList = empData.filter(item => item !== null && item !== undefined)
         } else if (typeof empData === "object") {
           empList = Object.entries(empData)
-            .filter(([k,v]) => v !== null && v !== undefined)
-            .map(([k,v]) => ({...v, id: k}))
+            .filter(([k, v]) => v !== null && v !== undefined)
+            .map(([k, v]) => ({ ...v, id: k }))
         }
       }
       setEmployees(empList)
 
       // Load tasks
       const hrData = await fbGet('hr')
-      const tasksList = hrData?.tasks ? Object.entries(hrData.tasks).map(([k,v]) => ({...v, id: k})) : []
+      const tasksList = hrData?.tasks ? Object.entries(hrData.tasks).map(([k, v]) => ({ ...v, id: k })) : []
       setTasks(tasksList)
 
       // Load task logs
-      const logsList = hrData?.taskLogs ? Object.entries(hrData.taskLogs).map(([k,v]) => ({...v, id: k})) : []
+      const logsList = hrData?.taskLogs ? Object.entries(hrData.taskLogs).map(([k, v]) => ({ ...v, id: k })) : []
       setTaskLogs(logsList)
 
       setLoading(false)
@@ -117,7 +119,7 @@ function Tasks() {
           Quản trị Giao việc
         </h1>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
+          <button
             className="btn btn-primary"
             onClick={() => {
               setSelectedTask(null)
@@ -134,8 +136,8 @@ function Tasks() {
       {/* Filters */}
       <div className="card" style={{ marginBottom: '20px' }}>
         <div className="search-box" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <select 
-            value={filterDept} 
+          <select
+            value={filterDept}
             onChange={(e) => setFilterDept(e.target.value)}
             style={{ padding: '8px', borderRadius: '4px' }}
           >
@@ -144,9 +146,9 @@ function Tasks() {
               <option key={dept} value={dept}>{dept}</option>
             ))}
           </select>
-          
-          <select 
-            value={filterStatus} 
+
+          <select
+            value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
             style={{ padding: '8px', borderRadius: '4px' }}
           >
@@ -159,21 +161,83 @@ function Tasks() {
             <option value="Tạm dừng">Tạm dừng</option>
           </select>
 
-          <select 
-            value={filterAssignee} 
-            onChange={(e) => setFilterAssignee(e.target.value)}
-            style={{ padding: '8px', borderRadius: '4px' }}
-          >
-            <option value="">Tất cả người nhận</option>
-            {employees.map(emp => (
-              <option key={emp.id} value={emp.id}>
-                {emp.ho_va_ten || emp.name || 'N/A'}
-              </option>
-            ))}
-          </select>
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              placeholder="Tất cả người nhận"
+              value={filterAssigneeSearch}
+              onChange={(e) => {
+                setFilterAssigneeSearch(e.target.value)
+                setShowFilterAssigneeDropdown(true)
+                if (filterAssignee) setFilterAssignee('') // Clear filter if typing
+              }}
+              onFocus={() => setShowFilterAssigneeDropdown(true)}
+              style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ddd', minWidth: '200px' }}
+            />
+            {showFilterAssigneeDropdown && (
+              <React.Fragment>
+                <div
+                  style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 998 }}
+                  onClick={() => setShowFilterAssigneeDropdown(false)}
+                />
+                <ul style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  width: '100%',
+                  maxHeight: '300px',
+                  overflowY: 'auto',
+                  background: '#fff',
+                  border: '1px solid #ccc',
+                  borderRadius: '0 0 4px 4px',
+                  zIndex: 999,
+                  margin: 0,
+                  padding: 0,
+                  listStyle: 'none',
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                }}>
+                  <li
+                    onClick={() => {
+                      setFilterAssignee('')
+                      setFilterAssigneeSearch('')
+                      setShowFilterAssigneeDropdown(false)
+                    }}
+                    style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #eee', color: '#666' }}
+                    onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                    onMouseLeave={(e) => e.target.style.background = '#fff'}
+                  >
+                    Tất cả người nhận
+                  </li>
+                  {employees
+                    .filter(emp => {
+                      const name = emp.ho_va_ten || emp.name || ''
+                      return normalizeString(name).includes(normalizeString(filterAssigneeSearch))
+                    })
+                    .map(emp => (
+                      <li
+                        key={emp.id}
+                        onClick={() => {
+                          setFilterAssignee(emp.id)
+                          setFilterAssigneeSearch(emp.ho_va_ten || emp.name || '')
+                          setShowFilterAssigneeDropdown(false)
+                        }}
+                        style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #eee' }}
+                        onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                        onMouseLeave={(e) => e.target.style.background = '#fff'}
+                      >
+                        {emp.ho_va_ten || emp.name || 'N/A'}
+                      </li>
+                    ))}
+                  {employees.filter(emp => normalizeString(emp.ho_va_ten || emp.name || '').includes(normalizeString(filterAssigneeSearch))).length === 0 && (
+                    <li style={{ padding: '10px', color: '#999', textAlign: 'center' }}>Không tìm thấy</li>
+                  )}
+                </ul>
+              </React.Fragment>
+            )}
+          </div>
 
-          <select 
-            value={filterPriority} 
+          <select
+            value={filterPriority}
             onChange={(e) => setFilterPriority(e.target.value)}
             style={{ padding: '8px', borderRadius: '4px' }}
           >
@@ -183,12 +247,13 @@ function Tasks() {
             <option value="Thấp">Thấp</option>
           </select>
 
-          <button 
+          <button
             className="btn btn-sm"
             onClick={() => {
               setFilterDept('')
               setFilterStatus('')
               setFilterAssignee('')
+              setFilterAssigneeSearch('')
               setFilterPriority('')
             }}
           >
@@ -220,10 +285,10 @@ function Tasks() {
             {filteredTasks.length > 0 ? (
               filteredTasks.map((task, idx) => {
                 const overdue = isOverdue(task)
-                const status = overdue && task.status !== 'Đã xong' && task.status !== 'Đã hoàn thành' 
-                  ? 'Quá hạn' 
+                const status = overdue && task.status !== 'Đã xong' && task.status !== 'Đã hoàn thành'
+                  ? 'Quá hạn'
                   : task.status
-                
+
                 return (
                   <tr key={task.id} style={overdue ? { backgroundColor: '#fff3cd' } : {}}>
                     <td>{idx + 1}</td>
@@ -233,11 +298,10 @@ function Tasks() {
                     <td>{escapeHtml(task.assignerName || getEmployeeName(task.assignerId) || '-')}</td>
                     <td>{escapeHtml(getEmployeeName(task.assigneeId) || '-')}</td>
                     <td>
-                      <span className={`badge ${
-                        task.priority === 'Cao' ? 'badge-danger' :
+                      <span className={`badge ${task.priority === 'Cao' ? 'badge-danger' :
                         task.priority === 'Trung bình' ? 'badge-warning' :
-                        'badge-info'
-                      }`}>
+                          'badge-info'
+                        }`}>
                         {escapeHtml(task.priority || '-')}
                       </span>
                     </td>
@@ -246,21 +310,20 @@ function Tasks() {
                       {task.deadline ? new Date(task.deadline).toLocaleDateString('vi-VN') : '-'}
                     </td>
                     <td>
-                      <span className={`badge ${
-                        status === 'Đã xong' || status === 'Đã hoàn thành' ? 'badge-success' :
+                      <span className={`badge ${status === 'Đã xong' || status === 'Đã hoàn thành' ? 'badge-success' :
                         status === 'Đang làm' ? 'badge-info' :
-                        status === 'Quá hạn' ? 'badge-danger' :
-                        status === 'Tạm dừng' ? 'badge-warning' :
-                        'badge-secondary'
-                      }`}>
+                          status === 'Quá hạn' ? 'badge-danger' :
+                            status === 'Tạm dừng' ? 'badge-warning' :
+                              'badge-secondary'
+                        }`}>
                         {escapeHtml(status || '-')}
                       </span>
                     </td>
                     <td>
                       {task.resultFileLink ? (
-                        <a 
-                          href={task.resultFileLink} 
-                          target="_blank" 
+                        <a
+                          href={task.resultFileLink}
+                          target="_blank"
                           rel="noopener noreferrer"
                           style={{ color: 'var(--primary)' }}
                         >
@@ -272,7 +335,7 @@ function Tasks() {
                     </td>
                     <td>
                       <div className="actions">
-                        <button 
+                        <button
                           className="edit"
                           onClick={() => {
                             setSelectedTask(task)
@@ -282,7 +345,7 @@ function Tasks() {
                         >
                           <i className="fas fa-edit"></i>
                         </button>
-                        <button 
+                        <button
                           className="view"
                           onClick={() => {
                             setSelectedTaskForDetail(task)
@@ -292,7 +355,7 @@ function Tasks() {
                         >
                           <i className="fas fa-eye"></i>
                         </button>
-                        <button 
+                        <button
                           className="delete"
                           onClick={() => handleDeleteTask(task.id)}
                           title="Xóa"

@@ -673,7 +673,7 @@ function Attendance() {
                   taxInfo.map((tax, idx) => {
                     const employee = employees.find(e => e.id === tax.employeeId)
                     const employeeDependents = dependents.filter(d => d.employeeId === tax.employeeId && d.status === 'Đang áp dụng')
-                    const totalDependentDeduction = employeeDependents.length * 4400000 // 4.4 triệu/người phụ thuộc
+                    const totalDependentDeduction = employeeDependents.length * 6200000 // 6.2 triệu/người phụ thuộc
                     const personalDeduction = tax.giamTruBanThan || 11000000 // 11 triệu
                     const taxableIncome = (tax.thuNhapTinhThue || 0) - personalDeduction - totalDependentDeduction - (tax.bhxh || 0)
                     return (
