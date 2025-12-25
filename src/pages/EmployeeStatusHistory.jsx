@@ -51,23 +51,30 @@ function EmployeeStatusHistory() {
 
   const filterByDate = (items) => {
     if (!fromDate && !toDate) return items
-    const from = fromDate ? new Date(fromDate) : null
-    const to = toDate ? new Date(toDate) : null
     return items.filter(item => {
-      const d = item.effectiveDate || item.createdAt
-      if (!d) return false
-      const dt = new Date(d)
-      if (from && dt < from) return false
-      if (to) {
-        const toEnd = new Date(to)
-        toEnd.setHours(23, 59, 59, 999)
-        if (dt > toEnd) return false
-      }
+      // Lấy ngày log (cắt lấy yyyy-mm-dd)
+      const rawDate = item.effectiveDate || item.createdAt
+      if (!rawDate) return false
+
+      // Chuyển về YYYY-MM-DD (nếu là ISO string thì cắt 10 ký tự đầu)
+      const dateStr = rawDate.substring(0, 10)
+
+      if (fromDate && dateStr < fromDate) return false
+      if (toDate && dateStr > toDate) return false
+
       return true
     })
   }
 
+  const [activeTab, setActiveTab] = useState('detail') // 'detail' or 'summary'
+
   const filteredLogs = filterByDate(logs)
+
+  const summaryStats = {
+    thuViec: filteredLogs.filter(l => l.newStatus === 'Thử việc').length,
+    chinhThuc: filteredLogs.filter(l => l.newStatus === 'Chính thức').length,
+    nghiViec: filteredLogs.filter(l => l.newStatus === 'Nghỉ việc').length
+  }
 
   if (loading) {
     return <div className="loadingState">Đang tải dữ liệu...</div>
@@ -102,39 +109,105 @@ function EmployeeStatusHistory() {
         </div>
       </div>
 
-      <div className="card">
-        <table>
-          <thead>
-            <tr>
-              <th>STT</th>
-              <th>Mã nhân viên</th>
-              <th>Tên nhân viên</th>
-              <th>Trạng thái mới</th>
-              <th>Ngày hiệu lực</th>
-              <th>Người thực hiện</th>
-              <th>Ghi chú</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredLogs.length > 0 ? (
-              filteredLogs.map((log, idx) => (
-                <tr key={log.id || idx}>
-                  <td>{idx + 1}</td>
-                  <td>{escapeHtml(log.employeeCode || log.employeeId || '')}</td>
-                  <td>{escapeHtml(log.employeeName || '')}</td>
-                  <td>{escapeHtml(log.newStatus || '')}</td>
-                  <td>{log.effectiveDate ? new Date(log.effectiveDate).toLocaleDateString('vi-VN') : ''}</td>
-                  <td>{escapeHtml(log.actor || 'HR')}</td>
-                  <td>{escapeHtml(log.note || '')}</td>
+      <div className="tabs" style={{ marginBottom: '20px' }}>
+        <button
+          className={`tab ${activeTab === 'detail' ? 'active' : ''}`}
+          onClick={() => setActiveTab('detail')}
+        >
+          <i className="fas fa-list-alt" style={{ marginRight: '8px' }}></i>
+          Chi tiết lịch sử thay đổi
+        </button>
+        <button
+          className={`tab ${activeTab === 'summary' ? 'active' : ''}`}
+          onClick={() => setActiveTab('summary')}
+        >
+          <i className="fas fa-chart-pie" style={{ marginRight: '8px' }}></i>
+          Bảng tổng hợp số liệu
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* Summary Table */}
+        {activeTab === 'summary' && (
+          <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
+            <div style={{ padding: '15px', borderBottom: '1px solid #eee', background: '#e3f2fd' }}>
+              <h4 style={{ margin: 0, fontSize: '1.1rem', color: '#0d47a1' }}>
+                <i className="fas fa-chart-pie" style={{ marginRight: '8px' }}></i>
+                Bảng tổng hợp số liệu
+              </h4>
+            </div>
+            <table className="table" style={{ marginBottom: 0 }}>
+              <thead>
+                <tr>
+                  <th style={{ width: '50%' }}>Chỉ tiêu</th>
+                  <th style={{ width: '50%', textAlign: 'center' }}>Số lượng</th>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="7" className="empty-state">Không có thay đổi trạng thái trong kỳ</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Tổng nhân viên Thử việc</td>
+                  <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#1976d2', fontSize: '1.2rem' }}>{summaryStats.thuViec}</td>
+                </tr>
+                <tr>
+                  <td>Tổng nhân viên Chính thức</td>
+                  <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#388e3c', fontSize: '1.2rem' }}>{summaryStats.chinhThuc}</td>
+                </tr>
+                <tr>
+                  <td>Tổng nhân viên Nghỉ việc</td>
+                  <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#d32f2f', fontSize: '1.2rem' }}>{summaryStats.nghiViec}</td>
+                </tr>
+                <tr style={{ background: '#f8f9fa' }}>
+                  <td style={{ fontWeight: 'bold' }}>Tổng lượt biến động</td>
+                  <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#333', fontSize: '1.2rem' }}>{filteredLogs.length}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Detailed History Table */}
+        {activeTab === 'detail' && (
+          <div className="card">
+            <div style={{ padding: '15px', borderBottom: '1px solid #eee', marginBottom: '15px' }}>
+              <h4 style={{ margin: 0, fontSize: '1.1rem', color: '#333' }}>
+                <i className="fas fa-list-alt" style={{ marginRight: '8px' }}></i>
+                Chi tiết lịch sử thay đổi
+              </h4>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>STT</th>
+                  <th>Mã nhân viên</th>
+                  <th>Tên nhân viên</th>
+                  <th>Trạng thái mới</th>
+                  <th>Ngày hiệu lực</th>
+                  <th>Người thực hiện</th>
+                  <th>Ghi chú</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLogs.length > 0 ? (
+                  filteredLogs.map((log, idx) => (
+                    <tr key={log.id || idx}>
+                      <td>{idx + 1}</td>
+                      <td>{escapeHtml(log.employeeCode || log.employeeId || '')}</td>
+                      <td>{escapeHtml(log.employeeName || '')}</td>
+                      <td>{escapeHtml(log.newStatus || '')}</td>
+                      <td>{log.effectiveDate ? new Date(log.effectiveDate).toLocaleDateString('vi-VN') : ''}</td>
+                      <td>{escapeHtml(log.actor || 'HR')}</td>
+                      <td>{escapeHtml(log.note || '')}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="7" className="empty-state">Không có thay đổi trạng thái trong kỳ</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )
