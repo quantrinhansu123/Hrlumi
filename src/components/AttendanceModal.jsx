@@ -172,7 +172,22 @@ function AttendanceModal({ attendance, employees, isOpen, onClose, onSave, readO
                                     required
                                 />
                                 {showDropdown && !readOnly && (
-                                    <ul className="dropdown-list">
+                                    <ul style={{
+                                        position: 'absolute',
+                                        top: '100%',
+                                        left: 0,
+                                        right: 0,
+                                        maxHeight: '200px',
+                                        overflowY: 'auto',
+                                        background: '#fff',
+                                        border: '1px solid #ccc',
+                                        borderRadius: '0 0 4px 4px',
+                                        zIndex: 1000,
+                                        margin: 0,
+                                        padding: 0,
+                                        listStyle: 'none',
+                                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                                    }}>
                                         {employees
                                             .filter(emp => {
                                                 const name = emp.ho_va_ten || emp.name || ''
@@ -186,19 +201,31 @@ function AttendanceModal({ attendance, employees, isOpen, onClose, onSave, readO
                                                         setSearchTerm(emp.ho_va_ten || emp.name || 'N/A')
                                                         setShowDropdown(false)
                                                     }}
+                                                    style={{
+                                                        padding: '10px',
+                                                        cursor: 'pointer',
+                                                        borderBottom: '1px solid #eee',
+                                                        transition: 'background 0.2s'
+                                                    }}
+                                                    onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                                                    onMouseLeave={(e) => e.target.style.background = '#fff'}
                                                 >
                                                     <strong>{emp.ho_va_ten || emp.name || 'N/A'}</strong>
-                                                    <small>{emp.vi_tri || '-'} | {emp.bo_phan || '-'}</small>
+                                                    <br />
+                                                    <small style={{ color: '#666' }}>{emp.vi_tri || '-'} | {emp.bo_phan || '-'}</small>
                                                 </li>
                                             ))}
                                         {employees.filter(emp => normalizeString(emp.ho_va_ten || emp.name || '').includes(normalizeString(searchTerm))).length === 0 && (
-                                            <li className="no-result">Không tìm thấy nhân viên</li>
+                                            <li style={{ padding: '10px', color: '#999', textAlign: 'center' }}>Không tìm thấy nhân viên</li>
                                         )}
                                     </ul>
                                 )}
                             </div>
                             {showDropdown && (
-                                <div className="dropdown-overlay" onClick={() => setShowDropdown(false)} />
+                                <div
+                                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
+                                    onClick={() => setShowDropdown(false)}
+                                />
                             )}
                         </div>
 

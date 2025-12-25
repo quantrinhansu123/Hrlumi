@@ -22,6 +22,10 @@ function TaskModal({ task, employees, isOpen, onClose, onSave }) {
   const [assignerSearchTerm, setAssignerSearchTerm] = useState('')
   const [showAssignerDropdown, setShowAssignerDropdown] = useState(false)
 
+  // Searchable state for Assignee
+  const [assigneeSearchTerm, setAssigneeSearchTerm] = useState('')
+  const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false)
+
   useEffect(() => {
     if (formData.assignerId) {
       const emp = employees.find(e => e.id === formData.assignerId)
@@ -32,6 +36,17 @@ function TaskModal({ task, employees, isOpen, onClose, onSave }) {
       setAssignerSearchTerm('')
     }
   }, [formData.assignerId, employees])
+
+  useEffect(() => {
+    if (formData.assigneeId) {
+      const emp = employees.find(e => e.id === formData.assigneeId)
+      if (emp) {
+        setAssigneeSearchTerm(emp.ho_va_ten || emp.name || '')
+      }
+    } else {
+      setAssigneeSearchTerm('')
+    }
+  }, [formData.assigneeId, employees])
 
   useEffect(() => {
     if (task) {
@@ -279,19 +294,87 @@ function TaskModal({ task, employees, isOpen, onClose, onSave }) {
               </div>
               <div className="form-group">
                 <label>Người nhận *</label>
-                <select
-                  name="assigneeId"
-                  value={formData.assigneeId}
-                  onChange={handleChange}
-                  required
-                >
-                  <option value="">Chọn người nhận</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.ho_va_ten || emp.name || 'N/A'}
-                    </option>
-                  ))}
-                </select>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    placeholder="Tìm kiếm người nhận..."
+                    value={assigneeSearchTerm}
+                    onChange={(e) => {
+                      setAssigneeSearchTerm(e.target.value)
+                      setShowAssigneeDropdown(true)
+                      handleChange({ target: { name: 'assigneeId', value: '' } })
+                    }}
+                    onFocus={() => setShowAssigneeDropdown(true)}
+                    style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    required
+                  />
+                  <input
+                    type="text"
+                    style={{ display: 'none' }}
+                    name="assigneeId"
+                    value={formData.assigneeId}
+                    onChange={() => { }}
+                    required
+                  />
+
+                  {showAssigneeDropdown && (
+                    <React.Fragment>
+                      <div
+                        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
+                        onClick={() => setShowAssigneeDropdown(false)}
+                      />
+                      <ul style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        background: '#fff',
+                        border: '1px solid #ccc',
+                        borderRadius: '0 0 4px 4px',
+                        zIndex: 1000,
+                        margin: 0,
+                        padding: 0,
+                        listStyle: 'none',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                      }}>
+                        {employees
+                          .filter(emp => {
+                            const name = emp.ho_va_ten || emp.name || ''
+                            return normalizeString(name).includes(normalizeString(assigneeSearchTerm))
+                          })
+                          .map(emp => (
+                            <li
+                              key={emp.id}
+                              onClick={() => {
+                                handleChange({ target: { name: 'assigneeId', value: emp.id } })
+                                setAssigneeSearchTerm(emp.ho_va_ten || emp.name || 'N/A')
+                                setShowAssigneeDropdown(false)
+                              }}
+                              style={{
+                                padding: '10px',
+                                cursor: 'pointer',
+                                borderBottom: '1px solid #eee',
+                                transition: 'background 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                              onMouseLeave={(e) => e.target.style.background = '#fff'}
+                            >
+                              <strong>{emp.ho_va_ten || emp.name || 'N/A'}</strong>
+                              <br />
+                              <small style={{ color: '#666' }}>{emp.vi_tri || '-'} | {emp.bo_phan || '-'}</small>
+                            </li>
+                          ))}
+                        {employees.filter(emp => normalizeString(emp.ho_va_ten || emp.name || '').includes(normalizeString(assigneeSearchTerm))).length === 0 && (
+                          <li style={{ padding: '10px', color: '#999', textAlign: 'center' }}>
+                            Không tìm thấy nhân viên
+                          </li>
+                        )}
+                      </ul>
+                    </React.Fragment>
+                  )}
+                </div>
               </div>
             </div>
 

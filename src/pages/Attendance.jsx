@@ -11,7 +11,7 @@ import SeedPayrollDataButton from '../components/SeedPayrollDataButton'
 import TaxModal from '../components/TaxModal'
 import { fbDelete, fbGet } from '../services/firebase'
 import { TAX_CONFIG } from '../utils/constants'
-import { calculateProgressiveTax, escapeHtml, formatMoney } from '../utils/helpers'
+import { calculateProgressiveTax, escapeHtml, formatMoney, normalizeString } from '../utils/helpers'
 
 function Attendance() {
   const [activeTab, setActiveTab] = useState('attendance')
@@ -51,6 +51,7 @@ function Attendance() {
   const [filterPayrollPeriod, setFilterPayrollPeriod] = useState('')
   const [filterPayrollDept, setFilterPayrollDept] = useState('')
   const [filterAttendanceMonth, setFilterAttendanceMonth] = useState('')
+  const [filterAttendanceEmployee, setFilterAttendanceEmployee] = useState('')
 
   useEffect(() => {
     loadData()
@@ -396,19 +397,28 @@ function Attendance() {
         <div className="card">
           <div className="card-header">
             <h3 className="card-title">Bảng chấm công</h3>
-            <select
-              value={filterAttendanceMonth}
-              onChange={(e) => setFilterAttendanceMonth(e.target.value)}
-              style={{ padding: '8px', borderRadius: '4px' }}
-            >
-              <option value="">Tất cả tháng</option>
-              {[...new Set(attendanceLogs.map(log => {
-                const date = new Date(log.date || log.timestamp)
-                return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-              }))].sort().map(month => (
-                <option key={month} value={month}>{month}</option>
-              ))}
-            </select>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="Tìm theo tên hoặc mã NV..."
+                value={filterAttendanceEmployee}
+                onChange={(e) => setFilterAttendanceEmployee(e.target.value)}
+                style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ddd', minWidth: '250px' }}
+              />
+              <select
+                value={filterAttendanceMonth}
+                onChange={(e) => setFilterAttendanceMonth(e.target.value)}
+                style={{ padding: '8px', borderRadius: '4px' }}
+              >
+                <option value="">Tất cả tháng</option>
+                {[...new Set(attendanceLogs.map(log => {
+                  const date = new Date(log.date || log.timestamp)
+                  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+                }))].sort().map(month => (
+                  <option key={month} value={month}>{month}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table>
@@ -431,10 +441,25 @@ function Attendance() {
                 {attendanceLogs.length > 0 ? (
                   attendanceLogs
                     .filter(log => {
-                      if (!filterAttendanceMonth) return true
-                      const date = new Date(log.date || log.timestamp)
-                      const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-                      return monthStr === filterAttendanceMonth
+                      // Filter by month
+                      if (filterAttendanceMonth) {
+                        const date = new Date(log.date || log.timestamp)
+                        const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+                        if (monthStr !== filterAttendanceMonth) return false
+                      }
+
+                      // Filter by employee name or ID
+                      if (filterAttendanceEmployee) {
+                        const emp = employees.find(e => e.id === log.employeeId)
+                        const empName = emp?.ho_va_ten || emp?.name || ''
+                        const empId = log.employeeId || ''
+                        const searchTerm = normalizeString(filterAttendanceEmployee)
+
+                        return normalizeString(empName).includes(searchTerm) ||
+                          normalizeString(empId).includes(searchTerm)
+                      }
+
+                      return true
                     })
                     .sort((a, b) => {
                       // Sort by employee name first
