@@ -43,7 +43,7 @@ function KPITemplateModal({ template, isOpen, onClose, onSave, readOnly = false 
   }
 
   const handleChange = (e) => {
-    const value = e.target.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value
+    const value = e.target.value
     setFormData({
       ...formData,
       [e.target.name]: value
@@ -53,10 +53,15 @@ function KPITemplateModal({ template, isOpen, onClose, onSave, readOnly = false 
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
+      const dataToSave = {
+        ...formData,
+        weight: formData.weight === '' ? 0 : parseFloat(formData.weight)
+      }
+
       if (template && template.id) {
-        await fbUpdate(`hr/kpiTemplates/${template.id}`, formData)
+        await fbUpdate(`hr/kpiTemplates/${template.id}`, dataToSave)
       } else {
-        await fbPush('hr/kpiTemplates', formData)
+        await fbPush('hr/kpiTemplates', dataToSave)
       }
       onSave()
       onClose()
@@ -146,10 +151,10 @@ function KPITemplateModal({ template, isOpen, onClose, onSave, readOnly = false 
                   name="weight"
                   value={formData.weight}
                   onChange={handleChange}
+                  onFocus={(e) => e.target.select()}
                   required
                   min="0"
-                  max="100"
-                  step="1"
+                  step="0.01"
                   disabled={readOnly}
                 />
               </div>

@@ -41,11 +41,11 @@ function SalaryGradeModal({ grade, isOpen, onClose, onSave, readOnly }) {
   }
 
   const handleChange = (e) => {
-    const value = e.target.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value
-    setFormData({
-      ...formData,
-      [e.target.name]: value
-    })
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
   }
 
   const handleSubmit = async (e) => {
@@ -53,6 +53,9 @@ function SalaryGradeModal({ grade, isOpen, onClose, onSave, readOnly }) {
     try {
       const data = {
         ...formData,
+        revenueFrom: formData.revenueFrom === '' ? 0 : Number(formData.revenueFrom),
+        level: formData.level === '' ? 1 : Number(formData.level),
+        salary: formData.salary === '' ? 0 : Number(formData.salary),
         revenueTo: formData.revenueTo === '' || formData.revenueTo === 'Không giới hạn' ? null : formData.revenueTo
       }
 
@@ -121,7 +124,9 @@ function SalaryGradeModal({ grade, isOpen, onClose, onSave, readOnly }) {
                   onChange={handleChange}
                   required
                   min="0"
+                  step="any"
                   disabled={readOnly}
+                  onFocus={(e) => e.target.select()}
                 />
               </div>
               <div className="form-group">
@@ -148,6 +153,7 @@ function SalaryGradeModal({ grade, isOpen, onClose, onSave, readOnly }) {
                   required
                   min="1"
                   disabled={readOnly}
+                  onFocus={(e) => e.target.select()}
                 />
               </div>
               <div className="form-group">
@@ -160,6 +166,7 @@ function SalaryGradeModal({ grade, isOpen, onClose, onSave, readOnly }) {
                   required
                   min="0"
                   disabled={readOnly}
+                  onFocus={(e) => e.target.select()}
                 />
               </div>
             </div>

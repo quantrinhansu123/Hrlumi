@@ -88,6 +88,7 @@ function Employees() {
 
   const downloadTemplate = () => {
     const headers = [
+      'Mã nhân viên',
       'Họ và tên',
       'Email',
       'SĐT',
@@ -99,6 +100,7 @@ function Employees() {
       'CCCD',
       'Ngày cấp',
       'Nơi cấp',
+      'Địa chỉ thường trú',
       'Quê quán',
       'Giới tính',
       'Tình trạng hôn nhân',
@@ -107,6 +109,7 @@ function Employees() {
 
     const sampleData = [
       [
+        'NV001',
         'Nguyễn Văn A',
         'nguyenvana@example.com',
         '0901234567',
@@ -119,11 +122,13 @@ function Employees() {
         '2020-01-01',
         'CA TP.HCM',
         'TP.HCM',
+        '123 Đường ABC, Q.1, TP.HCM',
         'Nam',
         'Độc thân',
         'https://drive.google.com/file/d/YOUR_FILE_ID/view'
       ],
       [
+        'NV002',
         'Trần Thị B',
         'tranthib@example.com',
         '0912345678',
@@ -136,6 +141,7 @@ function Employees() {
         '2019-05-15',
         'CA Hà Nội',
         'Hà Nội',
+        '456 Phố XYZ, Hà Nội',
         'Nữ',
         'Đã kết hôn',
         'https://i.imgur.com/example.jpg'
@@ -345,6 +351,7 @@ function Employees() {
         })
 
         const payload = {
+          employeeId: rowObj['ma_nhan_vien'] || rowObj['ma_nv'] || rowObj['employee_id'] || rowObj['code'] || '',
           ho_va_ten: rowObj['ho_va_ten'] || rowObj['ho_ten'] || rowObj['ten'] || rowObj['ho_va_ten'] || rowObj['name'] || '',
           email: rowObj['email'] || '',
           sđt: rowObj['sdt'] || rowObj['so_dien_thoai'] || rowObj['dien_thoai'] || rowObj['phone'] || '',
@@ -357,6 +364,7 @@ function Employees() {
           cccd: rowObj['cccd'] || rowObj['cmnd'] || '',
           ngay_cap: rowObj['ngay_cap'] || '',
           noi_cap: rowObj['noi_cap'] || '',
+          dia_chi_thuong_tru: rowObj['dia_chi_thuong_tru'] || rowObj['thuong_tru'] || rowObj['dia_chi'] || rowObj['address'] || '',
           que_quan: rowObj['que_quan'] || '',
           gioi_tinh: rowObj['gioi_tinh'] || rowObj['gender'] || '',
           tinh_trang_hon_nhan: rowObj['tinh_trang_hon_nhan'] || rowObj['hon_nhan'] || '',
@@ -402,7 +410,7 @@ function Employees() {
       <div className="page-header">
         <h1 className="page-title">
           <i className="fas fa-users"></i>
-          Hồ sơ nhân sự
+          Hồ sơ nhân sự.
         </h1>
         <div>
           <button
@@ -423,6 +431,19 @@ function Employees() {
           >
             <i className="fas fa-file-upload"></i>
             Upload Excel
+          </button>
+          <button
+            className="btn btn-info"
+            onClick={downloadTemplate}
+            style={{
+              marginRight: '10px',
+              color: '#fff',
+              background: '#17a2b8',
+              borderColor: '#17a2b8'
+            }}
+          >
+            <i className="fas fa-download"></i>
+            Tải file mẫu
           </button>
           <button
             className="btn btn-success"
@@ -471,28 +492,28 @@ function Employees() {
         </select>
       </div>
 
-      <div className="card" style={{ overflowX: 'auto' }}>
+      <div className="card" style={{ overflow: 'auto', maxHeight: 'calc(100vh - 180px)', position: 'relative' }}>
         <table style={{ minWidth: 'max-content' }}>
           <thead>
             <tr>
-              <th style={{ width: '40px', whiteSpace: 'nowrap', padding: '4px 8px' }}>STT</th>
-              <th style={{ width: '50px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Ảnh</th>
-              <th style={{ minWidth: '160px', position: 'sticky', left: 0, background: '#f8f9fa', zIndex: 2, whiteSpace: 'nowrap', padding: '4px 8px', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)' }}>Họ và tên</th>
-              <th style={{ minWidth: '160px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Email</th>
-              <th style={{ minWidth: '100px', whiteSpace: 'nowrap', padding: '4px 8px' }}>SĐT</th>
-              <th style={{ minWidth: '100px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Ngày sinh</th>
-              <th style={{ minWidth: '110px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Ngày vào làm</th>
-              <th style={{ minWidth: '110px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Ngày chính thức</th>
-              <th style={{ minWidth: '110px', whiteSpace: 'nowrap', padding: '4px 8px' }}>CCCD</th>
-              <th style={{ minWidth: '100px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Ngày cấp</th>
-              <th style={{ minWidth: '120px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Nơi cấp</th>
-              <th style={{ minWidth: '120px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Quê quán</th>
-              <th style={{ minWidth: '70px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Giới tính</th>
-              <th style={{ minWidth: '100px', whiteSpace: 'nowrap', padding: '4px 8px' }}>TT Hôn nhân</th>
-              <th style={{ minWidth: '100px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Chi nhánh</th>
-              <th style={{ minWidth: '120px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Bộ phận</th>
-              <th style={{ minWidth: '120px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Vị trí</th>
-              <th style={{ width: '80px', whiteSpace: 'nowrap', padding: '4px 8px' }}>Thao tác</th>
+              <th style={{ width: '40px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+              <th style={{ width: '50px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ảnh</th>
+              <th style={{ minWidth: '160px', position: 'sticky', left: 0, top: 0, background: '#f8f9fa', zIndex: 12, whiteSpace: 'nowrap', padding: '4px 8px', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)' }}>Họ và tên</th>
+              <th style={{ minWidth: '160px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>Email</th>
+              <th style={{ minWidth: '100px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>SĐT</th>
+              <th style={{ minWidth: '100px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>Ngày sinh</th>
+              <th style={{ minWidth: '110px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>Ngày vào làm</th>
+              <th style={{ minWidth: '110px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>Ngày chính thức</th>
+              <th style={{ minWidth: '110px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>CCCD</th>
+              <th style={{ minWidth: '100px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>Ngày cấp</th>
+              <th style={{ minWidth: '120px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>Nơi cấp</th>
+              <th style={{ minWidth: '120px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>Quê quán</th>
+              <th style={{ minWidth: '70px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>Giới tính</th>
+              <th style={{ minWidth: '100px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>TT Hôn nhân</th>
+              <th style={{ minWidth: '100px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Chi nhánh</th>
+              <th style={{ minWidth: '120px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Bộ phận</th>
+              <th style={{ minWidth: '120px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Vị trí</th>
+              <th style={{ width: '80px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -527,17 +548,17 @@ function Employees() {
                       )}
                     </td>
                     <td style={{ fontWeight: '500', position: 'sticky', left: 0, background: 'white', zIndex: 1, padding: '4px 8px', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)' }}>{escapeHtml(name)}</td>
-                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.email || '-')}</td>
-                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.sđt || emp.sdt || '-')}</td>
-                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.ngay_sinh || emp.dob || '-')}</td>
-                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.ngay_vao_lam || '-')}</td>
-                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.ngay_lam_chinh_thuc || '-')}</td>
-                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.cccd || '-')}</td>
-                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.ngay_cap || '-')}</td>
-                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.noi_cap || '-')}</td>
-                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.que_quan || '-')}</td>
-                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.gioi_tinh || '-')}</td>
-                    <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.tinh_trang_hon_nhan || '-')}</td>
+                    <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.email || '-')}</td>
+                    <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.sđt || emp.sdt || '-')}</td>
+                    <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.ngay_sinh || emp.dob || '-')}</td>
+                    <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.ngay_vao_lam || '-')}</td>
+                    <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.ngay_lam_chinh_thuc || '-')}</td>
+                    <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.cccd || '-')}</td>
+                    <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.ngay_cap || '-')}</td>
+                    <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.noi_cap || '-')}</td>
+                    <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.que_quan || '-')}</td>
+                    <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.gioi_tinh || '-')}</td>
+                    <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.tinh_trang_hon_nhan || '-')}</td>
                     <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.chi_nhanh || '-')}</td>
                     <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.bo_phan || '-')}</td>
                     <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.vi_tri || '-')}</td>
@@ -579,7 +600,7 @@ function Employees() {
               })
             ) : (
               <tr>
-                <td colSpan="17" className="empty-state">
+                <td colSpan="7" className="empty-state">
                   {employees.length === 0 ? 'Chưa có dữ liệu nhân sự' : 'Không tìm thấy kết quả'}
                 </td>
               </tr>

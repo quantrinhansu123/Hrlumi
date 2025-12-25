@@ -1,15 +1,14 @@
-import React from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
+import Attendance from './pages/Attendance'
+import Competency from './pages/Competency'
 import Dashboard from './pages/Dashboard'
 import Employees from './pages/Employees'
-import Recruitment from './pages/Recruitment'
 import EmployeeStatusHistory from './pages/EmployeeStatusHistory'
-import Salary from './pages/Salary'
-import Competency from './pages/Competency'
 import KPI from './pages/KPI'
+import Recruitment from './pages/Recruitment'
+import Salary from './pages/Salary'
 import Tasks from './pages/Tasks'
-import Attendance from './pages/Attendance'
 
 function App() {
   return (

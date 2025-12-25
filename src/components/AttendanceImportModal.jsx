@@ -486,6 +486,23 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
                 <label>File Excel dữ liệu</label>
                 <input type="file" accept=".xlsx,.xls" onChange={handleFileChange} style={{ width: '100%', padding: '10px' }} />
               </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-10px', marginBottom: '10px' }}>
+                <button
+                  type="button"
+                  className="btn btn-link"
+                  style={{ fontSize: '0.85rem', padding: 0 }}
+                  onClick={() => {
+                    const headers = ['Mã NV', 'Họ và tên', 'Ngày (YYYY-MM-DD)', 'Giờ vào (HH:MM)', 'Giờ ra (HH:MM)']
+                    const sample = ['NV001', 'Nguyễn Văn A', '2024-11-01', '08:00', '17:30']
+                    const ws = utils.aoa_to_sheet([headers, sample])
+                    const wb = utils.book_new()
+                    utils.book_append_sheet(wb, ws, 'MauChamCong')
+                    utils.writeFile(wb, 'Mau_nhap_cham_cong.xlsx')
+                  }}
+                >
+                  <i className="fas fa-download"></i> Tải file mẫu danh sách
+                </button>
+              </div>
               <div className="alert alert-info" style={{ marginTop: '15px', background: '#e2e3e5', padding: '10px', borderRadius: '4px' }}>
                 <small>
                   <strong>Hỗ trợ 2 định dạng:</strong><br />

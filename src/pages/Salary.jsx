@@ -1,16 +1,13 @@
 import { useEffect, useState } from 'react'
 import * as XLSX from 'xlsx'
 import EmployeeSalaryModal from '../components/EmployeeSalaryModal'
-import InsuranceModal from '../components/InsuranceModal'
 import PromotionHistoryModal from '../components/PromotionHistoryModal'
 import PromotionModal from '../components/PromotionModal'
 import SalaryGradeModal from '../components/SalaryGradeModal'
 import SeedDataButton from '../components/SeedDataButton'
 import SeedPromotionHistoryButton from '../components/SeedPromotionHistoryButton'
-import TaxModal from '../components/TaxModal'
 import { fbDelete, fbGet, fbPush } from '../services/firebase'
-import { TAX_CONFIG } from '../utils/constants'
-import { calculateProgressiveTax, escapeHtml, formatMoney } from '../utils/helpers'
+import { escapeHtml, formatMoney } from '../utils/helpers'
 
 
 function Salary() {
@@ -42,17 +39,23 @@ function Salary() {
   const [isEmployeeSalaryReadOnly, setIsEmployeeSalaryReadOnly] = useState(false)
   const [isInsuranceReadOnly, setIsInsuranceReadOnly] = useState(false)
 
-  // Excel Import/Export states for Insurance
-  const [isInsuranceImportModalOpen, setIsInsuranceImportModalOpen] = useState(false)
-  const [insuranceImportFile, setInsuranceImportFile] = useState(null)
-  const [insuranceImportPreviewData, setInsuranceImportPreviewData] = useState([])
-  const [isInsuranceImporting, setIsInsuranceImporting] = useState(false)
+  // Excel Import/Export states for Salary Grades
+  const [isGradeImportModalOpen, setIsGradeImportModalOpen] = useState(false)
+  const [gradeImportFile, setGradeImportFile] = useState(null)
+  const [gradeImportPreviewData, setGradeImportPreviewData] = useState([])
+  const [isGradeImporting, setIsGradeImporting] = useState(false)
 
-  // Excel Import/Export states for Tax
-  const [isTaxImportModalOpen, setIsTaxImportModalOpen] = useState(false)
-  const [taxImportFile, setTaxImportFile] = useState(null)
-  const [taxImportPreviewData, setTaxImportPreviewData] = useState([])
-  const [isTaxImporting, setIsTaxImporting] = useState(false)
+  // Excel Import/Export states for Employee Salaries
+  const [isEmpSalaryImportModalOpen, setIsEmpSalaryImportModalOpen] = useState(false)
+  const [empSalaryImportFile, setEmpSalaryImportFile] = useState(null)
+  const [empSalaryImportPreviewData, setEmpSalaryImportPreviewData] = useState([])
+  const [isEmpSalaryImporting, setIsEmpSalaryImporting] = useState(false)
+
+  // Excel Import/Export states for Promotion History
+  const [isHistoryImportModalOpen, setIsHistoryImportModalOpen] = useState(false)
+  const [historyImportFile, setHistoryImportFile] = useState(null)
+  const [historyImportPreviewData, setHistoryImportPreviewData] = useState([])
+  const [isHistoryImporting, setIsHistoryImporting] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -131,14 +134,466 @@ function Salary() {
   }
 
 
-  const handleDeleteInsurance = async (id) => {
-    if (!confirm('Bạn có chắc muốn xóa thông tin bảo hiểm này?')) return
+  // Export Grades
+  const exportGradesToExcel = () => {
+    if (salaryGrades.length === 0) {
+      alert('Không có dữ liệu để xuất!')
+      return
+    }
+
+    const exportData = salaryGrades.map((grade, idx) => ({
+      'STT': idx + 1,
+      'Vị trí': grade.position || grade.name || '',
+      'Ca làm việc': grade.shift || '',
+      'Doanh thu từ (triệu)': grade.revenueFrom || 0,
+      'Doanh thu đến (triệu)': grade.revenueTo || 'Không giới hạn',
+      'Bậc lương': grade.level || 1,
+      'Lương P1 (VNĐ)': grade.salary || 0,
+      'Trạng thái': grade.status || 'Đang áp dụng'
+    }))
+
+    const ws = XLSX.utils.json_to_sheet(exportData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Bac_luong')
+    XLSX.writeFile(wb, `Danh_muc_bac_luong_${new Date().toISOString().split('T')[0]}.xlsx`)
+  }
+
+  // Download Template
+  const downloadGradeTemplate = () => {
+    const data = [
+      ['Vị trí', 'Ca làm việc', 'Doanh thu từ', 'Doanh thu đến', 'Bậc lương', 'Lương P1'],
+      ['Nhân viên kinh doanh', 'Ca ngày', 0, 100, 1, 5000000],
+      ['Nhân viên kinh doanh', 'Ca đêm', 0, 100, 1, 5500000]
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Mau_import_bac_luong')
+    XLSX.writeFile(wb, 'Mau_import_bac_luong.xlsx')
+  }
+
+  // --- Employee Salary Excel Functions ---
+
+  const downloadEmpSalaryTemplate = () => {
+    const data = [
+      ['Mã nhân viên', 'Vị trí', 'Ca làm việc', 'Bậc', 'Ngày hiệu lực (YYYY-MM-DD)'],
+      ['NV001', 'Nhân viên kinh doanh', 'Ca ngày', '1', '2024-01-01'],
+      ['NV002', 'Công nhân', 'Ca đêm', '2', '2024-01-01']
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Mau_import_luong_nv')
+    XLSX.writeFile(wb, 'Mau_import_luong_nhan_vien.xlsx')
+  }
+
+
+  // Handle File Select
+  const handleGradeFileSelect = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    setGradeImportFile(file)
+    setIsGradeImporting(true)
+
     try {
-      await fbDelete(`hr/insuranceInfo/${id}`)
-      loadData()
-      alert('Đã xóa thông tin bảo hiểm')
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data)
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+
+      if (jsonData.length < 2) {
+        alert('File không có dữ liệu')
+        setIsGradeImporting(false)
+        return
+      }
+
+      const headers = jsonData[0].map(h => String(h).toLowerCase().trim())
+
+      // Strict Template Validation
+      const requiredHeaders = [
+        { key: 'vị trí', label: 'Vị trí' },
+        { key: 'ca', label: 'Ca làm việc' },
+        { key: 'bậc', label: 'Bậc lương' },
+        { key: 'lương', label: 'Lương P1' }
+      ]
+
+      const missingHeaders = requiredHeaders.filter(req => !headers.some(h => h.includes(req.key)))
+
+      if (missingHeaders.length > 0) {
+        alert(`File không đúng mẫu! Thiếu các cột: ${missingHeaders.map(m => m.label).join(', ')}. Vui lòng tải file mẫu và nhập lại.`)
+        setIsGradeImporting(false)
+        return
+      }
+
+      const dataRows = jsonData.slice(1)
+
+      const parsedData = dataRows.map(row => {
+        // Map columns by index or name approximation
+        const position = row[headers.findIndex(h => h.includes('vị trí'))] || ''
+        const shift = row[headers.findIndex(h => h.includes('ca'))] || 'Ca ngày'
+        const revenueFrom = row[headers.findIndex(h => h.includes('từ'))] || 0
+        const revenueTo = row[headers.findIndex(h => h.includes('đến'))] || ''
+        const level = row[headers.findIndex(h => h.includes('bậc'))] || 1
+        const salary = row[headers.findIndex(h => h.includes('lương'))] || 0
+
+        if (!position) return null
+
+        return {
+          position,
+          shift,
+          revenueFrom: Number(revenueFrom),
+          revenueTo: revenueTo === 'Không giới hạn' ? '' : (revenueTo ? Number(revenueTo) : ''),
+          level: Number(level),
+          salary: Number(salary),
+          status: 'Đang áp dụng'
+        }
+      }).filter(item => item !== null)
+
+      setGradeImportPreviewData(parsedData)
+      setIsGradeImporting(false)
     } catch (error) {
-      alert('Lỗi khi xóa: ' + error.message)
+      alert('Lỗi đọc file: ' + error.message)
+      setIsGradeImporting(false)
+    }
+  }
+
+  // Confirm Import
+  const handleConfirmGradeImport = async () => {
+    if (gradeImportPreviewData.length === 0) return
+
+    if (!confirm(`Xác nhận import ${gradeImportPreviewData.length} bậc lương?`)) return
+
+    setIsGradeImporting(true)
+    try {
+      for (const grade of gradeImportPreviewData) {
+        await fbPush('hr/salaryGrades', grade)
+      }
+      alert('Import thành công!')
+      setIsGradeImportModalOpen(false)
+      setGradeImportPreviewData([])
+      setGradeImportFile(null)
+      loadData()
+    } catch (error) {
+      alert('Lỗi khi import: ' + error.message)
+    } finally {
+      setIsGradeImporting(false)
+    }
+  }
+
+  // --- Employee Salary Excel Functions ---
+
+  const exportEmpSalariesToExcel = () => {
+    if (employeeSalaries.length === 0) {
+      alert('Không có dữ liệu để xuất!')
+      return
+    }
+
+    const exportData = employeeSalaries.map((item, idx) => {
+      const employee = employees.find(e => e.id === item.employeeId)
+      const grade = salaryGrades.find(g => g.id === item.salaryGradeId)
+
+      return {
+        'STT': idx + 1,
+        'Mã NV': item.employeeId || '',
+        'Họ tên': employee ? (employee.ho_va_ten || employee.name || '') : '',
+        'Bộ phận': employee ? (employee.bo_phan || '') : '',
+        'Vị trí': grade ? (grade.position || grade.name || '') : '',
+        'Ca': grade ? (grade.shift || '') : '',
+        'Bậc': grade ? (grade.level || '') : '',
+        'Lương cơ bản': grade ? (grade.salary || 0) : 0,
+        'Ngày hiệu lực': item.effectiveDate || ''
+      }
+    })
+
+    const ws = XLSX.utils.json_to_sheet(exportData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Bac_luong_nhan_vien')
+    XLSX.writeFile(wb, `Bac_luong_nhan_vien_${new Date().toISOString().split('T')[0]}.xlsx`)
+  }
+
+  const handleEmpSalaryFileSelect = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    setEmpSalaryImportFile(file)
+    setIsEmpSalaryImporting(true)
+
+    try {
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data)
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+
+      if (jsonData.length < 2) {
+        alert('File không có dữ liệu')
+        setIsEmpSalaryImporting(false)
+        return
+      }
+
+      const headers = jsonData[0].map(h => String(h).toLowerCase().trim())
+      const requiredHeaders = [
+        { key: 'mã nhân viên', label: 'Mã nhân viên' },
+        { key: 'vị trí', label: 'Vị trí' },
+        { key: 'ca', label: 'Ca làm việc' },
+        { key: 'bậc', label: 'Bậc' }
+      ]
+
+      const missingHeaders = requiredHeaders.filter(req => !headers.some(h => h.includes(req.key)))
+
+      if (missingHeaders.length > 0) {
+        alert(`File không đúng mẫu! Thiếu các cột: ${missingHeaders.map(m => m.label).join(', ')}.`)
+        setIsEmpSalaryImporting(false)
+        return
+      }
+
+      const dataRows = jsonData.slice(1)
+      const parsedData = []
+
+      for (const row of dataRows) {
+        const empId = String(row[headers.findIndex(h => h.includes('mã nhân viên'))] || '').trim()
+        const pos = String(row[headers.findIndex(h => h.includes('vị trí'))] || '').trim()
+        const shift = String(row[headers.findIndex(h => h.includes('ca'))] || '').trim()
+        const level = String(row[headers.findIndex(h => h.includes('bậc'))] || '').trim()
+        const dateRaw = row[headers.findIndex(h => h.includes('ngày hiệu lực'))]
+
+        if (!empId || !pos) continue
+
+        const empExists = employees.find(e => e.id === empId)
+        const gradeExists = salaryGrades.find(g =>
+          String(g.position).trim().toLowerCase() === pos.toLowerCase() &&
+          String(g.shift).trim().toLowerCase() === shift.toLowerCase() &&
+          String(g.level).trim() === level
+        )
+
+        let note = ''
+        if (!empExists) note += 'Mã NV không tồn tại. '
+        if (!gradeExists) note += 'Không tìm thấy Bậc lương phù hợp. '
+
+        let effectiveDate = new Date().toISOString().split('T')[0]
+        if (dateRaw) effectiveDate = String(dateRaw)
+
+        parsedData.push({
+          employeeId: empId,
+          salaryGradeId: gradeExists ? gradeExists.id : null,
+          effectiveDate,
+          employeeName: empExists ? (empExists.ho_va_ten || empExists.name) : 'Unknown',
+          gradeName: gradeExists ? `${gradeExists.position} - Bậc ${gradeExists.level}` : 'Unknown',
+          isValid: !note,
+          note
+        })
+      }
+
+      setEmpSalaryImportPreviewData(parsedData)
+      setIsEmpSalaryImporting(false)
+    } catch (error) {
+      alert('Lỗi đọc file: ' + error.message)
+      setIsEmpSalaryImporting(false)
+    }
+  }
+
+  const handleConfirmEmpSalaryImport = async () => {
+    const validData = empSalaryImportPreviewData.filter(d => d.isValid)
+    if (validData.length === 0) {
+      alert('Không có dữ liệu hợp lệ để import')
+      return
+    }
+
+    if (!confirm(`Xác nhận import ${validData.length} dòng hợp lệ?`)) return
+
+    setIsEmpSalaryImporting(true)
+    try {
+      for (const item of validData) {
+        // Save salary
+        const salaryPayload = {
+          employeeId: item.employeeId,
+          salaryGradeId: item.salaryGradeId,
+          effectiveDate: item.effectiveDate
+        }
+        await fbPush('hr/employeeSalaries', salaryPayload)
+
+        // Auto create promotion history
+        const historyPayload = {
+          employeeId: item.employeeId,
+          salaryGradeId: item.salaryGradeId,
+          effectiveDate: item.effectiveDate,
+          type: 'Điều chỉnh',
+          reason: 'Import từ Excel',
+          approvedBy: 'System'
+        }
+        await fbPush('hr/promotionHistory', historyPayload)
+      }
+      alert('Import thành công!')
+      setIsEmpSalaryImportModalOpen(false)
+      setEmpSalaryImportPreviewData([])
+      setEmpSalaryImportFile(null)
+      loadData()
+    } catch (err) {
+      alert('Lỗi import: ' + err.message)
+    } finally {
+      setIsEmpSalaryImporting(false)
+    }
+  }
+
+  // --- Promotion History Excel Functions ---
+
+  const exportHistoryToExcel = () => {
+    if (promotionHistory.length === 0) {
+      alert('Không có dữ liệu để xuất!')
+      return
+    }
+
+    const exportData = promotionHistory.map((item, idx) => {
+      const employee = employees.find(e => e.id === item.employeeId)
+      const grade = salaryGrades.find(g => g.id === item.salaryGradeId)
+
+      return {
+        'STT': idx + 1,
+        'Mã NV': item.employeeId || '',
+        'Họ tên': employee ? (employee.ho_va_ten || employee.name || '') : '',
+        'Bộ phận': employee ? (employee.bo_phan || '') : '',
+        'Vị trí': grade ? (grade.position || grade.name || '') : '',
+        'Ca': grade ? (grade.shift || '') : '',
+        'Bậc': grade ? (grade.level || '') : '',
+        'Lương cơ bản': grade ? (grade.salary || 0) : 0,
+        'Ngày thay đổi': item.effectiveDate || '',
+        'Hình thức': item.type || item.hinhThuc || '',
+        'Lý do': item.reason || item.lyDo || ''
+      }
+    })
+
+    const ws = XLSX.utils.json_to_sheet(exportData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Lich_su_thang_tien')
+    XLSX.writeFile(wb, `Lich_su_thang_tien_${new Date().toISOString().split('T')[0]}.xlsx`)
+  }
+
+  const downloadHistoryTemplate = () => {
+    const data = [
+      ['Mã nhân viên', 'Vị trí', 'Ca làm việc', 'Bậc', 'Ngày thay đổi (YYYY-MM-DD)', 'Hình thức', 'Lý do'],
+      ['NV001', 'Nhân viên kinh doanh', 'Ca ngày', '1', '2024-01-01', 'Điều chỉnh', 'Tăng lương định kỳ'],
+      ['NV002', 'Công nhân', 'Ca đêm', '2', '2024-01-01', 'Thăng cấp', 'Hoàn thành xuất sắc nhiệm vụ']
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Mau_import_lich_su')
+    XLSX.writeFile(wb, 'Mau_import_lich_su_thang_tien.xlsx')
+  }
+
+  const handleHistoryFileSelect = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    setHistoryImportFile(file)
+    setIsHistoryImporting(true)
+
+    try {
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data)
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+
+      if (jsonData.length < 2) {
+        alert('File không có dữ liệu')
+        setIsHistoryImporting(false)
+        return
+      }
+
+      const headers = jsonData[0].map(h => String(h).toLowerCase().trim())
+
+      const requiredHeaders = [
+        { key: 'mã nhân viên', label: 'Mã nhân viên' },
+        { key: 'vị trí', label: 'Vị trí' },
+        { key: 'ca', label: 'Ca làm việc' },
+        { key: 'bậc', label: 'Bậc' }
+      ]
+
+      const missingHeaders = requiredHeaders.filter(req => !headers.some(h => h.includes(req.key)))
+
+      if (missingHeaders.length > 0) {
+        alert(`File không đúng mẫu! Thiếu các cột: ${missingHeaders.map(m => m.label).join(', ')}.`)
+        setIsHistoryImporting(false)
+        return
+      }
+
+      const dataRows = jsonData.slice(1)
+      const parsedData = []
+
+      for (const row of dataRows) {
+        const empId = String(row[headers.findIndex(h => h.includes('mã nhân viên'))] || '').trim()
+        const pos = String(row[headers.findIndex(h => h.includes('vị trí'))] || '').trim()
+        const shift = String(row[headers.findIndex(h => h.includes('ca'))] || '').trim()
+        const level = String(row[headers.findIndex(h => h.includes('bậc'))] || '').trim()
+        const dateRaw = row[headers.findIndex(h => h.includes('ngày'))]
+        const type = row[headers.findIndex(h => h.includes('hình thức'))] || 'Điều chỉnh'
+        const reason = row[headers.findIndex(h => h.includes('lý do'))] || ''
+
+        if (!empId || !pos) continue
+
+        const empExists = employees.find(e => e.id === empId)
+        const gradeExists = salaryGrades.find(g =>
+          String(g.position).trim().toLowerCase() === pos.toLowerCase() &&
+          String(g.shift).trim().toLowerCase() === shift.toLowerCase() &&
+          String(g.level).trim() === level
+        )
+
+        let note = ''
+        if (!empExists) note += 'Mã NV không tồn tại. '
+        if (!gradeExists) note += 'Không tìm thấy Bậc lương tương ứng. '
+
+        let effectiveDate = new Date().toISOString().split('T')[0]
+        if (dateRaw) effectiveDate = String(dateRaw)
+
+        parsedData.push({
+          employeeId: empId,
+          salaryGradeId: gradeExists ? gradeExists.id : null,
+          effectiveDate,
+          type,
+          reason,
+          employeeName: empExists ? (empExists.ho_va_ten || empExists.name) : 'Unknown',
+          gradeName: gradeExists ? `${gradeExists.position} - Bậc ${gradeExists.level}` : 'Unknown',
+          isValid: !note,
+          note
+        })
+      }
+
+      setHistoryImportPreviewData(parsedData)
+      setIsHistoryImporting(false)
+    } catch (error) {
+      alert('Lỗi đọc file: ' + error.message)
+      setIsHistoryImporting(false)
+    }
+  }
+
+  const handleConfirmHistoryImport = async () => {
+    const validData = historyImportPreviewData.filter(d => d.isValid)
+    if (validData.length === 0) {
+      alert('Không có dữ liệu hợp lệ để import')
+      return
+    }
+
+    if (!confirm(`Xác nhận import ${validData.length} lịch sử thăng tiến?`)) return
+
+    setIsHistoryImporting(true)
+    try {
+      for (const item of validData) {
+        const payload = {
+          employeeId: item.employeeId,
+          salaryGradeId: item.salaryGradeId,
+          effectiveDate: item.effectiveDate,
+          type: item.type,
+          reason: item.reason,
+          approvedBy: 'System Import'
+        }
+        await fbPush('hr/promotionHistory', payload)
+      }
+      alert('Import thành công!')
+      setIsHistoryImportModalOpen(false)
+      setHistoryImportPreviewData([])
+      setHistoryImportFile(null)
+      loadData()
+    } catch (err) {
+      alert('Lỗi import: ' + err.message)
+    } finally {
+      setIsHistoryImporting(false)
     }
   }
 
@@ -154,323 +609,7 @@ function Salary() {
     }
   }
 
-  // Export Insurance Data to Excel
-  const exportInsuranceToExcel = () => {
-    if (insuranceInfo.length === 0) {
-      alert('Không có dữ liệu để xuất!')
-      return
-    }
 
-    const exportData = insuranceInfo.map((ins, idx) => {
-      const employee = employees.find(e => e.id === ins.employeeId)
-      return {
-        'STT': idx + 1,
-        'Mã NV': ins.employeeId || '',
-        'Họ và tên': employee ? (employee.ho_va_ten || employee.name || '') : '',
-        'Bộ phận': employee ? (employee.bo_phan || '') : '',
-        'Số sổ BHXH': ins.soSoBHXH || '',
-        'Ngày tham gia': ins.ngayThamGia ? new Date(ins.ngayThamGia).toLocaleDateString('vi-VN') : '',
-        'Mức lương đóng BHXH': ins.mucLuongDong || 0,
-        'Tỷ lệ NLĐ (%)': ins.tyLeNLD || 0,
-        'Tỷ lệ DN (%)': ins.tyLeDN || 0,
-        'Trạng thái': ins.status || ''
-      }
-    })
-
-    const ws = XLSX.utils.json_to_sheet(exportData)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Bảo Hiểm Xã Hội')
-    const fileName = `Thong_tin_BHXH_${new Date().toISOString().split('T')[0]}.xlsx`
-    XLSX.writeFile(wb, fileName)
-  }
-
-  // Handle file selection for insurance import
-  const handleInsuranceFileSelect = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-
-    setInsuranceImportFile(file)
-    setIsInsuranceImporting(true)
-
-    try {
-      const data = await file.arrayBuffer()
-      const workbook = XLSX.read(data)
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
-
-      if (jsonData.length < 2) {
-        alert('File Excel không có dữ liệu')
-        setIsInsuranceImporting(false)
-        return
-      }
-
-      const headers = Array.from(jsonData[0] || []).map(h => String(h || '').toLowerCase().trim())
-
-      // Find column indexes
-      const maNVIdx = headers.findIndex(h => h.includes('mã nv') || h.includes('mã nhân viên'))
-      const soSoIdx = headers.findIndex(h => h.includes('số sổ'))
-      const ngayThamGiaIdx = headers.findIndex(h => h.includes('ngày tham gia'))
-      const mucLuongIdx = headers.findIndex(h => h.includes('mức lương'))
-      const tyLeNLDIdx = headers.findIndex(h => h.includes('tỷ lệ nld') || h.includes('nld'))
-      const tyLeDNIdx = headers.findIndex(h => h.includes('tỷ lệ dn') || h.includes('dn'))
-      const statusIdx = headers.findIndex(h => h.includes('trạng thái'))
-
-      // Validate required columns
-      if (maNVIdx === -1 || soSoIdx === -1 || mucLuongIdx === -1) {
-        alert('File Excel cần có các cột: Mã NV, Số sổ BHXH, Mức lương đóng BHXH')
-        setIsInsuranceImporting(false)
-        return
-      }
-
-      // Parse data rows
-      const parsedData = []
-      for (let i = 1; i < jsonData.length; i++) {
-        const row = jsonData[i]
-        if (!row[maNVIdx] || !row[soSoIdx] || !row[mucLuongIdx]) continue
-
-        // Find employee by ID
-        const empId = String(row[maNVIdx]).trim()
-        const employee = employees.find(e => e.id === empId)
-
-        if (!employee) {
-          console.warn(`Không tìm thấy nhân viên với mã: ${empId}`)
-          continue
-        }
-
-        parsedData.push({
-          employeeId: empId,
-          soSoBHXH: row[soSoIdx] || '',
-          ngayThamGia: ngayThamGiaIdx !== -1 ? row[ngayThamGiaIdx] || new Date().toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          mucLuongDong: Number(row[mucLuongIdx]) || 0,
-          tyLeNLD: tyLeNLDIdx !== -1 ? Number(row[tyLeNLDIdx]) || 10.5 : 10.5,
-          tyLeDN: tyLeDNIdx !== -1 ? Number(row[tyLeDNIdx]) || 21.5 : 21.5,
-          status: statusIdx !== -1 ? row[statusIdx] || 'Đang tham gia' : 'Đang tham gia',
-          employeeName: employee.ho_va_ten || employee.name || '',
-          department: employee.bo_phan || ''
-        })
-      }
-
-      setInsuranceImportPreviewData(parsedData)
-      setIsInsuranceImporting(false)
-    } catch (error) {
-      alert('Lỗi khi đọc file: ' + error.message)
-      setIsInsuranceImporting(false)
-    }
-  }
-
-  // Confirm and import insurance data to Firebase
-  const handleConfirmInsuranceImport = async () => {
-    if (insuranceImportPreviewData.length === 0) {
-      alert('Không có dữ liệu để import')
-      return
-    }
-
-    setIsInsuranceImporting(true)
-    try {
-      let successCount = 0
-      for (const insurance of insuranceImportPreviewData) {
-        // Remove temporary fields before saving
-        const { employeeName, department, ...dataToSave } = insurance
-        await fbPush('hr/insuranceInfo', dataToSave)
-        successCount++
-      }
-
-      alert(`Đã import thành công ${successCount} thông tin BHXH`)
-      setIsInsuranceImportModalOpen(false)
-      setInsuranceImportFile(null)
-      setInsuranceImportPreviewData([])
-      await loadData()
-    } catch (error) {
-      alert('Lỗi khi import: ' + error.message)
-    } finally {
-      setIsInsuranceImporting(false)
-    }
-  }
-
-
-  const handleDeleteTax = async (id) => {
-    if (!confirm('Bạn có chắc muốn xóa thông tin thuế này?')) return
-    try {
-      await fbDelete(`hr/taxInfo/${id}`)
-      loadData()
-      alert('Đã xóa thông tin thuế')
-    } catch (error) {
-      alert('Lỗi khi xóa: ' + error.message)
-    }
-  }
-
-  // Export Tax Data to Excel
-  const exportTaxToExcel = () => {
-    if (taxInfo.length === 0) {
-      alert('Không có dữ liệu để xuất!')
-      return
-    }
-
-    const exportData = taxInfo.map((tax, idx) => {
-      const employee = employees.find(e => e.id === tax.employeeId)
-      return {
-        'STT': idx + 1,
-        'Mã NV': tax.employeeId || '',
-        'Họ và tên': employee ? (employee.ho_va_ten || employee.name || '') : '',
-        'Bộ phận': employee ? (employee.bo_phan || '') : '',
-        'Mã số thuế': tax.maSoThue || '',
-        'Thu nhập tính thuế': tax.thuNhapTinhThue || 0,
-        'Giảm trừ bản thân': tax.giamTruBanThan || 0,
-        'Giảm trừ BHXH': tax.giamTruBHXH || 0,
-        'Tổng giảm trừ NPT': tax.tongGiamTruNguoiPhuThuoc || 0,
-        'Thu nhập chịu thuế': tax.thuNhapChiuThue || 0,
-        'Thuế phải nộp': tax.thuePhaiNop || 0,
-        'Biểu thuế': tax.bieuThue || '',
-        'Kỳ áp dụng': tax.kyApDung || ''
-      }
-    })
-
-    const ws = XLSX.utils.json_to_sheet(exportData)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Thuế TNCN')
-    const fileName = `Thong_tin_Thue_TNCN_${new Date().toISOString().split('T')[0]}.xlsx`
-    XLSX.writeFile(wb, fileName)
-  }
-
-  // Handle file selection for tax import
-  const handleTaxFileSelect = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-
-    setTaxImportFile(file)
-    setIsTaxImporting(true)
-
-    try {
-      const data = await file.arrayBuffer()
-      const workbook = XLSX.read(data)
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
-
-      if (jsonData.length < 2) {
-        alert('File Excel không có dữ liệu')
-        setIsTaxImporting(false)
-        return
-      }
-
-      const headers = Array.from(jsonData[0] || []).map(h => String(h || '').toLowerCase().trim())
-
-      // Find column indexes
-      const maNVIdx = headers.findIndex(h => h.includes('mã nv') || h.includes('mã nhân viên'))
-      const mstIdx = headers.findIndex(h => h.includes('mã số thuế'))
-      const thuNhapIdx = headers.findIndex(h => h.includes('thu nhập tính thuế'))
-      const giamTruIdx = headers.findIndex(h => h.includes('giảm trừ bản thân'))
-      const bieuThueIdx = headers.findIndex(h => h.includes('biểu thuế'))
-      const kyApDungIdx = headers.findIndex(h => h.includes('kỳ áp dụng'))
-
-      // Validate required columns
-      if (maNVIdx === -1 || thuNhapIdx === -1) {
-        alert('File Excel cần có các cột: Mã NV, Thu nhập tính thuế')
-        setIsTaxImporting(false)
-        return
-      }
-
-      // Parse data rows
-      const parsedData = []
-      for (let i = 1; i < jsonData.length; i++) {
-        const row = jsonData[i]
-        if (!row[maNVIdx] || !row[thuNhapIdx]) continue
-
-        // Find employee by ID
-        const empId = String(row[maNVIdx]).trim()
-        const employee = employees.find(e => e.id === empId)
-
-        if (!employee) {
-          console.warn(`Không tìm thấy nhân viên với mã: ${empId}`)
-          continue
-        }
-
-        parsedData.push({
-          employeeId: empId,
-          maSoThue: mstIdx !== -1 ? row[mstIdx] || '' : '',
-          thuNhapTinhThue: Number(row[thuNhapIdx]) || 0,
-          giamTruBanThan: giamTruIdx !== -1 ? Number(row[giamTruIdx]) || 15500000 : 15500000,
-          bieuThue: bieuThueIdx !== -1 ? row[bieuThueIdx] || 'Lũy tiến' : 'Lũy tiến',
-          kyApDung: kyApDungIdx !== -1 ? row[kyApDungIdx] || '' : '',
-          employeeName: employee.ho_va_ten || employee.name || '',
-          department: employee.bo_phan || ''
-        })
-      }
-
-      setTaxImportPreviewData(parsedData)
-      setIsTaxImporting(false)
-    } catch (error) {
-      alert('Lỗi khi đọc file: ' + error.message)
-      setIsTaxImporting(false)
-    }
-  }
-
-  // Confirm and import tax data to Firebase
-  const handleConfirmTaxImport = async () => {
-    if (taxImportPreviewData.length === 0) {
-      alert('Không có dữ liệu để import')
-      return
-    }
-
-    setIsTaxImporting(true)
-    try {
-      let successCount = 0
-      for (const tax of taxImportPreviewData) {
-        // Remove temporary fields and calculate tax
-        const { employeeName, department, ...baseData } = tax
-
-        // Get dependents for this employee
-        const employeeDependents = dependents.filter(d => d.employeeId === tax.employeeId && d.status === 'Đang áp dụng')
-        const totalDependentDeduction = employeeDependents.length * 6200000
-
-        // Get insurance deduction
-        let insuranceDeduction = 0
-        const empIns = insuranceInfo.find(i => i.employeeId === tax.employeeId && i.status === 'Đang tham gia')
-        if (empIns) {
-          insuranceDeduction = (empIns.mucLuongDong || 0) * ((empIns.tyLeNLD || 10.5) / 100)
-        }
-
-        const personalDeduction = tax.giamTruBanThan || 15500000
-        const taxableIncome = Math.max(0, tax.thuNhapTinhThue - personalDeduction - totalDependentDeduction - insuranceDeduction)
-
-        // Calculate tax based on bieuThue
-        let thuePhaiNop = 0
-        if (tax.bieuThue === 'Toàn phần') {
-          thuePhaiNop = taxableIncome * 0.1
-        } else {
-          // Lũy tiến
-          if (taxableIncome <= 0) thuePhaiNop = 0
-          else if (taxableIncome <= 5000000) thuePhaiNop = taxableIncome * 0.05
-          else if (taxableIncome <= 10000000) thuePhaiNop = taxableIncome * 0.1 - 250000
-          else if (taxableIncome <= 18000000) thuePhaiNop = taxableIncome * 0.15 - 750000
-          else if (taxableIncome <= 32000000) thuePhaiNop = taxableIncome * 0.2 - 1650000
-          else if (taxableIncome <= 52000000) thuePhaiNop = taxableIncome * 0.25 - 3250000
-          else if (taxableIncome <= 80000000) thuePhaiNop = taxableIncome * 0.3 - 5850000
-          else thuePhaiNop = taxableIncome * 0.35 - 9850000
-        }
-
-        const dataToSave = {
-          ...baseData,
-          tongGiamTruNguoiPhuThuoc: totalDependentDeduction,
-          giamTruBHXH: insuranceDeduction,
-          thuNhapChiuThue: taxableIncome,
-          thuePhaiNop
-        }
-
-        await fbPush('hr/taxInfo', dataToSave)
-        successCount++
-      }
-
-      alert(`Đã import thành công ${successCount} thông tin thuế TNCN`)
-      setIsTaxImportModalOpen(false)
-      setTaxImportFile(null)
-      setTaxImportPreviewData([])
-      await loadData()
-    } catch (error) {
-      alert('Lỗi khi import: ' + error.message)
-    } finally {
-      setIsTaxImporting(false)
-    }
-  }
 
   if (loading) {
     return <div className="loadingState">Đang tải dữ liệu...</div>
@@ -496,19 +635,103 @@ function Salary() {
               Thêm bậc lương
             </button>
             <SeedDataButton />
+            <button
+              className="btn"
+              onClick={exportGradesToExcel}
+              style={{
+                marginLeft: '10px',
+                background: '#28a745',
+                borderColor: '#28a745',
+                color: '#fff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontWeight: '500'
+              }}
+              title="Xuất dữ liệu ra file Excel"
+            >
+              <i className="fas fa-file-excel"></i> Xuất Excel
+            </button>
+            <button
+              className="btn btn-info"
+              onClick={downloadGradeTemplate}
+              style={{ marginLeft: '10px' }}
+            >
+              <i className="fas fa-download"></i> Tải mẫu
+            </button>
+            <button
+              className="btn"
+              onClick={() => setIsGradeImportModalOpen(true)}
+              style={{
+                marginLeft: '10px',
+                background: '#6f42c1',
+                borderColor: '#6f42c1',
+                color: '#fff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+              title="Nhập dữ liệu từ file Excel mẫu"
+            >
+              <i className="fas fa-file-import"></i>
+              Import Excel
+            </button>
           </>
         )}
         {activeTab === 'employee-salary' && (
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              setSelectedEmployeeSalary(null)
-              setIsEmployeeSalaryModalOpen(true)
-            }}
-          >
-            <i className="fas fa-plus"></i>
-            Gán bậc lương NV
-          </button>
+          <>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setSelectedEmployeeSalary(null)
+                setIsEmployeeSalaryModalOpen(true)
+              }}
+            >
+              <i className="fas fa-plus"></i>
+              Gán bậc lương NV
+            </button>
+            <button
+              className="btn"
+              onClick={exportEmpSalariesToExcel}
+              style={{
+                marginLeft: '10px',
+                background: '#28a745',
+                borderColor: '#28a745',
+                color: '#fff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontWeight: '500'
+              }}
+              title="Xuất dữ liệu ra file Excel"
+            >
+              <i className="fas fa-file-excel"></i> Xuất Excel
+            </button>
+            <button
+              className="btn btn-info"
+              onClick={downloadEmpSalaryTemplate}
+              style={{ marginLeft: '10px' }}
+            >
+              <i className="fas fa-download"></i> Tải mẫu
+            </button>
+            <button
+              className="btn"
+              onClick={() => setIsEmpSalaryImportModalOpen(true)}
+              style={{
+                marginLeft: '10px',
+                background: '#6f42c1',
+                borderColor: '#6f42c1',
+                color: '#fff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+              title="Nhập dữ liệu từ file Excel mẫu"
+            >
+              <i className="fas fa-file-import"></i>
+              Import Excel
+            </button>
+          </>
         )}
         {activeTab === 'promotions' && (
           <>
@@ -527,68 +750,50 @@ function Salary() {
               salaryGrades={salaryGrades}
               onComplete={loadData}
             />
-          </>
-        )}
-        {activeTab === 'insurance' && (
-          <>
             <button
-              className="btn btn-success"
-              onClick={exportInsuranceToExcel}
-              title="Xuất dữ liệu ra Excel"
+              className="btn"
+              onClick={exportHistoryToExcel}
+              style={{
+                marginLeft: '10px',
+                background: '#28a745',
+                borderColor: '#28a745',
+                color: '#fff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontWeight: '500'
+              }}
+              title="Xuất dữ liệu ra file Excel"
             >
-              <i className="fas fa-file-excel"></i>
-              Xuất Excel
+              <i className="fas fa-file-excel"></i> Xuất Excel
             </button>
             <button
               className="btn btn-info"
-              onClick={() => setIsInsuranceImportModalOpen(true)}
-              title="Import từ Excel"
+              onClick={downloadHistoryTemplate}
+              style={{ marginLeft: '10px' }}
             >
-              <i className="fas fa-file-import"></i>
-              Import từ Excel
+              <i className="fas fa-download"></i> Tải mẫu
             </button>
             <button
-              className="btn btn-primary"
-              onClick={() => {
-                setSelectedInsurance(null)
-                setIsInsuranceModalOpen(true)
+              className="btn"
+              onClick={() => setIsHistoryImportModalOpen(true)}
+              style={{
+                marginLeft: '10px',
+                background: '#6f42c1',
+                borderColor: '#6f42c1',
+                color: '#fff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
               }}
+              title="Nhập dữ liệu từ file Excel mẫu"
             >
-              <i className="fas fa-plus"></i>
-              Tạo mới Cá nhân BHXH
+              <i className="fas fa-file-import"></i>
+              Import Excel
             </button>
           </>
         )}
-        {activeTab === 'tax' && (
-          <>
-            <button
-              className="btn btn-success"
-              onClick={exportTaxToExcel}
-              title="Xuất dữ liệu ra Excel"
-            >
-              <i className="fas fa-file-excel"></i>
-              Xuất Excel
-            </button>
-            <button
-              className="btn btn-info"
-              onClick={() => setIsTaxImportModalOpen(true)}
-              title="Import từ Excel"
-            >
-              <i className="fas fa-file-import"></i>
-              Import từ Excel
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                setSelectedTax(null)
-                setIsTaxModalOpen(true)
-              }}
-            >
-              <i className="fas fa-plus"></i>
-              Tạo mới Cá nhân Thuế
-            </button>
-          </>
-        )}
+
       </div>
 
       <div className="tabs">
@@ -610,18 +815,7 @@ function Salary() {
         >
           📈 Lịch sử thăng tiến
         </div>
-        <div
-          className={`tab ${activeTab === 'insurance' ? 'active' : ''}`}
-          onClick={() => setActiveTab('insurance')}
-        >
-          🏥 Thông tin BHXH
-        </div>
-        <div
-          className={`tab ${activeTab === 'tax' ? 'active' : ''}`}
-          onClick={() => setActiveTab('tax')}
-        >
-          💸 Thuế TNCN
-        </div>
+
       </div>
 
       {/* Tab 1: Danh mục bậc lương */}
@@ -869,214 +1063,10 @@ function Salary() {
         </div>
       )}
 
-      <SalaryGradeModal
-        grade={selectedGrade}
-        isOpen={isGradeModalOpen}
-        onClose={() => {
-          setIsGradeModalOpen(false)
-          setSelectedGrade(null)
-        }}
-        onSave={loadData}
-      />
 
-      <EmployeeSalaryModal
-        employeeSalary={selectedEmployeeSalary}
-        employees={employees}
-        salaryGrades={salaryGrades}
-        isOpen={isEmployeeSalaryModalOpen}
-        onClose={() => {
-          setIsEmployeeSalaryModalOpen(false)
-          setSelectedEmployeeSalary(null)
-        }}
-        onSave={loadData}
-      />
 
-      {/* Tab 4: Thông tin BHXH */}
-      {activeTab === 'insurance' && (
-        <div className="card">
-          <table>
-            <thead>
-              <tr>
-                <th>STT</th>
-                <th>Mã NV</th>
-                <th>Họ tên</th>
-                <th>Bộ phận</th>
-                <th>Số sổ BHXH</th>
-                <th>Ngày tham gia</th>
-                <th>Mức lương đóng BHXH</th>
-                <th>Tỷ lệ NLĐ (%)</th>
-                <th>Tỷ lệ DN (%)</th>
-                <th>Trạng thái</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {insuranceInfo.length > 0 ? (
-                insuranceInfo.map((ins, idx) => {
-                  const employee = employees.find(e => e.id === ins.employeeId)
-                  return (
-                    <tr key={ins.id}>
-                      <td>{idx + 1}</td>
-                      <td>{employee ? (employee.id || '-') : '-'}</td>
-                      <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
-                      <td>{employee ? (employee.bo_phan || '-') : '-'}</td>
-                      <td>{ins.soSoBHXH || ins.soSo || '-'}</td>
-                      <td>{ins.ngayThamGia || '-'}</td>
-                      <td>{formatMoney(ins.mucLuongDong || ins.mucLuong || 0)}</td>
-                      <td>{ins.tyLeNLD || ins.tyLeNhanVien || 10.5}%</td>
-                      <td>{ins.tyLeDN || ins.tyLeDoanhNghiep || 21.5}%</td>
-                      <td>
-                        <span className={`badge ${ins.status === 'Đang tham gia' ? 'badge-success' : 'badge-danger'}`}>
-                          {ins.status || 'Đang tham gia'}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="actions">
-                          {ins.status === 'Đang tham gia' && (
-                            <button
-                              className="view"
-                              title="Xem chi tiết"
-                              onClick={() => {
-                                setSelectedInsurance(ins)
-                                setIsInsuranceReadOnly(true)
-                                setIsInsuranceModalOpen(true)
-                              }}
-                            >
-                              <i className="fas fa-eye"></i>
-                            </button>
-                          )}
-                          <button
-                            className="edit"
-                            onClick={() => {
-                              setSelectedInsurance(ins)
-                              setIsInsuranceReadOnly(false)
-                              setIsInsuranceModalOpen(true)
-                            }}
-                          >
-                            <i className="fas fa-pencil-alt"></i>
-                          </button>
-                          <button
-                            className="delete"
-                            onClick={() => handleDeleteInsurance(ins.id)}
-                          >
-                            <i className="fas fa-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              ) : (
-                <tr>
-                  <td colSpan="11" className="empty-state">Chưa có thông tin BHXH</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
 
-      {activeTab === 'tax' && (
-        <div className="card">
-          <table>
-            <thead>
-              <tr>
-                <th>STT</th>
-                <th>Mã NV</th>
-                <th>Họ tên</th>
-                <th>Mã số thuế TNCN</th>
-                <th>Thu nhập tính thuế</th>
-                <th>Giảm trừ bản thân</th>
-                <th>Tổng giảm trừ NPT</th>
-                <th>Thu nhập chịu thuế</th>
-                <th>Biểu thuế</th>
-                <th>Thuế TNCN phải nộp</th>
-                <th>Kỳ áp dụng</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {taxInfo.length > 0 ? (
-                taxInfo.map((tax, idx) => {
-                  const employee = employees.find(e => e.id === tax.employeeId)
 
-                  // 1. Calculate Deductions
-                  const personalDeduction = TAX_CONFIG.PERSONAL_DEDUCTION
-
-                  const employeeDependents = dependents.filter(d =>
-                    d.employeeId === tax.employeeId &&
-                    d.status === 'Đang áp dụng'
-                  )
-                  const dependentDeduction = employeeDependents.length * TAX_CONFIG.DEPENDENT_DEDUCTION
-
-                  // BHXH Deduction (10.5% of Insurance Salary)
-                  const empInsurance = insuranceInfo.find(i => i.employeeId === tax.employeeId && i.status === 'Đang tham gia')
-                  const insuranceDeduction = empInsurance ? (Number(empInsurance.mucLuongDongBHXH || 0) * 0.105) : 0
-
-                  // 2. Calculate Assessable Income
-                  // Formula: Input - Personal - Dependent - Insurance
-                  const inputIncome = Number(tax.thuNhapTinhThue || 0)
-                  const assessableIncome = Math.max(0, inputIncome - personalDeduction - dependentDeduction - insuranceDeduction)
-
-                  // 3. Calculate Tax using progressive formula
-                  const taxAmount = calculateProgressiveTax(assessableIncome)
-
-                  return (
-                    <tr key={tax.id}>
-                      <td>{idx + 1}</td>
-                      <td>{employee ? (employee.id || '-') : '-'}</td>
-                      <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
-                      <td>{tax.maSoThue || tax.mst || '-'}</td>
-                      <td>{formatMoney(inputIncome)}</td>
-                      <td>{formatMoney(personalDeduction)}</td>
-                      <td>{formatMoney(dependentDeduction)}</td>
-                      <td>{formatMoney(assessableIncome)}</td>
-                      <td>{tax.bieuThue || 'Lũy tiến'}</td>
-                      <td style={{ fontWeight: 700, color: 'var(--danger)' }}>{formatMoney(taxAmount)}</td>
-                      <td>{tax.kyApDung || tax.period || '-'}</td>
-                      <td>
-                        <div className="actions">
-                          <button
-                            className="view"
-                            title="Xem chi tiết"
-                            onClick={() => {
-                              setSelectedTax(tax)
-                              setIsTaxReadOnly(true)
-                              setIsTaxModalOpen(true)
-                            }}
-                          >
-                            <i className="fas fa-eye"></i>
-                          </button>
-                          <button
-                            className="edit"
-                            onClick={() => {
-                              setSelectedTax(tax)
-                              setIsTaxReadOnly(false)
-                              setIsTaxModalOpen(true)
-                            }}
-                          >
-                            <i className="fas fa-pencil-alt"></i>
-                          </button>
-                          <button
-                            className="delete"
-                            onClick={() => handleDeleteTax(tax.id)}
-                          >
-                            <i className="fas fa-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              ) : (
-                <tr>
-                  <td colSpan="12" className="empty-state">Chưa có thông tin Thuế TNCN</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
 
       <SalaryGradeModal
         grade={selectedGrade}
@@ -1128,134 +1118,55 @@ function Salary() {
         onSave={loadData}
       />
 
-      <InsuranceModal
-        insurance={selectedInsurance}
-        employees={employees}
-        employeeSalaries={employeeSalaries}
-        salaryGrades={salaryGrades}
-        isOpen={isInsuranceModalOpen}
-        onClose={() => {
-          setIsInsuranceModalOpen(false)
-          setSelectedInsurance(null)
-          setIsInsuranceReadOnly(false)
-        }}
-        onSave={loadData}
-        readOnly={isInsuranceReadOnly}
-      />
 
-      <TaxModal
-        tax={selectedTax}
-        employees={employees}
-        dependents={dependents}
-        insuranceList={insuranceInfo}
-        isOpen={isTaxModalOpen}
-        onClose={() => {
-          setIsTaxModalOpen(false)
-          setSelectedTax(null)
-          setIsTaxReadOnly(false)
-        }}
-        onSave={loadData}
-        readOnly={isTaxReadOnly}
-      />
 
-      {/* Import Excel Modal for Insurance */}
-      {isInsuranceImportModalOpen && (
-        <div className="modal show" onClick={() => setIsInsuranceImportModalOpen(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+
+
+
+      {isGradeImportModalOpen && (
+        <div className="modal show" onClick={() => setIsGradeImportModalOpen(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '800px' }}>
             <div className="modal-header">
-              <h3>
-                <i className="fas fa-file-import"></i>
-                Import Thông tin BHXH từ Excel
-              </h3>
-              <button className="modal-close" onClick={() => setIsInsuranceImportModalOpen(false)}>&times;</button>
+              <h3>Import Bậc Lương</h3>
+              <button className="modal-close" onClick={() => setIsGradeImportModalOpen(false)}>&times;</button>
             </div>
             <div className="modal-body">
-              <div className="form-group">
-                <label>Chọn file Excel</label>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={handleInsuranceFileSelect}
-                  style={{ width: '100%', padding: '10px' }}
-                />
-              </div>
+              <input type="file" onChange={handleGradeFileSelect} accept=".xlsx,.xls" />
 
-              <div style={{ marginTop: '15px', padding: '10px', background: '#f0f8ff', borderRadius: '4px', fontSize: '0.9rem' }}>
-                <strong>Lưu ý:</strong>
-                <ul style={{ marginTop: '5px', paddingLeft: '20px' }}>
-                  <li>File Excel cần có các cột bắt buộc: <b>Mã NV, Số sổ BHXH, Mức lương đóng BHXH</b></li>
-                  <li>Các cột khác: Ngày tham gia, Tỷ lệ NLĐ, Tỷ lệ DN, Trạng thái</li>
-                  <li>Mã NV phải tồn tại trong hệ thống</li>
-                  <li>Tải file Excel mẫu để xem định dạng chuẩn</li>
-                </ul>
-              </div>
-
-              {insuranceImportPreviewData.length > 0 && (
-                <div style={{ marginTop: '20px' }}>
-                  <h4>Preview dữ liệu ({insuranceImportPreviewData.length} nhân viên)</h4>
-                  <div style={{ maxHeight: '300px', overflow: 'auto', border: '1px solid #ddd', borderRadius: '4px' }}>
-                    <table style={{ width: '100%', fontSize: '0.85rem' }}>
-                      <thead style={{ position: 'sticky', top: 0, background: '#f5f5f5' }}>
-                        <tr>
-                          <th>STT</th>
-                          <th>Mã NV</th>
-                          <th>Họ tên</th>
-                          <th>Bộ phận</th>
-                          <th>Số sổ BHXH</th>
-                          <th>Mức lương đóng</th>
-                          <th>Tỷ lệ NLĐ</th>
-                          <th>Tỷ lệ DN</th>
-                          <th>Trạng thái</th>
+              {gradeImportPreviewData.length > 0 && (
+                <div style={{ marginTop: '15px', maxHeight: '300px', overflow: 'auto' }}>
+                  <table className="table table-bordered">
+                    <thead>
+                      <tr>
+                        <th>Vị trí</th>
+                        <th>Ca</th>
+                        <th>Bậc</th>
+                        <th>Lương P1</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {gradeImportPreviewData.map((d, i) => (
+                        <tr key={i}>
+                          <td>{d.position}</td>
+                          <td>{d.shift}</td>
+                          <td>{d.level}</td>
+                          <td>{formatMoney(d.salary)}</td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {insuranceImportPreviewData.map((item, idx) => (
-                          <tr key={idx}>
-                            <td>{idx + 1}</td>
-                            <td>{item.employeeId}</td>
-                            <td>{item.employeeName}</td>
-                            <td>{item.department}</td>
-                            <td>{item.soSoBHXH}</td>
-                            <td>{formatMoney(item.mucLuongDong)}</td>
-                            <td>{item.tyLeNLD}%</td>
-                            <td>{item.tyLeDN}%</td>
-                            <td>{item.status}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
 
-              <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <div className="modal-actions" style={{ marginTop: '15px', textAlign: 'right' }}>
+                <button className="btn" onClick={() => setIsGradeImportModalOpen(false)}>Hủy</button>
                 <button
-                  type="button"
-                  className="btn"
-                  onClick={() => {
-                    setIsInsuranceImportModalOpen(false)
-                    setInsuranceImportFile(null)
-                    setInsuranceImportPreviewData([])
-                  }}
-                  disabled={isInsuranceImporting}
-                >
-                  Hủy
-                </button>
-                <button
-                  type="button"
                   className="btn btn-primary"
-                  onClick={handleConfirmInsuranceImport}
-                  disabled={isInsuranceImporting || insuranceImportPreviewData.length === 0}
+                  onClick={handleConfirmGradeImport}
+                  disabled={isGradeImporting || gradeImportPreviewData.length === 0}
+                  style={{ marginLeft: '10px' }}
                 >
-                  {isInsuranceImporting ? (
-                    <>
-                      <i className="fas fa-spinner fa-spin"></i> Đang import...
-                    </>
-                  ) : (
-                    <>
-                      <i className="fas fa-check"></i> Xác nhận Import ({insuranceImportPreviewData.length})
-                    </>
-                  )}
+                  {isGradeImporting ? 'Đang import...' : 'Xác nhận'}
                 </button>
               </div>
             </div>
@@ -1263,111 +1174,132 @@ function Salary() {
         </div>
       )}
 
-      {/* Import Excel Modal for Tax */}
-      {isTaxImportModalOpen && (
-        <div className="modal show" onClick={() => setIsTaxImportModalOpen(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+      {isEmpSalaryImportModalOpen && (
+        <div className="modal show" onClick={() => setIsEmpSalaryImportModalOpen(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '900px' }}>
             <div className="modal-header">
-              <h3>
-                <i className="fas fa-file-import"></i>
-                Import Thuế TNCN từ Excel
-              </h3>
-              <button className="modal-close" onClick={() => setIsTaxImportModalOpen(false)}>&times;</button>
+              <h3>Import Bậc Lương Nhân Viên</h3>
+              <button className="modal-close" onClick={() => setIsEmpSalaryImportModalOpen(false)}>&times;</button>
             </div>
             <div className="modal-body">
-              <div className="form-group">
-                <label>Chọn file Excel</label>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={handleTaxFileSelect}
-                  style={{ width: '100%', padding: '10px' }}
-                />
+              <div className="alert alert-info">
+                Vui lòng sử dụng file mẫu để đảm bảo định dạng dữ liệu chính xác.
               </div>
+              <input type="file" onChange={handleEmpSalaryFileSelect} accept=".xlsx,.xls" />
 
-              <div style={{ marginTop: '15px', padding: '10px', background: '#f0f8ff', borderRadius: '4px', fontSize: '0.9rem' }}>
-                <strong>Lưu ý:</strong>
-                <ul style={{ marginTop: '5px', paddingLeft: '20px' }}>
-                  <li>File Excel cần có các cột bắt buộc: <b>Mã NV, Thu nhập tính thuế</b></li>
-                  <li>Các cột khác: Mã số thuế TNCN, Giảm trừ bản thân, Biểu thuế, Kỳ áp dụng</li>
-                  <li>Mã NV phải tồn tại trong hệ thống</li>
-                  <li>Hệ thống sẽ tự động tính thuế dựa trên người phụ thuộc và BHXH</li>
-                  <li>Tải file Excel mẫu để xem định dạng chuẩn</li>
-                </ul>
-              </div>
-
-              {taxImportPreviewData.length > 0 && (
-                <div style={{ marginTop: '20px' }}>
-                  <h4>Preview dữ liệu ({taxImportPreviewData.length} nhân viên)</h4>
-                  <div style={{ maxHeight: '300px', overflow: 'auto', border: '1px solid #ddd', borderRadius: '4px' }}>
-                    <table style={{ width: '100%', fontSize: '0.85rem' }}>
-                      <thead style={{ position: 'sticky', top: 0, background: '#f5f5f5' }}>
-                        <tr>
-                          <th>STT</th>
-                          <th>Mã NV</th>
-                          <th>Họ tên</th>
-                          <th>Bộ phận</th>
-                          <th>MST</th>
-                          <th>Thu nhập</th>
-                          <th>Giảm trừ BT</th>
-                          <th>Biểu thuế</th>
-                          <th>Kỳ áp dụng</th>
+              {empSalaryImportPreviewData.length > 0 && (
+                <div style={{ marginTop: '15px', maxHeight: '400px', overflow: 'auto' }}>
+                  <table className="table table-bordered">
+                    <thead>
+                      <tr>
+                        <th>Mã NV</th>
+                        <th>Nhân viên</th>
+                        <th>Bậc lương</th>
+                        <th>Ngày hiệu lực</th>
+                        <th>Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {empSalaryImportPreviewData.map((d, i) => (
+                        <tr key={i} style={{ backgroundColor: d.isValid ? 'transparent' : '#fff3f3' }}>
+                          <td>{d.employeeId}</td>
+                          <td>{d.employeeName}</td>
+                          <td>{d.gradeName}</td>
+                          <td>{d.effectiveDate}</td>
+                          <td>
+                            {d.isValid ? (
+                              <span style={{ color: 'green' }}>✓ Hợp lệ</span>
+                            ) : (
+                              <span style={{ color: 'red' }}>✕ {d.note}</span>
+                            )}
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {taxImportPreviewData.map((item, idx) => (
-                          <tr key={idx}>
-                            <td>{idx + 1}</td>
-                            <td>{item.employeeId}</td>
-                            <td>{item.employeeName}</td>
-                            <td>{item.department}</td>
-                            <td>{item.maSoThue}</td>
-                            <td>{formatMoney(item.thuNhapTinhThue)}</td>
-                            <td>{formatMoney(item.giamTruBanThan)}</td>
-                            <td>{item.bieuThue}</td>
-                            <td>{item.kyApDung}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
 
-              <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <div className="modal-actions" style={{ marginTop: '15px', textAlign: 'right' }}>
+                <button className="btn" onClick={() => setIsEmpSalaryImportModalOpen(false)}>Hủy</button>
                 <button
-                  type="button"
-                  className="btn"
-                  onClick={() => {
-                    setIsTaxImportModalOpen(false)
-                    setTaxImportFile(null)
-                    setTaxImportPreviewData([])
-                  }}
-                  disabled={isTaxImporting}
-                >
-                  Hủy
-                </button>
-                <button
-                  type="button"
                   className="btn btn-primary"
-                  onClick={handleConfirmTaxImport}
-                  disabled={isTaxImporting || taxImportPreviewData.length === 0}
+                  onClick={handleConfirmEmpSalaryImport}
+                  disabled={isEmpSalaryImporting || empSalaryImportPreviewData.filter(d => d.isValid).length === 0}
+                  style={{ marginLeft: '10px' }}
                 >
-                  {isTaxImporting ? (
-                    <>
-                      <i className="fas fa-spinner fa-spin"></i> Đang import...
-                    </>
-                  ) : (
-                    <>
-                      <i className="fas fa-check"></i> Xác nhận Import ({taxImportPreviewData.length})
-                    </>
-                  )}
+                  {isEmpSalaryImporting ? 'Đang import...' : 'Xác nhận Import'}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {isHistoryImportModalOpen && (
+        <div className="modal show" onClick={() => setIsHistoryImportModalOpen(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+            <div className="modal-header">
+              <h3>Import Lịch Sử Thăng Tiến</h3>
+              <button className="modal-close" onClick={() => setIsHistoryImportModalOpen(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="alert alert-info">
+                Vui lòng sử dụng file mẫu. Hệ thống sẽ tự tìm Bậc lương dựa trên Vị trí, Ca và Bậc.
+              </div>
+              <input type="file" onChange={handleHistoryFileSelect} accept=".xlsx,.xls" />
+
+              {historyImportPreviewData.length > 0 && (
+                <div style={{ marginTop: '15px', maxHeight: '400', overflow: 'auto' }}>
+                  <table className="table table-bordered">
+                    <thead>
+                      <tr>
+                        <th>Mã NV</th>
+                        <th>Nhân viên</th>
+                        <th>Bậc lương</th>
+                        <th>Ngày</th>
+                        <th>Hình thức</th>
+                        <th>Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historyImportPreviewData.map((d, i) => (
+                        <tr key={i} style={{ backgroundColor: d.isValid ? 'transparent' : '#fff3f3' }}>
+                          <td>{d.employeeId}</td>
+                          <td>{d.employeeName}</td>
+                          <td>{d.gradeName}</td>
+                          <td>{d.effectiveDate}</td>
+                          <td>{d.type}</td>
+                          <td>
+                            {d.isValid ? (
+                              <span style={{ color: 'green' }}>✓ Hợp lệ</span>
+                            ) : (
+                              <span style={{ color: 'red' }}>✕ {d.note}</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="modal-actions" style={{ marginTop: '15px', textAlign: 'right' }}>
+                <button className="btn" onClick={() => setIsHistoryImportModalOpen(false)}>Hủy</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleConfirmHistoryImport}
+                  disabled={isHistoryImporting || historyImportPreviewData.filter(d => d.isValid).length === 0}
+                  style={{ marginLeft: '10px' }}
+                >
+                  {isHistoryImporting ? 'Đang import...' : 'Xác nhận Import'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

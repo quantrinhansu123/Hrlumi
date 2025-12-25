@@ -56,6 +56,24 @@ function Competency() {
   const [inputFilterDept, setInputFilterDept] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
+  // Excel Import/Export states for Competency Framework
+  const [isFrameworkImportModalOpen, setIsFrameworkImportModalOpen] = useState(false)
+  const [frameworkImportFile, setFrameworkImportFile] = useState(null)
+  const [frameworkImportPreviewData, setFrameworkImportPreviewData] = useState([])
+  const [isFrameworkImporting, setIsFrameworkImporting] = useState(false)
+
+  // Excel Import/Export states for Evaluations
+  const [isEvalImportModalOpen, setIsEvalImportModalOpen] = useState(false)
+  const [evalImportFile, setEvalImportFile] = useState(null)
+  const [evalImportPreviewData, setEvalImportPreviewData] = useState([])
+  const [isEvalImporting, setIsEvalImporting] = useState(false)
+
+  // Excel Import/Export states for Training
+  const [isTrainingImportModalOpen, setIsTrainingImportModalOpen] = useState(false)
+  const [trainingImportFile, setTrainingImportFile] = useState(null)
+  const [trainingImportPreviewData, setTrainingImportPreviewData] = useState([])
+  const [isTrainingImporting, setIsTrainingImporting] = useState(false)
+
   // Bảng 1: Khai báo khung năng lực state
   const [isFrameworkModalOpen, setIsFrameworkModalOpen] = useState(false)
   const [isFrameworkReadOnly, setIsFrameworkReadOnly] = useState(false)
@@ -160,6 +178,472 @@ function Competency() {
       alert('Đã xóa chương trình đào tạo')
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)
+    }
+  }
+
+  // --- Competency Framework Excel Functions ---
+
+  const exportFrameworkToExcel = () => {
+    if (competencyFramework.length === 0) {
+      alert('Không có dữ liệu để xuất!')
+      return
+    }
+
+    const exportData = competencyFramework.map((item, idx) => ({
+      'STT': idx + 1,
+      'Bộ phận': item.department || '',
+      'Vị trí': item.position || '',
+      'Nhóm năng lực': item.group || '',
+      'Tên năng lực': item.name || '',
+      'Level yêu cầu': item.level || 1,
+      'Trạng thái': item.status || 'Áp dụng',
+      'Ghi chú': item.note || ''
+    }))
+
+    const ws = XLSX.utils.json_to_sheet(exportData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Khung_nang_luc')
+    XLSX.writeFile(wb, `KHNL_${new Date().toISOString().split('T')[0]}.xlsx`)
+  }
+
+  const downloadFrameworkTemplate = () => {
+    const data = [
+      ['Bộ phận', 'Vị trí', 'Nhóm năng lực', 'Tên năng lực', 'Level yêu cầu (1-5)', 'Trạng thái (Áp dụng/Ngừng)', 'Ghi chú'],
+      ['MKT', 'MKT 1', 'Chuyên môn', 'Lập kế hoạch & giám sát KPI', 3, 'Áp dụng', ''],
+      ['Sale', 'Sale 1', 'Cá nhân', 'Giao tiếp thuyết phục', 2, 'Áp dụng', '']
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Mau_import_KHNL')
+    XLSX.writeFile(wb, 'Mau_import_khung_nang_luc.xlsx')
+  }
+
+  const handleFrameworkFileSelect = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    setFrameworkImportFile(file)
+    setIsFrameworkImporting(true)
+
+    try {
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data)
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+
+      if (jsonData.length < 2) {
+        alert('File không có dữ liệu')
+        setIsFrameworkImporting(false)
+        return
+      }
+
+      const headers = jsonData[0].map(h => String(h).toLowerCase().trim())
+      const requiredHeaders = [
+        { key: 'bộ phận', label: 'Bộ phận' },
+        { key: 'vị trí', label: 'Vị trí' },
+        { key: 'tên năng lực', label: 'Tên năng lực' }
+      ]
+
+      const missingHeaders = requiredHeaders.filter(req => !headers.some(h => h.includes(req.key)))
+
+      if (missingHeaders.length > 0) {
+        alert(`File không đúng mẫu! Thiếu các cột: ${missingHeaders.map(m => m.label).join(', ')}.`)
+        setIsFrameworkImporting(false)
+        return
+      }
+
+      const dataRows = jsonData.slice(1)
+      const parsedData = []
+
+      for (const row of dataRows) {
+        const dept = String(row[headers.findIndex(h => h.includes('bộ phận'))] || '').trim()
+        const pos = String(row[headers.findIndex(h => h.includes('vị trí'))] || '').trim()
+        const group = String(row[headers.findIndex(h => h.includes('nhóm'))] || 'Chuyên môn').trim()
+        const name = String(row[headers.findIndex(h => h.includes('tên năng lực'))] || '').trim()
+        const levelRaw = row[headers.findIndex(h => h.includes('level'))]
+        const status = String(row[headers.findIndex(h => h.includes('trạng thái'))] || 'Áp dụng').trim()
+        const note = String(row[headers.findIndex(h => h.includes('ghi chú'))] || '').trim()
+
+        if (!dept || !pos || !name) continue
+
+        const level = parseInt(levelRaw) || 1
+
+        parsedData.push({
+          department: dept,
+          position: pos,
+          group,
+          name,
+          level,
+          status: status.includes('Ngừng') ? 'Ngừng' : 'Áp dụng',
+          note,
+          isValid: true,
+          note_val: ''
+        })
+      }
+
+      setFrameworkImportPreviewData(parsedData)
+      setIsFrameworkImporting(false)
+    } catch (error) {
+      alert('Lỗi đọc file: ' + error.message)
+      setIsFrameworkImporting(false)
+    }
+  }
+
+  const handleConfirmFrameworkImport = async () => {
+    const validData = frameworkImportPreviewData.filter(d => d.isValid)
+    if (validData.length === 0) {
+      alert('Không có dữ liệu hợp lệ để import')
+      return
+    }
+
+    if (!confirm(`Xác nhận import ${validData.length} năng lực vào khung đào tạo?`)) return
+
+    setIsFrameworkImporting(true)
+    try {
+      for (const item of validData) {
+        const { isValid, note_val, ...payload } = item
+        await fbPush('hr/competencyFramework', payload)
+      }
+      alert('Import thành công!')
+      setIsFrameworkImportModalOpen(false)
+      setFrameworkImportPreviewData([])
+      loadData()
+    } catch (error) {
+      alert('Lỗi khi import: ' + error.message)
+    } finally {
+      setIsFrameworkImporting(false)
+    }
+  }
+
+  // --- Evaluation Excel Functions ---
+
+  const exportEvaluationsToExcel = () => {
+    if (evaluations.length === 0) {
+      alert('Không có dữ liệu để xuất!')
+      return
+    }
+
+    const exportData = []
+    evaluations.forEach(evalItem => {
+      const emp = employees.find(e => e.id === evalItem.employeeId)
+      const empName = emp ? (emp.ho_va_ten || emp.name) : (evalItem.employeeName || 'N/A')
+
+      evalItem.items?.forEach(item => {
+        exportData.push({
+          'Kỳ đánh giá': evalItem.period || '',
+          'Mã NV': evalItem.employeeCode || evalItem.employeeId || '',
+          'Họ tên': empName,
+          'Bộ phận': evalItem.department || '',
+          'Vị trí': evalItem.position || '',
+          'Ngày đánh giá': evalItem.evaluationDate || '',
+          'Nhóm NL': item.group || '',
+          'Tên năng lực': item.competencyName || '',
+          'Level yêu cầu': item.requiredLevel || 0,
+          'Level đạt được': item.achievedLevel || 0,
+          'Chênh lệch': item.difference || 0,
+          'Nhận xét': item.comment || ''
+        })
+      })
+    })
+
+    const ws = XLSX.utils.json_to_sheet(exportData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Ket_qua_danh_gia')
+    XLSX.writeFile(wb, `KQ_DanhGia_${new Date().toISOString().split('T')[0]}.xlsx`)
+  }
+
+  const downloadEvalTemplate = () => {
+    const data = [
+      ['Mã nhân viên', 'Kỳ đánh giá (YYYY-MM)', 'Ngày đánh giá (YYYY-MM-DD)', 'Tên năng lực', 'Level đạt được (1-5)', 'Nhận xét'],
+      ['NV001', '2024-10', '2024-10-25', 'Lập kế hoạch & giám sát KPI', 4, 'Làm tốt'],
+      ['NV001', '2024-10', '2024-10-25', 'Giao tiếp thuyết phục', 3, 'Cần cố gắng']
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Mau_import_KQDG')
+    XLSX.writeFile(wb, 'Mau_import_ket_qua_danh_gia.xlsx')
+  }
+
+  const handleEvalFileSelect = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    setEvalImportFile(file)
+    setIsEvalImporting(true)
+
+    try {
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data)
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+
+      if (jsonData.length < 2) {
+        alert('File không có dữ liệu')
+        setIsEvalImporting(false)
+        return
+      }
+
+      const headers = jsonData[0].map(h => String(h).toLowerCase().trim())
+      const requiredFields = [
+        { key: 'mã nhân viên', label: 'Mã nhân viên' },
+        { key: 'kỳ đánh giá', label: 'Kỳ đánh giá' },
+        { key: 'tên năng lực', label: 'Tên năng lực' },
+        { key: 'level đạt được', label: 'Level đạt được' }
+      ]
+
+      const missing = requiredFields.filter(f => !headers.some(h => h.includes(f.key)))
+      if (missing.length > 0) {
+        alert(`Thiếu các cột: ${missing.map(m => m.label).join(', ')}`)
+        setIsEvalImporting(false)
+        return
+      }
+
+      const dataRows = jsonData.slice(1)
+      const items = []
+
+      for (const row of dataRows) {
+        const empId = String(row[headers.findIndex(h => h.includes('mã nhân viên'))] || '').trim()
+        const period = String(row[headers.findIndex(h => h.includes('kỳ đánh giá'))] || '').trim()
+        const dateRaw = row[headers.findIndex(h => h.includes('ngày đánh giá'))]
+        const compName = String(row[headers.findIndex(h => h.includes('tên năng lực'))] || '').trim()
+        const levelRaw = row[headers.findIndex(h => h.includes('level đạt được'))]
+        const comment = String(row[headers.findIndex(h => h.includes('nhận xét'))] || '').trim()
+
+        if (!empId || !period || !compName) continue
+
+        const emp = employees.find(e => e.id === empId || e.employeeCode === empId || e.ma_nhan_vien === empId)
+        const frameworkItem = competencyFramework.find(f =>
+          f.name.toLowerCase().trim() === compName.toLowerCase().trim() &&
+          (emp ? (f.position === (emp.vi_tri || emp.position)) : true)
+        )
+
+        let note = ''
+        if (!emp) note += 'NV không tồn tại. '
+        if (!frameworkItem) note += 'NL không thuộc vị trí này. '
+
+        items.push({
+          empId: emp ? emp.id : empId,
+          empName: emp ? (emp.ho_va_ten || emp.name) : 'Unknown',
+          period,
+          evaluationDate: dateRaw ? String(dateRaw) : new Date().toISOString().split('T')[0],
+          competencyId: frameworkItem ? frameworkItem.id : null,
+          competencyName: compName,
+          group: frameworkItem ? frameworkItem.group : 'Unknown',
+          requiredLevel: frameworkItem ? frameworkItem.level : 0,
+          achievedLevel: parseInt(levelRaw) || 0,
+          comment,
+          isValid: emp && frameworkItem,
+          note
+        })
+      }
+
+      // Group by empId and period
+      const grouped = items.reduce((acc, current) => {
+        const key = `${current.empId}_${current.period}`
+        if (!acc[key]) {
+          acc[key] = {
+            id: key,
+            employeeId: current.empId,
+            employeeCode: current.empId,
+            employeeName: current.empName,
+            period: current.period,
+            evaluationDate: current.evaluationDate,
+            items: [],
+            isValid: true,
+            note: ''
+          }
+        }
+        acc[key].items.push({
+          competencyId: current.competencyId,
+          competencyName: current.competencyName,
+          group: current.group,
+          requiredLevel: current.requiredLevel,
+          achievedLevel: current.achievedLevel,
+          difference: current.achievedLevel - current.requiredLevel,
+          comment: current.comment
+        })
+        if (!current.isValid) {
+          acc[key].isValid = false
+          acc[key].note += `[${current.competencyName}: ${current.note}] `
+        }
+        return acc
+      }, {})
+
+      setEvalImportPreviewData(Object.values(grouped))
+      setIsEvalImporting(false)
+    } catch (error) {
+      alert('Lỗi khi đọc file: ' + error.message)
+      setIsEvalImporting(false)
+    }
+  }
+
+  const handleConfirmEvalImport = async () => {
+    const validData = evalImportPreviewData.filter(d => d.isValid)
+    if (validData.length === 0) {
+      alert('Không có dữ liệu hợp lệ')
+      return
+    }
+
+    if (!confirm(`Import ${validData.length} kết quả đánh giá?`)) return
+
+    setIsEvalImporting(true)
+    try {
+      for (const assessment of validData) {
+        const avgRequired = assessment.items.reduce((sum, i) => sum + i.requiredLevel, 0) / assessment.items.length
+        const avgAchieved = assessment.items.reduce((sum, i) => sum + i.achievedLevel, 0) / assessment.items.length
+
+        const emp = employees.find(e => e.id === assessment.employeeId)
+
+        const payload = {
+          employeeId: assessment.employeeId,
+          employeeCode: assessment.employeeCode,
+          period: assessment.period,
+          evaluationDate: assessment.evaluationDate,
+          items: assessment.items,
+          diemYC: avgRequired || 0,
+          diemKQ: avgAchieved || 0,
+          result: (avgAchieved || 0) >= (avgRequired || 0) ? 'Đạt' : 'Cần cải thiện',
+          department: emp ? (emp.bo_phan || emp.department || '') : '',
+          position: emp ? (emp.vi_tri || emp.position || '') : '',
+          updatedAt: new Date().toISOString()
+        }
+        await fbPush('hr/employee_competency_assessment', payload)
+      }
+      alert('Import thành công!')
+      setIsEvalImportModalOpen(false)
+      loadData()
+    } catch (error) {
+      alert('Lỗi khi import: ' + error.message)
+    } finally {
+      setIsEvalImporting(false)
+    }
+  }
+
+  // --- Training Excel Functions ---
+
+  const exportTrainingToExcel = () => {
+    if (trainingPrograms.length === 0) {
+      alert('Không có dữ liệu để xuất!')
+      return
+    }
+
+    const exportData = trainingPrograms.map((t, idx) => ({
+      'STT': idx + 1,
+      'Mã chương trình': t.code || t.id || '',
+      'Tên chương trình': t.name || '',
+      'Hình thức': t.format || t.hinhThuc || '',
+      'Đơn vị đào tạo': t.provider || t.donVi || '',
+      'Thời gian bắt đầu': t.startDate || '',
+      'Thời gian kết thúc': t.endDate || '',
+      'Mục tiêu': t.objective || t.mucTieu || '',
+      'Trạng thái': t.status || ''
+    }))
+
+    const ws = XLSX.utils.json_to_sheet(exportData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Chuong_trinh_dao_tao')
+    XLSX.writeFile(wb, `CT_DaoTao_${new Date().toISOString().split('T')[0]}.xlsx`)
+  }
+
+  const downloadTrainingTemplate = () => {
+    const data = [
+      ['Mã chương trình', 'Tên chương trình', 'Hình thức', 'Đơn vị đào tạo', 'Thời gian bắt đầu (YYYY-MM-DD)', 'Thời gian kết thúc (YYYY-MM-DD)', 'Mục tiêu', 'Trạng thái'],
+      ['CT001', 'Đào tạo kỹ năng giao tiếp', 'Nội bộ', 'Phòng HR', '2024-11-01', '2024-11-05', 'Nâng cao kỹ năng thuyết phục', 'Sắp diễn ra'],
+      ['CT002', 'Kỹ thuật bán hàng nâng cao', 'External', 'PwC', '2024-12-01', '2024-12-10', 'Tăng tỷ lệ chốt đơn', 'Sắp diễn ra']
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Mau_import_CTDT')
+    XLSX.writeFile(wb, 'Mau_import_chuong_trinh_dao_tao.xlsx')
+  }
+
+  const handleTrainingFileSelect = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    setTrainingImportFile(file)
+    setIsTrainingImporting(true)
+
+    try {
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data)
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+
+      if (jsonData.length < 2) {
+        alert('File không có dữ liệu')
+        setIsTrainingImporting(false)
+        return
+      }
+
+      const headers = jsonData[0].map(h => String(h).toLowerCase().trim())
+      const required = ['tên chương trình', 'hình thức', 'đơn vị đào tạo']
+      const missing = required.filter(r => !headers.some(h => h.includes(r)))
+
+      if (missing.length > 0) {
+        alert(`Thiếu các cột: ${missing.join(', ')}`)
+        setIsTrainingImporting(false)
+        return
+      }
+
+      const dataRows = jsonData.slice(1)
+      const parsedData = []
+
+      for (const row of dataRows) {
+        const code = String(row[headers.findIndex(h => h.includes('mã chương trình'))] || '').trim()
+        const name = String(row[headers.findIndex(h => h.includes('tên chương trình'))] || '').trim()
+        const format = String(row[headers.findIndex(h => h.includes('hình thức'))] || '').trim()
+        const provider = String(row[headers.findIndex(h => h.includes('đơn vị đào tạo'))] || '').trim()
+        const start = row[headers.findIndex(h => h.includes('bắt đầu'))]
+        const end = row[headers.findIndex(h => h.includes('kết thúc'))]
+        const objective = String(row[headers.findIndex(h => h.includes('mục tiêu'))] || '').trim()
+        const status = String(row[headers.findIndex(h => h.includes('trạng thái'))] || 'Sắp diễn ra').trim()
+
+        if (!name || !format || !provider) continue
+
+        parsedData.push({
+          code,
+          name,
+          format,
+          provider,
+          startDate: start ? String(start) : null,
+          endDate: end ? String(end) : null,
+          objective,
+          status,
+          isValid: true
+        })
+      }
+
+      setTrainingImportPreviewData(parsedData)
+      setIsTrainingImporting(false)
+    } catch (error) {
+      alert('Lỗi khi đọc file: ' + error.message)
+      setIsTrainingImporting(false)
+    }
+  }
+
+  const handleConfirmTrainingImport = async () => {
+    const validData = trainingImportPreviewData.filter(d => d.isValid)
+    if (validData.length === 0) {
+      alert('Không có dữ liệu hợp lệ')
+      return
+    }
+
+    if (!confirm(`Import ${validData.length} chương trình đào tạo?`)) return
+
+    setIsTrainingImporting(true)
+    try {
+      for (const item of validData) {
+        const { isValid, ...payload } = item
+        await fbPush('hr/trainings', payload)
+      }
+      alert('Import thành công!')
+      setIsTrainingImportModalOpen(false)
+      loadData()
+    } catch (error) {
+      alert('Lỗi khi import: ' + error.message)
+    } finally {
+      setIsTrainingImporting(false)
     }
   }
 
@@ -395,19 +879,148 @@ function Competency() {
         {activeTab === 'framework' && (
           <>
             <SeedCompetencyDataButton onComplete={loadData} />
+            <button
+              className="btn"
+              onClick={exportFrameworkToExcel}
+              style={{
+                marginLeft: '10px',
+                background: '#28a745',
+                borderColor: '#28a745',
+                color: '#fff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontWeight: '500'
+              }}
+              title="Xuất dữ liệu ra file Excel"
+            >
+              <i className="fas fa-file-excel"></i> Xuất Excel
+            </button>
+            <button
+              className="btn btn-info"
+              onClick={downloadFrameworkTemplate}
+              style={{ marginLeft: '10px' }}
+            >
+              <i className="fas fa-download"></i> Tải mẫu
+            </button>
+            <button
+              className="btn"
+              onClick={() => setIsFrameworkImportModalOpen(true)}
+              style={{
+                marginLeft: '10px',
+                background: '#6f42c1',
+                borderColor: '#6f42c1',
+                color: '#fff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+              title="Nhập dữ liệu từ file Excel mẫu"
+            >
+              <i className="fas fa-file-import"></i>
+              Import Excel
+            </button>
+          </>
+        )}
+        {activeTab === 'evaluation' && (
+          <>
+            <button
+              className="btn"
+              onClick={exportEvaluationsToExcel}
+              style={{
+                marginLeft: '10px',
+                background: '#28a745',
+                borderColor: '#28a745',
+                color: '#fff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontWeight: '500'
+              }}
+              title="Xuất dữ liệu đánh giá"
+            >
+              <i className="fas fa-file-excel"></i> Xuất Excel
+            </button>
+            <button
+              className="btn btn-info"
+              onClick={downloadEvalTemplate}
+              style={{ marginLeft: '10px' }}
+            >
+              <i className="fas fa-download"></i> Tải mẫu
+            </button>
+            <button
+              className="btn"
+              onClick={() => setIsEvalImportModalOpen(true)}
+              style={{
+                marginLeft: '10px',
+                background: '#6f42c1',
+                borderColor: '#6f42c1',
+                color: '#fff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+              title="Nhập dữ liệu đánh giá từ Excel"
+            >
+              <i className="fas fa-file-import"></i>
+              Import Excel
+            </button>
           </>
         )}
         {activeTab === 'training' && (
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              setSelectedTraining(null)
-              setIsTrainingModalOpen(true)
-            }}
-          >
-            <i className="fas fa-plus"></i>
-            Thêm CTĐT
-          </button>
+          <>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setSelectedTraining(null)
+                setIsTrainingModalOpen(true)
+              }}
+            >
+              <i className="fas fa-plus"></i>
+              Thêm CTĐT
+            </button>
+            <button
+              className="btn"
+              onClick={exportTrainingToExcel}
+              style={{
+                marginLeft: '10px',
+                background: '#28a745',
+                borderColor: '#28a745',
+                color: '#fff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontWeight: '500'
+              }}
+              title="Xuất danh sách CTĐT"
+            >
+              <i className="fas fa-file-excel"></i> Xuất Excel
+            </button>
+            <button
+              className="btn btn-info"
+              onClick={downloadTrainingTemplate}
+              style={{ marginLeft: '10px' }}
+            >
+              <i className="fas fa-download"></i> Tải mẫu
+            </button>
+            <button
+              className="btn"
+              onClick={() => setIsTrainingImportModalOpen(true)}
+              style={{
+                marginLeft: '10px',
+                background: '#6f42c1',
+                borderColor: '#6f42c1',
+                color: '#fff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+              title="Nhập danh sách CTĐT từ Excel"
+            >
+              <i className="fas fa-file-import"></i>
+              Import Excel
+            </button>
+          </>
         )}
       </div>
 
@@ -472,7 +1085,7 @@ function Competency() {
                       onChange={handleFrameworkFormChange}
                       onFocus={() => setShowPositionDropdown(true)}
                       onBlur={() => setTimeout(() => setShowPositionDropdown(false), 200)}
-                      placeholder="VD: MKT 1, Sale 1..."
+                      placeholder="Nhập vị trí mới hoặc chọn từ danh sách..."
                       style={{ width: '100%', padding: '8px' }}
                       required
                       autoComplete="off"
@@ -665,7 +1278,7 @@ function Competency() {
                         <th rowSpan="2">Nhóm năng lực</th>
                         <th rowSpan="2">Tên năng lực</th>
                         {matrixPositions.map(pos => (
-                          <th key={pos}>{escapeHtml(pos)}</th>
+                          <th key={pos}>{pos}</th>
                         ))}
                       </tr>
                       <tr>
@@ -679,8 +1292,8 @@ function Competency() {
                         pivotRows.map((row, idx) => (
                           <tr key={`${row.group}_${row.name}`}>
                             <td style={{ textAlign: 'center' }}>{idx + 1}</td>
-                            <td>{escapeHtml(row.group)}</td>
-                            <td>{escapeHtml(row.name)}</td>
+                            <td>{row.group}</td>
+                            <td>{row.name}</td>
                             {matrixPositions.map(pos => (
                               <td key={pos} style={{ textAlign: 'center', fontWeight: 'bold', color: row.levels[pos] !== '–' ? 'var(--primary)' : 'inherit' }}>
                                 {row.levels[pos] || '–'}
@@ -733,14 +1346,14 @@ function Competency() {
                     competencyFramework.map((c, idx) => (
                       <tr key={c.id}>
                         <td>{idx + 1}</td>
-                        <td>{escapeHtml(c.department || '-')}</td>
-                        <td>{escapeHtml(c.position || '-')}</td>
-                        <td>{escapeHtml(c.group || '-')}</td>
-                        <td>{escapeHtml(c.name || '-')}</td>
+                        <td>{c.department || '-'}</td>
+                        <td>{c.position || '-'}</td>
+                        <td>{c.group || '-'}</td>
+                        <td>{c.name || '-'}</td>
                         <td style={{ textAlign: 'center' }}>{c.level || '-'}</td>
                         <td>
                           <span className={`badge ${c.status === 'Áp dụng' ? 'badge-success' : 'badge-danger'}`}>
-                            {escapeHtml(c.status || 'Áp dụng')}
+                            {c.status || 'Áp dụng'}
                           </span>
                         </td>
                         <td>
@@ -954,8 +1567,8 @@ function Competency() {
                         {assessmentForm.items.map((item, idx) => (
                           <tr key={idx}>
                             <td>{idx + 1}</td>
-                            <td>{escapeHtml(item.group || '-')}</td>
-                            <td>{escapeHtml(item.competencyName || '-')}</td>
+                            <td>{item.group || '-'}</td>
+                            <td>{item.competencyName || '-'}</td>
                             <td style={{ textAlign: 'center' }}>{item.requiredLevel}</td>
                             <td>
                               <select
@@ -1073,11 +1686,11 @@ function Competency() {
                         return (
                           <tr key={evaluation.id}>
                             <td>{idx + 1}</td>
-                            <td>{escapeHtml(evaluation.period || '-')}</td>
+                            <td>{evaluation.period || '-'}</td>
                             <td>{evaluation.employeeCode || evaluation.employeeId || '-'}</td>
                             <td>{employee ? (employee.ho_va_ten || employee.name || '-') : (evaluation.employeeName || '-')}</td>
-                            <td>{escapeHtml(evaluation.department || '-')}</td>
-                            <td>{escapeHtml(evaluation.position || '-')}</td>
+                            <td>{evaluation.department || '-'}</td>
+                            <td>{evaluation.position || '-'}</td>
                             <td style={{ fontWeight: 'bold' }}>{avgRequired.toFixed(1)}</td>
                             <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{avgAchieved.toFixed(1)}</td>
                             <td>
@@ -1158,20 +1771,20 @@ function Competency() {
                     trainingPrograms.map((training, idx) => (
                       <tr key={training.id}>
                         <td>{idx + 1}</td>
-                        <td>{escapeHtml(training.code || training.id || '-')}</td>
-                        <td>{escapeHtml(training.name || '-')}</td>
-                        <td>{escapeHtml(training.format || training.hinhThuc || '-')}</td>
-                        <td>{escapeHtml(training.provider || training.donVi || '-')}</td>
+                        <td>{training.code || training.id || '-'}</td>
+                        <td>{training.name || '-'}</td>
+                        <td>{training.format || training.hinhThuc || '-'}</td>
+                        <td>{training.provider || training.donVi || '-'}</td>
                         <td>{training.startDate ? new Date(training.startDate).toLocaleDateString('vi-VN') : '-'}</td>
                         <td>{training.endDate ? new Date(training.endDate).toLocaleDateString('vi-VN') : '-'}</td>
-                        <td>{escapeHtml(training.objective || training.mucTieu || '-')}</td>
+                        <td>{training.objective || training.mucTieu || '-'}</td>
                         <td>
                           <span className={`badge ${training.status === 'Đã kết thúc' ? 'badge-success' :
                             training.status === 'Đang diễn ra' ? 'badge-info' :
                               training.status === 'Sắp diễn ra' ? 'badge-warning' :
                                 'badge-danger'
                             }`}>
-                            {escapeHtml(training.status || '-')}
+                            {training.status || '-'}
                           </span>
                         </td>
                         <td>
@@ -1388,6 +2001,196 @@ function Competency() {
         employees={employees}
         competencyFramework={competencyFramework}
       />
+
+      {isFrameworkImportModalOpen && (
+        <div className="modal show" onClick={() => setIsFrameworkImportModalOpen(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+            <div className="modal-header">
+              <h3>Import Khung Năng Lực</h3>
+              <button className="modal-close" onClick={() => setIsFrameworkImportModalOpen(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="alert alert-info">
+                Vui lòng sử dụng file mẫu. Hệ thống sẽ import danh sách năng lực theo vị trí và bộ phận.
+              </div>
+              <input type="file" onChange={handleFrameworkFileSelect} accept=".xlsx,.xls" />
+
+              {frameworkImportPreviewData.length > 0 && (
+                <div style={{ marginTop: '15px', maxHeight: '400px', overflow: 'auto' }}>
+                  <table className="table table-bordered">
+                    <thead>
+                      <tr>
+                        <th>Bộ phận</th>
+                        <th>Vị trí</th>
+                        <th>Nhóm</th>
+                        <th>Tên năng lực</th>
+                        <th>Level</th>
+                        <th>Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {frameworkImportPreviewData.map((d, i) => (
+                        <tr key={i} style={{ backgroundColor: d.isValid ? 'transparent' : '#fff3f3' }}>
+                          <td>{d.department}</td>
+                          <td>{d.position}</td>
+                          <td>{d.group}</td>
+                          <td>{d.name}</td>
+                          <td style={{ textAlign: 'center' }}>{d.level}</td>
+                          <td>
+                            {d.isValid ? (
+                              <span style={{ color: 'green' }}>✓ Hợp lệ</span>
+                            ) : (
+                              <span style={{ color: 'red' }}>✕ {d.note_val}</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="modal-actions" style={{ marginTop: '15px', textAlign: 'right' }}>
+                <button className="btn" onClick={() => setIsFrameworkImportModalOpen(false)}>Hủy</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleConfirmFrameworkImport}
+                  disabled={isFrameworkImporting || frameworkImportPreviewData.filter(d => d.isValid).length === 0}
+                  style={{ marginLeft: '10px' }}
+                >
+                  {isFrameworkImporting ? 'Đang import...' : 'Xác nhận Import'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isEvalImportModalOpen && (
+        <div className="modal show" onClick={() => setIsEvalImportModalOpen(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '1000px' }}>
+            <div className="modal-header">
+              <h3>Import Kết Quả Đánh Giá</h3>
+              <button className="modal-close" onClick={() => setIsEvalImportModalOpen(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="alert alert-info">
+                Hệ thống sẽ tự động tổng hợp kết quả theo Nhân viên và Kỳ đánh giá.
+              </div>
+              <input type="file" onChange={handleEvalFileSelect} accept=".xlsx,.xls" />
+
+              {evalImportPreviewData.length > 0 && (
+                <div style={{ marginTop: '15px', maxHeight: '400px', overflow: 'auto' }}>
+                  <table className="table table-bordered">
+                    <thead>
+                      <tr>
+                        <th>Mã NV</th>
+                        <th>Họ tên</th>
+                        <th>Kỳ</th>
+                        <th>Số lượng NL</th>
+                        <th>Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {evalImportPreviewData.map((d, i) => (
+                        <tr key={i} style={{ backgroundColor: d.isValid ? 'transparent' : '#fff3f3' }}>
+                          <td>{d.employeeId}</td>
+                          <td>{d.employeeName}</td>
+                          <td>{d.period}</td>
+                          <td style={{ textAlign: 'center' }}>{d.items.length}</td>
+                          <td>
+                            {d.isValid ? (
+                              <span style={{ color: 'green' }}>✓ Hợp lệ</span>
+                            ) : (
+                              <span style={{ color: 'red' }}>✕ {d.note}</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="modal-actions" style={{ marginTop: '15px', textAlign: 'right' }}>
+                <button className="btn" onClick={() => setIsEvalImportModalOpen(false)}>Hủy</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleConfirmEvalImport}
+                  disabled={isEvalImporting || evalImportPreviewData.filter(d => d.isValid).length === 0}
+                  style={{ marginLeft: '10px' }}
+                >
+                  {isEvalImporting ? 'Đang import...' : 'Xác nhận Import'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isTrainingImportModalOpen && (
+        <div className="modal show" onClick={() => setIsTrainingImportModalOpen(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+            <div className="modal-header">
+              <h3>Import Chương Trình Đào Tạo</h3>
+              <button className="modal-close" onClick={() => setIsTrainingImportModalOpen(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="alert alert-info">
+                Vui lòng sử dụng file mẫu để import danh sách chương trình đào tạo nội bộ.
+              </div>
+              <input type="file" onChange={handleTrainingFileSelect} accept=".xlsx,.xls" />
+
+              {trainingImportPreviewData.length > 0 && (
+                <div style={{ marginTop: '15px', maxHeight: '400px', overflow: 'auto' }}>
+                  <table className="table table-bordered">
+                    <thead>
+                      <tr>
+                        <th>Mã</th>
+                        <th>Tên chương trình</th>
+                        <th>Hình thức</th>
+                        <th>Đơn vị</th>
+                        <th>Bắt đầu</th>
+                        <th>Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {trainingImportPreviewData.map((d, i) => (
+                        <tr key={i} style={{ backgroundColor: d.isValid ? 'transparent' : '#fff3f3' }}>
+                          <td>{d.code}</td>
+                          <td>{d.name}</td>
+                          <td>{d.format}</td>
+                          <td>{d.provider}</td>
+                          <td>{d.startDate}</td>
+                          <td>
+                            {d.isValid ? (
+                              <span style={{ color: 'green' }}>✓ Hợp lệ</span>
+                            ) : (
+                              <span style={{ color: 'red' }}>✕ Không hợp lệ</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="modal-actions" style={{ marginTop: '15px', textAlign: 'right' }}>
+                <button className="btn" onClick={() => setIsTrainingImportModalOpen(false)}>Hủy</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleConfirmTrainingImport}
+                  disabled={isTrainingImporting || trainingImportPreviewData.filter(d => d.isValid).length === 0}
+                  style={{ marginLeft: '10px' }}
+                >
+                  {isTrainingImporting ? 'Đang import...' : 'Xác nhận Import'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div >
   )
 }

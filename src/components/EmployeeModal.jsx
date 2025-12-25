@@ -4,6 +4,7 @@ import { fbPush, fbUpdate } from '../services/firebase'
 function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) {
   const [formData, setFormData] = useState({
     ho_va_ten: '',
+    employeeId: '',
     email: '',
     sđt: '',
     chi_nhanh: 'HCM',
@@ -15,6 +16,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
     cccd: '',
     ngay_cap: '',
     noi_cap: '',
+    dia_chi_thuong_tru: '',
     que_quan: '',
     ngay_sinh: '',
     gioi_tinh: '',
@@ -35,6 +37,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
     if (employee) {
       setFormData({
         ho_va_ten: employee.ho_va_ten || '',
+        employeeId: employee.employeeId || '',
         email: employee.email || '',
         sđt: employee.sđt || employee.sdt || '',
         chi_nhanh: employee.chi_nhanh || 'HCM',
@@ -46,6 +49,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
         cccd: employee.cccd || '',
         ngay_cap: employee.ngay_cap || '',
         noi_cap: employee.noi_cap || '',
+        dia_chi_thuong_tru: employee.dia_chi_thuong_tru || '',
         que_quan: employee.que_quan || '',
         ngay_sinh: employee.ngay_sinh || employee.dob || '',
         gioi_tinh: employee.gioi_tinh || '',
@@ -74,6 +78,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
   const resetForm = () => {
     setFormData({
       ho_va_ten: '',
+      employeeId: '',
       email: '',
       sđt: '',
       chi_nhanh: 'HCM',
@@ -85,6 +90,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
       cccd: '',
       ngay_cap: '',
       noi_cap: '',
+      dia_chi_thuong_tru: '',
       que_quan: '',
       ngay_sinh: '',
       gioi_tinh: '',
@@ -285,6 +291,21 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
           <form onSubmit={handleSubmit}>
             <div className="form-row">
               <div className="form-group">
+                <label>Mã nhân viên *</label>
+                <input
+                  type="text"
+                  name="employeeId"
+                  value={formData.employeeId}
+                  onChange={handleChange}
+                  placeholder="Ví dụ: NV001"
+                  required
+                  disabled={readOnly}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
                 <label>Họ và tên *</label>
                 <input
                   type="text"
@@ -439,6 +460,20 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
                   value={formData.que_quan}
                   onChange={handleChange}
                   placeholder="Quê quán"
+                  disabled={readOnly}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Địa chỉ thường trú</label>
+                <input
+                  type="text"
+                  name="dia_chi_thuong_tru"
+                  value={formData.dia_chi_thuong_tru}
+                  onChange={handleChange}
+                  placeholder="Địa chỉ thường trú"
                   disabled={readOnly}
                 />
               </div>
@@ -651,8 +686,8 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
             </div>
           </form>
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   )
 }
 

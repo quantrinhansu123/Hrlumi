@@ -215,6 +215,49 @@ function Recruitment() {
     document.body.removeChild(link)
   }
 
+  // Download Template for Recruitment Plans
+  const downloadPlanTemplate = () => {
+    const headers = [
+      'STT',
+      'Bộ phận',
+      'Vị trí',
+      'Nhân sự hiện có',
+      'Định biên',
+      'Cần tuyển',
+      'Ghi chú'
+    ]
+
+    const sampleData = [
+      [1, 'Kinh doanh', 'Nhân viên kinh doanh', 5, 10, 5, 'Tuyển gấp'],
+      [2, 'Marketing', 'Content Writer', 2, 3, 1, '']
+    ]
+
+    const escapeCell = (val) => String(val || '').replace(/"/g, '&quot;')
+
+    // Create Excel content manually to avoid library dependency for simple template
+    const headerHtml = headers.map(h => `<th>${escapeCell(h)}</th>`).join('')
+    const rowsHtml = sampleData.map(row => {
+      const tds = row.map(cell => `<td>${escapeCell(cell)}</td>`).join('')
+      return `<tr>${tds}</tr>`
+    }).join('')
+
+    const tableHtml = `<table><thead><tr>${headerHtml}</tr></thead><tbody>${rowsHtml}</tbody></table>`
+    const htmlContent = `
+      <html xmlns:x="urn:schemas-microsoft-com:office:excel">
+        <head><meta charset="UTF-8"></head>
+        <body>${tableHtml}</body>
+      </html>
+    `
+
+    const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = 'Mau_dinh_bien_nhan_su.xls'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   // Handle file selection for plan import
   const handlePlanFileSelect = async (e) => {
     const file = e.target.files[0]
@@ -314,6 +357,7 @@ function Recruitment() {
       'Vị trí ứng tuyển',
       'Bộ phận',
       'Nguồn CV',
+      'HR phụ trách',
       'SĐT',
       'Email',
       'Trạng thái hiện tại',
@@ -341,6 +385,7 @@ function Recruitment() {
         c.vi_tri_ung_tuyen || c.vi_tri || '',
         c.bo_phan || '',
         c.nguon_cv || '',
+        c.hr_phu_trach || '',
         c.sdt || c.sđt || '',
         c.email || '',
         c.trang_thai || '',
@@ -378,6 +423,71 @@ function Recruitment() {
     document.body.removeChild(link)
   }
 
+  // Download Template for Candidates
+  const downloadCandidateTemplate = () => {
+    const headers = [
+      'Họ và tên',
+      'Vị trí ứng tuyển',
+      'Bộ phận',
+      'Nguồn CV',
+      'HR phụ trách',
+      'SĐT',
+      'Email',
+      'Trạng thái hiện tại',
+      'Ngày tiếp nhận',
+      'CCCD',
+      'Ngày cấp',
+      'Nơi cấp',
+      'Quê quán',
+      'Giới tính',
+      'Tình trạng hôn nhân'
+    ]
+
+    const sampleData = [
+      [
+        'Nguyễn Văn A',
+        'Lập trình viên',
+        'Công nghệ',
+        'TopCV',
+        'HR Nguyễn A',
+        '0901234567',
+        'nguyenvana@example.com',
+        'Phỏng vấn vòng 1',
+        '2024-03-01',
+        '001234567890',
+        '2020-01-01',
+        'CA TP.HCM',
+        'TP.HCM',
+        'Nam',
+        'Độc thân'
+      ]
+    ]
+
+    const escapeCell = (val) => String(val || '').replace(/"/g, '&quot;')
+
+    const headerHtml = headers.map(h => `<th>${escapeCell(h)}</th>`).join('')
+    const rowsHtml = sampleData.map(row => {
+      const tds = row.map(cell => `<td>${escapeCell(cell)}</td>`).join('')
+      return `<tr>${tds}</tr>`
+    }).join('')
+
+    const tableHtml = `<table><thead><tr>${headerHtml}</tr></thead><tbody>${rowsHtml}</tbody></table>`
+    const htmlContent = `
+      <html xmlns:x="urn:schemas-microsoft-com:office:excel">
+        <head><meta charset="UTF-8"></head>
+        <body>${tableHtml}</body>
+      </html>
+    `
+
+    const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = 'Mau_import_ung_vien.xls'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   // Handle file selection for import
   const handleFileSelect = async (e) => {
     const file = e.target.files[0]
@@ -401,12 +511,13 @@ function Recruitment() {
       const headers = Array.from(jsonData[0] || []).map(h => String(h || '').toLowerCase().trim())
 
       // Find column indexes
-      const hoTenIdx = headers.findIndex(h => h.includes('họ') && h.includes('tên'))
+      const hoTenIdx = headers.findIndex(h => h.includes('họ và tên') || h.includes('họ tên') || h.includes('name'))
       const viTriIdx = headers.findIndex(h => h.includes('vị trí'))
-      const boPhanIdx = headers.findIndex(h => h.includes('bộ phận'))
-      const nguonCVIdx = headers.findIndex(h => h.includes('nguồn'))
-      const sdtIdx = headers.findIndex(h => h.includes('sđt') || h.includes('số điện thoại'))
       const emailIdx = headers.findIndex(h => h.includes('email'))
+      const boPhanIdx = headers.findIndex(h => h.includes('bộ phận'))
+      const nguonCvIdx = headers.findIndex(h => h.includes('nguồn cv'))
+      const hrPhuTrachIdx = headers.findIndex(h => h.includes('hr phụ trách'))
+      const sdtIdx = headers.findIndex(h => h.includes('sđt') || h.includes('số điện thoại') || h.includes('phone'))
       const trangThaiIdx = headers.findIndex(h => h.includes('trạng thái'))
       const ngayTiepNhanIdx = headers.findIndex(h => h.includes('ngày tiếp nhận'))
       const cccdIdx = headers.findIndex(h => h.includes('cccd'))
@@ -432,9 +543,10 @@ function Recruitment() {
         parsedData.push({
           ho_ten: row[hoTenIdx] || '',
           vi_tri_ung_tuyen: row[viTriIdx] || '',
-          bo_phan: boPhanIdx !== -1 ? row[boPhanIdx] || '' : '',
-          nguon_cv: nguonCVIdx !== -1 ? row[nguonCVIdx] || '' : '',
-          sdt: sdtIdx !== -1 ? row[sdtIdx] || '' : '',
+          bo_phan: boPhanIdx !== -1 ? (row[boPhanIdx] || '') : '',
+          nguon_cv: nguonCvIdx !== -1 ? (row[nguonCvIdx] || '') : '',
+          hr_phu_trach: hrPhuTrachIdx !== -1 ? (row[hrPhuTrachIdx] || '') : '',
+          sdt: sdtIdx !== -1 ? (row[sdtIdx] || '') : '',
           email: row[emailIdx] || '',
           trang_thai: trangThaiIdx !== -1 ? row[trangThaiIdx] || 'CV mới' : 'CV mới',
           ngay_tiep_nhan: ngayTiepNhanIdx !== -1 ? row[ngayTiepNhanIdx] || new Date().toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
@@ -517,6 +629,15 @@ function Recruitment() {
             </button>
             <button
               className="btn btn-info"
+              onClick={downloadPlanTemplate}
+              title="Tải file mẫu Excel"
+              style={{ background: '#17a2b8', borderColor: '#17a2b8', color: '#fff' }}
+            >
+              <i className="fas fa-download"></i>
+              Tải file mẫu
+            </button>
+            <button
+              className="btn btn-secondary"
               onClick={() => setIsPlanImportModalOpen(true)}
               title="Import từ Excel"
             >
@@ -635,6 +756,15 @@ function Recruitment() {
             </button>
             <button
               className="btn btn-info"
+              onClick={downloadCandidateTemplate}
+              title="Tải file mẫu Excel"
+              style={{ background: '#17a2b8', borderColor: '#17a2b8', color: '#fff' }}
+            >
+              <i className="fas fa-download"></i>
+              Tải file mẫu
+            </button>
+            <button
+              className="btn btn-secondary"
               onClick={() => setIsImportModalOpen(true)}
               title="Import từ Excel"
             >
@@ -661,6 +791,7 @@ function Recruitment() {
               <th>Vị trí ứng tuyển</th>
               <th>Bộ phận</th>
               <th>Nguồn CV</th>
+              <th>HR phụ trách</th>
               <th>SĐT</th>
               <th>Email</th>
               <th>Trạng thái hiện tại</th>
@@ -682,6 +813,7 @@ function Recruitment() {
                     <td>{escapeHtml(c.vi_tri_ung_tuyen || c.vi_tri || '')}</td>
                     <td>{escapeHtml(c.bo_phan || '')}</td>
                     <td>{escapeHtml(c.nguon_cv || '')}</td>
+                    <td>{escapeHtml(c.hr_phu_trach || '')}</td>
                     <td>{escapeHtml(c.sdt || c.sđt || '')}</td>
                     <td>{escapeHtml(c.email || '')}</td>
                     <td>{escapeHtml(status)}</td>
@@ -768,6 +900,7 @@ function Recruitment() {
         }}
         onSave={loadData}
         readOnly={isCandidateReadOnly}
+        employees={employees}
       />
 
       {/* Import Excel Modal for Candidates */}
@@ -812,6 +945,7 @@ function Recruitment() {
                           <th>Họ tên</th>
                           <th>Vị trí</th>
                           <th>Bộ phận</th>
+                          <th>HR phụ trách</th>
                           <th>Email</th>
                           <th>SĐT</th>
                           <th>Trạng thái</th>
@@ -824,6 +958,7 @@ function Recruitment() {
                             <td>{item.ho_ten}</td>
                             <td>{item.vi_tri_ung_tuyen}</td>
                             <td>{item.bo_phan}</td>
+                            <td>{item.hr_phu_trach}</td>
                             <td>{item.email}</td>
                             <td>{item.sdt}</td>
                             <td>{item.trang_thai}</td>

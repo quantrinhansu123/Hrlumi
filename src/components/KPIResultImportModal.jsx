@@ -199,10 +199,32 @@ function KPIResultImportModal({ employees, kpiTemplates, employeeKPIs, kpiConver
                     <button className="modal-close" onClick={onClose}>&times;</button>
                 </div>
                 <div className="modal-body">
-                    <div className="form-group">
+                    <div className="form-group" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <label>Chọn file Excel (Cột: Mã NV, Tháng, Mã KPI...)</label>
-                        <input type="file" onChange={handleFileSelect} />
+                        <button
+                            className="btn btn-link"
+                            style={{ color: 'var(--primary)', padding: 0 }}
+                            onClick={() => {
+                                // We can't easily call downloadKPIResultTemplate from here without passing it
+                                // but we can replicate it or just rely on the main page.
+                                // Re-using the logic for convenience
+                                const header = ['Mã NV', 'Tháng (YYYY-MM)']
+                                kpiTemplates.forEach(t => {
+                                    header.push(t.code || t.id)
+                                })
+                                const sample = ['NV001', '2024-10']
+                                kpiTemplates.forEach(() => sample.push(50000000))
+                                const data = [header, sample]
+                                const ws = XLSX.utils.aoa_to_sheet(data)
+                                const wb = XLSX.utils.book_new()
+                                XLSX.utils.book_append_sheet(wb, ws, 'MauKetQuaKPI')
+                                XLSX.writeFile(wb, 'Mau_import_ket_qua_KPI.xlsx')
+                            }}
+                        >
+                            <i className="fas fa-download"></i> Tải file mẫu
+                        </button>
                     </div>
+                    <input type="file" onChange={handleFileSelect} />
 
                     {previewData.length > 0 && (
                         <div style={{ marginTop: '20px', maxHeight: '300px', overflow: 'auto' }}>

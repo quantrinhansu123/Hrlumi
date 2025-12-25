@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
 
-function CandidateModal({ candidate, isOpen, onClose, onSave, readOnly = false }) {
+function CandidateModal({ candidate, isOpen, onClose, onSave, readOnly = false, employees = [] }) {
   const [formData, setFormData] = useState({
     ho_ten: '',
     vi_tri_ung_tuyen: '',
     bo_phan: '',
     nguon_cv: '',
+    hr_phu_trach: '',
     sdt: '',
     email: '',
     trang_thai: 'CV tiếp nhận',
@@ -15,6 +16,7 @@ function CandidateModal({ candidate, isOpen, onClose, onSave, readOnly = false }
   })
 
   const [filesPreview, setFilesPreview] = useState([])
+  const [showHrSuggestions, setShowHrSuggestions] = useState(false)
 
   useEffect(() => {
     if (candidate) {
@@ -23,12 +25,18 @@ function CandidateModal({ candidate, isOpen, onClose, onSave, readOnly = false }
         vi_tri_ung_tuyen: candidate.vi_tri_ung_tuyen || candidate.vi_tri || '',
         bo_phan: candidate.bo_phan || '',
         nguon_cv: candidate.nguon_cv || '',
+        hr_phu_trach: candidate.hr_phu_trach || '',
         sdt: candidate.sdt || candidate.sđt || '',
         email: candidate.email || '',
         trang_thai: candidate.trang_thai || 'CV tiếp nhận',
         ngay_tiep_nhan: candidate.ngay_tiep_nhan || '',
         cv_files: candidate.cv_files || []
       })
+
+
+
+
+
       setFilesPreview(candidate.cv_files || [])
     } else {
       resetForm()
@@ -41,6 +49,7 @@ function CandidateModal({ candidate, isOpen, onClose, onSave, readOnly = false }
       vi_tri_ung_tuyen: '',
       bo_phan: '',
       nguon_cv: '',
+      hr_phu_trach: '',
       sdt: '',
       email: '',
       trang_thai: 'CV tiếp nhận',
@@ -48,6 +57,7 @@ function CandidateModal({ candidate, isOpen, onClose, onSave, readOnly = false }
       cv_files: []
     })
     setFilesPreview([])
+    setShowHrSuggestions(false)
   }
 
   const handleChange = (e) => {
@@ -106,6 +116,7 @@ function CandidateModal({ candidate, isOpen, onClose, onSave, readOnly = false }
         vi_tri_ung_tuyen: formData.vi_tri_ung_tuyen.trim(),
         bo_phan: formData.bo_phan.trim(),
         nguon_cv: formData.nguon_cv.trim(),
+        hr_phu_trach: formData.hr_phu_trach.trim(),
         sdt: formData.sdt.trim(),
         email: formData.email.trim(),
         trang_thai: formData.trang_thai,
@@ -151,6 +162,12 @@ function CandidateModal({ candidate, isOpen, onClose, onSave, readOnly = false }
     if (readOnly) return 'Chi tiết hồ sơ ứng viên'
     return candidate ? 'Sửa CV ứng viên' : 'Tạo mới CV ứng viên'
   }
+
+  // Filter employees for HR suggestions
+  const hrEmployees = employees.filter(e => {
+    const position = (e.vi_tri || e.position || '').toLowerCase()
+    return position.includes('hr') || position.includes('nhân sự') || position.includes('tuyển dụng')
+  })
 
   return (
     <div className="modal show" onClick={onClose}>
@@ -201,6 +218,7 @@ function CandidateModal({ candidate, isOpen, onClose, onSave, readOnly = false }
                   disabled={readOnly}
                 />
               </div>
+
               <div className="form-group">
                 <label>Nguồn CV</label>
                 <input
@@ -211,6 +229,73 @@ function CandidateModal({ candidate, isOpen, onClose, onSave, readOnly = false }
                   placeholder="VD: Facebook, Giới thiệu, Website..."
                   disabled={readOnly}
                 />
+              </div>
+              <div className="form-group" style={{ position: 'relative' }}>
+                <label>HR phụ trách</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    name="hr_phu_trach"
+                    value={formData.hr_phu_trach}
+                    onChange={handleChange}
+                    onFocus={() => setShowHrSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowHrSuggestions(false), 200)}
+                    placeholder="Nhập hoặc chọn HR phụ trách..."
+                    disabled={readOnly}
+                    autoComplete="off"
+                  />
+                  {!readOnly && (
+                    <i
+                      className="fas fa-chevron-down"
+                      style={{
+                        position: 'absolute',
+                        right: '10px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: '#6c757d',
+                        pointerEvents: 'none'
+                      }}
+                    ></i>
+                  )}
+                </div>
+
+                {showHrSuggestions && !readOnly && hrEmployees.length > 0 && (
+                  <ul style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    background: '#fff',
+                    border: '1px solid #ced4da',
+                    borderRadius: '4px',
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    zIndex: 1000,
+                    padding: 0,
+                    margin: 0,
+                    listStyle: 'none',
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                  }}>
+                    {hrEmployees.map((hr, idx) => (
+                      <li
+                        key={idx}
+                        onClick={() => {
+                          setFormData({ ...formData, hr_phu_trach: hr.ho_va_ten || hr.ho_ten || hr.name })
+                          setShowHrSuggestions(false)
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          cursor: 'pointer',
+                          borderBottom: idx < hrEmployees.length - 1 ? '1px solid #f0f0f0' : 'none'
+                        }}
+                        onMouseEnter={(e) => e.target.style.background = '#f8f9fa'}
+                        onMouseLeave={(e) => e.target.style.background = '#fff'}
+                      >
+                        {hr.ho_va_ten || hr.ho_ten || hr.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
 

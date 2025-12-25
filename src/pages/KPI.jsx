@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react'
+import * as XLSX from 'xlsx'
 import EmployeeKPIModal from '../components/EmployeeKPIModal'
 import KPIConversionModal from '../components/KPIConversionModal'
-
 import KPIResultDetailModal from '../components/KPIResultDetailModal'
 import KPIResultImportModal from '../components/KPIResultImportModal'
 import KPITemplateModal from '../components/KPITemplateModal'
 import SeedKPIDataButton from '../components/SeedKPIDataButton'
-import { fbDelete, fbGet } from '../services/firebase'
+import { fbDelete, fbGet, fbPush } from '../services/firebase'
 import { escapeHtml, formatMoney } from '../utils/helpers'
 
 function KPI() {
@@ -107,6 +107,40 @@ function KPI() {
     }
   }
 
+  // --- KPI Catalog Excel Functions ---
+  const exportKPITemplatesToExcel = () => {
+    if (kpiTemplates.length === 0) {
+      alert('Không có dữ liệu để xuất!')
+      return
+    }
+    const data = kpiTemplates.map((t, idx) => ({
+      'STT': idx + 1,
+      'Mã KPI': t.code || t.id || '',
+      'Tên KPI': t.name || '',
+      'Đơn vị đo': t.unit || t.donVi || '',
+      'Đối tượng áp dụng': t.target || t.doiTuong || '',
+      'Trọng số (%)': t.weight || 0,
+      'Tháng áp dụng': t.month || '',
+      'Trạng thái': t.status || 'Đang áp dụng'
+    }))
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'DanhMucKPI')
+    XLSX.writeFile(wb, `DanhMucKPI_${new Date().toISOString().split('T')[0]}.xlsx`)
+  }
+
+  const downloadKPITemplateFile = () => {
+    const data = [
+      ['Mã KPI', 'Tên KPI', 'Đơn vị đo', 'Đối tượng áp dụng', 'Trọng số (%)', 'Tháng áp dụng (YYYY-MM)', 'Trạng thái'],
+      ['KPI01', 'Doanh số cá nhân', 'VNĐ', 'Nhân viên kinh doanh', 60, '2024-10', 'Đang áp dụng'],
+      ['KPI02', 'Tỷ lệ khách hàng quay lại', '%', 'Bộ phận CSKH', 40, '2024-10', 'Đang áp dụng']
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'MauImportKPI')
+    XLSX.writeFile(wb, 'Mau_import_danh_muc_KPI.xlsx')
+  }
+
   const handleDeleteEmployeeKPI = async (id) => {
     if (!confirm('Bạn có chắc muốn xóa KPI của nhân viên này?')) return
     try {
@@ -116,6 +150,50 @@ function KPI() {
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)
     }
+  }
+
+  // --- KPI Assignment Excel Functions ---
+  const exportEmployeeKPIsToExcel = () => {
+    if (employeeKPIs.length === 0) {
+      alert('Không có dữ liệu để xuất!')
+      return
+    }
+    const data = employeeKPIs.map((empKPI, idx) => {
+      const employee = employees.find(e => e.id === empKPI.employeeId)
+      const row = {
+        'STT': idx + 1,
+        'Mã NV': empKPI.employeeId,
+        'Họ và tên': employee ? (employee.ho_va_ten || employee.name) : '-',
+        'Tháng': empKPI.month || '',
+        'Trạng thái': empKPI.status || 'Chưa chốt',
+      }
+      // Add KPI columns
+      kpiTemplates.forEach(t => {
+        const val = empKPI.kpiValues?.[t.id] || empKPI.kpiValues?.[t.code]
+        row[t.code || t.id] = val ? val.target : ''
+      })
+      return row
+    })
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'GiaoKPI')
+    XLSX.writeFile(wb, `GiaoKPI_${new Date().toISOString().split('T')[0]}.xlsx`)
+  }
+
+  const downloadEmployeeKPITemplate = () => {
+    const header = ['Mã NV', 'Tháng (YYYY-MM)', 'Trạng thái']
+    // Add all KPI codes to header
+    kpiTemplates.forEach(t => {
+      header.push(t.code || t.id)
+    })
+    const sample = ['NV001', '2024-10', 'Chưa chốt']
+    kpiTemplates.forEach(() => sample.push(100))
+
+    const data = [header, sample]
+    const ws = XLSX.utils.aoa_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'MauGiaoKPI')
+    XLSX.writeFile(wb, 'Mau_giao_kpi_nhan_vien.xlsx')
   }
   const handleTemplateFileSelect = async (e) => {
     const file = e.target.files[0]
@@ -278,6 +356,49 @@ function KPI() {
       setIsEmployeeKPIImporting(false)
     }
   }
+  // --- KPI Results Excel Functions ---
+  const exportKPIResultsToExcel = () => {
+    if (kpiResults.length === 0) {
+      alert('Không có dữ liệu để xuất!')
+      return
+    }
+    const data = kpiResults.map((result, idx) => {
+      const employee = employees.find(e => e.id === result.employeeId)
+      const row = {
+        'STT': idx + 1,
+        'Mã NV': employee ? (employee.ma_nhan_vien || employee.employeeCode) : result.employeeId,
+        'Họ và tên': employee ? (employee.ho_va_ten || employee.name) : '-',
+        'Tháng': result.month || '',
+        'KPI tổng (%)': (result.totalKPI || result.kpiTong || 0).toFixed(1) + '%'
+      }
+      kpiTemplates.forEach(t => {
+        const kpiRes = result.kpiResults?.[t.id] || result.kpiResults?.[t.code]
+        row[t.code || t.id + ' (Thực tế)'] = kpiRes ? kpiRes.actual : ''
+        row[t.code || t.id + ' (% Quy đổi)'] = kpiRes ? kpiRes.conversionPercent + '%' : ''
+      })
+      return row
+    })
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'KetQuaKPI')
+    XLSX.writeFile(wb, `KetQuaKPI_${new Date().toISOString().split('T')[0]}.xlsx`)
+  }
+
+  const downloadKPIResultTemplate = () => {
+    const header = ['Mã NV', 'Tháng (YYYY-MM)']
+    kpiTemplates.forEach(t => {
+      header.push(t.code || t.id)
+    })
+    const sample = ['NV001', '2024-10']
+    kpiTemplates.forEach(() => sample.push(50000000)) // Sample value
+
+    const data = [header, sample]
+    const ws = XLSX.utils.aoa_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'MauKetQuaKPI')
+    XLSX.writeFile(wb, 'Mau_import_ket_qua_KPI.xlsx')
+  }
+
   // Get employee name
   const getEmployeeName = (employeeId) => {
     const emp = employees.find(e => e.id === employeeId)
@@ -387,9 +508,39 @@ function KPI() {
               Xóa bộ lọc
             </button>
             <button
-              className="btn btn-primary"
-              onClick={() => setIsResultImportModalOpen(true)}
+              className="btn"
+              onClick={exportKPIResultsToExcel}
+              style={{
+                marginLeft: '10px',
+                background: '#28a745',
+                borderColor: '#28a745',
+                color: '#fff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+            >
+              <i className="fas fa-file-excel"></i> Xuất Excel
+            </button>
+            <button
+              className="btn btn-info"
+              onClick={downloadKPIResultTemplate}
               style={{ marginLeft: '10px' }}
+            >
+              <i className="fas fa-download"></i> Tải mẫu
+            </button>
+            <button
+              className="btn"
+              onClick={() => setIsResultImportModalOpen(true)}
+              style={{
+                marginLeft: '10px',
+                background: '#6f42c1',
+                borderColor: '#6f42c1',
+                color: '#fff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
             >
               <i className="fas fa-upload"></i>
               Import Kết quả (Excel)
@@ -432,8 +583,36 @@ function KPI() {
                   Thêm danh mục KPI
                 </button>
                 <button
+                  className="btn"
+                  onClick={exportKPITemplatesToExcel}
+                  style={{
+                    background: '#28a745',
+                    borderColor: '#28a745',
+                    color: '#fff',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  <i className="fas fa-file-excel"></i> Xuất Excel
+                </button>
+                <button
                   className="btn btn-info"
+                  onClick={downloadKPITemplateFile}
+                >
+                  <i className="fas fa-download"></i> Tải mẫu
+                </button>
+                <button
+                  className="btn"
                   onClick={() => setIsTemplateImportModalOpen(true)}
+                  style={{
+                    background: '#6f42c1',
+                    borderColor: '#6f42c1',
+                    color: '#fff',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
                   title="Import Excel"
                 >
                   <i className="fas fa-file-import"></i>
@@ -530,10 +709,40 @@ function KPI() {
                   Gán KPI
                 </button>
                 <button
+                  className="btn"
+                  onClick={exportEmployeeKPIsToExcel}
+                  style={{
+                    marginTop: '-20px',
+                    background: '#28a745',
+                    borderColor: '#28a745',
+                    color: '#fff',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  <i className="fas fa-file-excel"></i> Xuất Excel
+                </button>
+                <button
                   className="btn btn-info"
-                  onClick={() => setIsEmployeeKPIImportModalOpen(true)}
-                  title="Import Excel"
+                  onClick={downloadEmployeeKPITemplate}
                   style={{ marginTop: '-20px' }}
+                >
+                  <i className="fas fa-download"></i> Tải mẫu
+                </button>
+                <button
+                  className="btn"
+                  onClick={() => setIsEmployeeKPIImportModalOpen(true)}
+                  style={{
+                    marginTop: '-20px',
+                    background: '#6f42c1',
+                    borderColor: '#6f42c1',
+                    color: '#fff',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                  title="Import Excel"
                 >
                   <i className="fas fa-file-import"></i>
                   Import Excel
@@ -565,10 +774,7 @@ function KPI() {
             <div style={{ overflowX: 'auto' }}>
               {(() => {
                 // Calculate max KPI count to expand columns dynamically
-                const maxKpiCount = Math.max(
-                  ...filteredEmployeeKPIs.map(e => Object.keys(e.kpiValues || {}).length),
-                  1 // Minimum 1 slot pair
-                )
+                const maxKpiCount = 3
 
                 return (
                   <table>

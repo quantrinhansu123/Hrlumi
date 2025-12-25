@@ -50,6 +50,7 @@ function Attendance() {
   // Filters
   const [filterPayrollPeriod, setFilterPayrollPeriod] = useState('')
   const [filterPayrollDept, setFilterPayrollDept] = useState('')
+  const [filterPayrollStatus, setFilterPayrollStatus] = useState('')
   const [filterAttendanceMonth, setFilterAttendanceMonth] = useState('')
   const [filterAttendanceEmployee, setFilterAttendanceEmployee] = useState('')
 
@@ -177,6 +178,7 @@ function Attendance() {
   const filteredPayrolls = payrolls.filter(payroll => {
     if (filterPayrollPeriod && payroll.period !== filterPayrollPeriod) return false
     if (filterPayrollDept && payroll.department !== filterPayrollDept) return false
+    if (filterPayrollStatus && payroll.status !== filterPayrollStatus) return false
     return true
   })
 
@@ -190,6 +192,256 @@ function Attendance() {
     const totalIncome = (payroll.luong3P || 0) + (payroll.luongNgayCong || 0) + (payroll.thuongNong || 0)
     const totalDeductions = calculateTotalDeductions(payroll)
     return totalIncome - totalDeductions
+  }
+
+  // --- START EXCEL FUNCTIONS ---
+
+  // 1. PAYROLL EXCEL
+  const exportPayrollToExcel = () => {
+    if (filteredPayrolls.length === 0) {
+      alert('Không có dữ liệu bảng lương để xuất!')
+      return
+    }
+    const data = filteredPayrolls.map((p, idx) => {
+      const emp = employees.find(e => e.id === p.employeeId)
+      const totalIncome = (p.luong3P || 0) + (p.luongNgayCong || 0) + (p.thuongNong || 0)
+      const totalDeductions = calculateTotalDeductions(p)
+      const netSalary = calculateNetSalary(p)
+
+      return {
+        'STT': idx + 1,
+        'Mã NV': p.employeeId,
+        'Họ tên': emp ? (emp.ho_va_ten || emp.name) : '',
+        'Bộ phận': p.department,
+        'Kỳ lương': p.period || '',
+        'Công thực tế': p.congThucTe || 0,
+        'Lương P1': p.luongP1 || 0,
+        'Kết quả P3': p.ketQuaP3 || '',
+        'Lương 3P': p.luong3P || 0,
+        'Lương ngày công': p.luongNgayCong || 0,
+        'Thưởng nóng': p.thuongNong || 0,
+        'Tổng thu nhập': totalIncome,
+        'BHXH': p.bhxh || 0,
+        'Thuế TNCN': p.thueTNCN || 0,
+        'Tạm ứng': p.tamUng || 0,
+        'Khấu trừ khác': p.khac || 0,
+        'Thực lĩnh': netSalary,
+        'Trạng thái': p.status || ''
+      }
+    })
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'BangLuong')
+    XLSX.writeFile(wb, `Bang_Luong_${filterPayrollPeriod || 'Tong_hop'}.xlsx`)
+  }
+
+  // Import for Payroll is tricky as it's usually calculated.
+  // But we can allow importing "Thưởng nóng" or "Manual Adjustments".
+  // For now, let's keep it simple: No Import for Payroll requested explicitly, 
+  // but usually users want to Export Reports.
+  // If user wants import, we can add later. "Tiếp sang phần chấm công nhớ logic hợp lý nhé" implies Attendance is focus.
+  // But let's add Export for Insurance/Tax/Dependents as they are data tables.
+
+
+  // 2. INSURANCE EXCEL
+  const exportInsuranceToExcel = () => {
+    if (insuranceInfo.length === 0) {
+      alert('Không có dữ liệu BHXH để xuất!')
+      return
+    }
+    const data = insuranceInfo.map((i, idx) => {
+      const emp = employees.find(e => e.id === i.employeeId)
+      return {
+        'STT': idx + 1,
+        'Mã NV': i.employeeId,
+        'Họ tên': emp ? (emp.ho_va_ten || emp.name) : '',
+        'Số sổ BHXH': i.soSoBHXH || '',
+        'Ngày tham gia': i.ngayThamGia || '',
+        'Mức lương đóng': i.mucLuongDong || 0,
+        'Tỷ lệ NLĐ (%)': i.tyLeNLD || 10.5,
+        'Tỷ lệ DN (%)': i.tyLeDN || 21.5,
+        'Trạng thái': i.status || ''
+      }
+    })
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'BHXH')
+    XLSX.writeFile(wb, 'Danh_sach_BHXH.xlsx')
+  }
+
+  const downloadInsuranceTemplate = () => {
+    const headers = ['Mã NV', 'Số sổ BHXH', 'Ngày tham gia (YYYY-MM-DD)', 'Mức lương đóng', 'Tỷ lệ NLĐ (%)', 'Trạng thái']
+    const sample = ['NV001', '123456789', '2024-01-01', 5000000, 10.5, 'Đang tham gia']
+    const ws = XLSX.utils.aoa_to_sheet([headers, sample])
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'MauBHXH')
+    XLSX.writeFile(wb, 'Mau_import_BHXH.xlsx')
+  }
+
+  // Reuse AttendanceImport logic? No, specific fields.
+  // We need a generic handle import function or specific ones. 
+  // Let's make a generic helper or separate functions. Separate is safer for validation.
+  const handleInsuranceImportFile = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    try {
+      const data = await file.arrayBuffer()
+      const wb = XLSX.read(data)
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const json = XLSX.utils.sheet_to_json(ws)
+
+      let count = 0
+      for (const row of json) {
+        const empCode = row['Mã NV']
+        if (!empCode) continue
+
+        // Find existing or new? Assuming update/create based on EmpID
+        const payload = {
+          employeeId: empCode,
+          soSoBHXH: row['Số sổ BHXH'],
+          ngayThamGia: row['Ngày tham gia (YYYY-MM-DD)'],
+          mucLuongDong: row['Mức lương đóng'],
+          tyLeNLD: row['Tỷ lệ NLĐ (%)'],
+          tyLeDN: 21.5, // Default
+          status: row['Trạng thái'] || 'Đang tham gia'
+        }
+        await fbPush('hr/insuranceInfo', payload)
+        count++
+      }
+      alert(`Đã import ${count} bản ghi BHXH`)
+      loadData()
+    } catch (err) {
+      alert('Lỗi import: ' + err.message)
+    }
+  }
+
+
+  // 3. TAX EXCEL
+  const exportTaxToExcel = () => {
+    if (taxInfo.length === 0) {
+      alert('Không có dữ liệu thuế để xuất!')
+      return
+    }
+    const data = taxInfo.map((t, idx) => {
+      const emp = employees.find(e => e.id === t.employeeId)
+      return {
+        'STT': idx + 1,
+        'Mã NV': t.employeeId,
+        'Họ tên': emp ? (emp.ho_va_ten || emp.name) : '',
+        'Mã số thuế': t.maSoThue || '',
+        'Số người phụ thuộc': t.soNguoiPhuThuoc || 0,
+        'Giảm trừ gia cảnh (VNĐ)': 11000000,
+        'Giảm trừ phụ thuộc (VNĐ)': (t.soNguoiPhuThuoc || 0) * 4400000
+      }
+    })
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'ThueTNCN')
+    XLSX.writeFile(wb, 'Danh_sach_Thue_TNCN.xlsx')
+  }
+
+  const downloadTaxTemplate = () => {
+    const headers = ['Mã NV', 'Mã số thuế', 'Số người phụ thuộc']
+    const sample = ['NV001', '8000123456', 0]
+    const ws = XLSX.utils.aoa_to_sheet([headers, sample])
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'MauThue')
+    XLSX.writeFile(wb, 'Mau_import_Thue_TNCN.xlsx')
+  }
+
+  const handleTaxImportFile = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    try {
+      const data = await file.arrayBuffer()
+      const wb = XLSX.read(data)
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const json = XLSX.utils.sheet_to_json(ws)
+
+      let count = 0
+      for (const row of json) {
+        const empCode = row['Mã NV']
+        if (!empCode) continue
+
+        const payload = {
+          employeeId: empCode,
+          maSoThue: row['Mã số thuế'],
+          soNguoiPhuThuoc: row['Số người phụ thuộc'] || 0
+        }
+        await fbPush('hr/taxInfo', payload)
+        count++
+      }
+      alert(`Đã import ${count} bản ghi Thuế`)
+      loadData()
+    } catch (err) {
+      alert('Lỗi import: ' + err.message)
+    }
+  }
+
+  // 4. DEPENDENTS EXCEL
+  const exportDependentsToExcel = () => {
+    if (dependents.length === 0) {
+      alert('Không có dữ liệu người phụ thuộc để xuất!')
+      return
+    }
+    const data = dependents.map((d, idx) => {
+      const emp = employees.find(e => e.id === d.employeeId)
+      return {
+        'STT': idx + 1,
+        'Mã NV': d.employeeId,
+        'Họ tên NV': emp ? (emp.ho_va_ten || emp.name) : '',
+        'Tên người phụ thuộc': d.dependentName || '',
+        'Mối quan hệ': d.relationship || '',
+        'Ngày sinh': d.birthDate || '',
+        'Mã số thuế NPT': d.taxCode || '',
+        'Trạng thái': d.status || ''
+      }
+    })
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'NguoiPhuThuoc')
+    XLSX.writeFile(wb, 'Danh_sach_Nguoi_Phu_Thuoc.xlsx')
+  }
+
+  const downloadDependentsTemplate = () => {
+    const headers = ['Mã NV', 'Tên người phụ thuộc', 'Mối quan hệ', 'Ngày sinh (YYYY-MM-DD)', 'Mã số thuế NPT']
+    const sample = ['NV001', 'Nguyễn Văn B', 'Con', '2015-05-20', '']
+    const ws = XLSX.utils.aoa_to_sheet([headers, sample])
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'MauNguoiPhuThuoc')
+    XLSX.writeFile(wb, 'Mau_import_NPT.xlsx')
+  }
+
+  const handleDependentsImportFile = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    try {
+      const data = await file.arrayBuffer()
+      const wb = XLSX.read(data)
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const json = XLSX.utils.sheet_to_json(ws)
+
+      let count = 0
+      for (const row of json) {
+        const empCode = row['Mã NV']
+        if (!empCode) continue
+
+        const payload = {
+          employeeId: empCode,
+          dependentName: row['Tên người phụ thuộc'],
+          relationship: row['Mối quan hệ'],
+          birthDate: row['Ngày sinh (YYYY-MM-DD)'],
+          taxCode: row['Mã số thuế NPT'],
+          status: 'Đã xác nhận'
+        }
+        await fbPush('hr/dependents', payload)
+        count++
+      }
+      alert(`Đã import ${count} người phụ thuộc`)
+      loadData()
+    } catch (err) {
+      alert('Lỗi import: ' + err.message)
+    }
   }
 
   // Export Attendance Data to Excel
@@ -257,6 +509,189 @@ function Attendance() {
     XLSX.writeFile(wb, fileName)
   }
 
+  // --- NEW FEATURES: Calculate Workdays & Batch Export Payslips ---
+
+  const handleCalculateWorkdays = async () => {
+    // 1. Ask for Month
+    const period = prompt('Nhập kỳ lương (YYYY-MM):', new Date().toISOString().slice(0, 7))
+    if (!period) return
+
+    if (!confirm(`Bạn có chắc muốn TÍNH CÔNG cho tháng ${period}? \nDữ liệu sẽ được cập nhật vào bảng lương.`)) return
+
+    setLoading(true)
+    try {
+      // 2. Get all attendance logs for this month
+      const logsInMonth = attendanceLogs.filter(log => {
+        const d = new Date(log.date || log.timestamp)
+        return log.date && log.date.startsWith(period)
+      })
+
+      // 3. Group by Employee
+      const empWorkdays = {} // { empId: count }
+
+      logsInMonth.forEach(log => {
+        let hours = 0
+        if (log.hours !== undefined && log.hours !== null) {
+          hours = typeof log.hours === 'string' ? parseFloat(log.hours) : Number(log.hours)
+        } else if (log.soGio !== undefined && log.soGio !== null) {
+          hours = typeof log.soGio === 'string' ? parseFloat(log.soGio) : Number(log.soGio)
+        }
+
+        // Logic: >= 8h => 1 công. < 8h => 0 công (hoặc 0.5?)
+        // Request says: "đủ từ 8h trở lên => tính là 1 công. dưới 8h không tính"
+        if (hours >= 8) {
+          empWorkdays[log.employeeId] = (empWorkdays[log.employeeId] || 0) + 1
+        }
+      })
+
+      // 4. Update or Create Payrolls
+      let updateCount = 0
+
+      // Iterate all employees to ensure everyone gets a record for the period? 
+      // Or only those with attendance? Usually all active employees.
+      for (const emp of employees) {
+        const empId = emp.id
+        const workdays = empWorkdays[empId] || 0
+
+        // Find existing payroll
+        const existingPayroll = payrolls.find(p => p.employeeId === empId && p.period === period)
+
+        const payload = {
+          period: period,
+          congThucTe: workdays,
+          // Recalculate salary based on new workdays?
+          // If we update workdays, we should probably update "luongNgayCong" too if "luong3P" exists.
+          // Formula: luongNgayCong = (luong3P / 26) * workdays
+          // But we don't have all data here easily unless we read deep.
+          // For now, let's just update `congThucTe` and `luongNgayCong`.
+          // We need to fetch `luong3P` from somewhere. 
+          // If existing, use existing `luong3P`. If new, default?
+
+          updatedAt: new Date().toISOString()
+        }
+
+        if (existingPayroll) {
+          // Update
+          const l3p = existingPayroll.luong3P || 0
+          payload.luongNgayCong = (l3p / 26) * workdays
+
+          await fbUpdate(`hr/payrolls/${existingPayroll.id}`, payload)
+        } else {
+          // Create new (basic)
+          // We might need to fetch Salary Grade... 
+          // For simplicity, we create a basic record, user can edit details later.
+          // Or we skip creating if we don't know Salary.
+          // However, "Tính công" implies updating the "Công" field.
+          if (workdays > 0) {
+            const baseSalary = 10000000 // Placeholder or 0? 
+            // Better: Init with 0 and let user fill salary info via "Seed" or Manual.
+            // But if we have workdays, we should probably save it.
+            payload.employeeId = empId
+            payload.department = emp.bo_phan || emp.department || ''
+            payload.luongP1 = 0
+            payload.luong3P = 0
+            payload.luongNgayCong = 0
+            payload.status = 'Đang tính'
+            await fbPush('hr/payrolls', payload)
+          }
+        }
+        updateCount++
+      }
+
+      await loadData() // Reload
+      alert(`Đã cập nhật công thực tế cho ${updateCount} nhân viên trong tháng ${period}.`)
+
+    } catch (err) {
+      alert('Lỗi tính công: ' + err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleBatchExportPayslips = () => {
+    if (filteredPayrolls.length === 0) {
+      alert('Không có bảng lương nào để xuất!')
+      return
+    }
+
+    // Create Workbook
+    const wb = XLSX.utils.book_new()
+
+    filteredPayrolls.forEach(payroll => {
+      const emp = employees.find(e => e.id === payroll.employeeId)
+      const empName = emp ? (emp.ho_va_ten || emp.name) : payroll.employeeId
+      const safeName = normalizeString(empName).replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30)
+
+      const totalIncome = (payroll.luong3P || 0) + (payroll.luongNgayCong || 0) + (payroll.thuongNong || 0)
+      const totalDeductions = calculateTotalDeductions(payroll)
+      const netSalary = calculateNetSalary(payroll)
+
+      // Template Data
+      // Template Data based on User's Image
+      const sheetData = [
+        ['PHIẾU LƯƠNG NHÂN VIÊN'],
+        [''],
+        ['1. Thông tin chung'],
+        ['Trường thông tin', 'Giá trị'],
+        ['Họ tên', empName],
+        ['Mã nhân sự', payroll.employeeId],
+        ['Bộ phận', payroll.department || ''],
+        ['Vị trí', emp ? emp.vi_tri : ''],
+        ['Kỳ lương', payroll.period],
+        [''],
+        ['2. Thu nhập'],
+        ['Khoản mục', 'Số tiền (VNĐ)'],
+        ['Lương bậc P1', payroll.luongP1 || 0],
+        ['Kết quả P3 (KPI)', payroll.ketQuaP3 || ''],
+        ['Lương 3P', payroll.luong3P || 0],
+        ['Thưởng nóng', payroll.thuongNong || 0],
+        ['Tổng thu nhập', totalIncome],
+        [''],
+        ['3. Khấu trừ'],
+        ['Khoản khấu trừ', 'Số tiền (VNĐ)'],
+        ['BHXH', payroll.bhxh || 0],
+        ['Thuế TNCN', payroll.thueTNCN || 0],
+        ['Khấu trừ khác', (payroll.tamUng || 0) + (payroll.khac || 0)],
+        ['Tổng khấu trừ', totalDeductions],
+        [''],
+        ['4. Thực lĩnh', netSalary]
+      ]
+
+      const ws = XLSX.utils.aoa_to_sheet(sheetData)
+
+      // Styling and Widths
+      ws['!cols'] = [
+        { wch: 30 }, // Column A: Labels (Wide)
+        { wch: 20 }  // Column B: Values (Medium)
+      ]
+
+      XLSX.utils.book_append_sheet(wb, ws, safeName)
+    })
+
+    XLSX.writeFile(wb, `Phieu_Luong_Hang_Loat_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
+
+  const downloadAttendanceTemplate = () => {
+    const headers = [
+      'Mã NV',
+      'Họ và tên',
+      'Ngày (YYYY-MM-DD)',
+      'Giờ vào (HH:MM)',
+      'Giờ ra (HH:MM)'
+    ]
+    const sample = [
+      'NV001', 'Nguyễn Văn A', '2024-11-01', '08:00', '17:30',
+      'NV001', 'Nguyễn Văn A', '2024-11-02', '07:55', '17:35'
+    ]
+    // Use AOA to Sheet for simple list
+    // Or better: Create a Matrix template as well?
+    // Let's provide the List Format as default simple template
+    const ws = XLSX.utils.aoa_to_sheet([headers, sample.slice(0, 5)]) // Just sample row
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'MauChamCong')
+    XLSX.writeFile(wb, 'Mau_nhap_cham_cong.xlsx')
+  }
+
   if (loading) {
     return <div className="loadingState">Đang tải dữ liệu...</div>
   }
@@ -277,6 +712,14 @@ function Attendance() {
             >
               <i className="fas fa-file-excel"></i>
               Xuất Excel
+            </button>
+            <button
+              className="btn btn-info"
+              onClick={downloadAttendanceTemplate}
+              title="Tải file mẫu nhập liệu"
+            >
+              <i className="fas fa-download"></i>
+              Tải mẫu
             </button>
             <button
               className="btn btn-primary"
@@ -309,6 +752,26 @@ function Attendance() {
         {activeTab === 'payroll' && (
           <>
             <button
+              className="btn btn-success"
+              onClick={exportPayrollToExcel}
+            >
+              <i className="fas fa-file-excel"></i> Xuất Excel
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleCalculateWorkdays}
+              title="Tính số công thực tế từ dữ liệu chấm công"
+            >
+              <i className="fas fa-calculator"></i> Tính công
+            </button>
+            <button
+              className="btn btn-success"
+              onClick={handleBatchExportPayslips}
+              title="Xuất phiếu lương hàng loạt ra Excel"
+            >
+              <i className="fas fa-file-invoice"></i> Xuất Phiếu Lương
+            </button>
+            <button
               className="btn btn-info"
               onClick={() => {
                 setFilterPayrollPeriod('')
@@ -322,40 +785,94 @@ function Attendance() {
           </>
         )}
         {activeTab === 'insurance' && (
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              setSelectedInsurance(null)
-              setIsInsuranceModalOpen(true)
-            }}
-          >
-            <i className="fas fa-plus"></i>
-            Thêm BHXH
-          </button>
+          <>
+            <button
+              className="btn btn-success"
+              onClick={exportInsuranceToExcel}
+            >
+              <i className="fas fa-file-excel"></i> Xuất Excel
+            </button>
+            <button
+              className="btn btn-info"
+              onClick={downloadInsuranceTemplate}
+            >
+              <i className="fas fa-download"></i> Tải mẫu
+            </button>
+            <label className="btn btn-primary" style={{ cursor: 'pointer', margin: 0 }}>
+              <i className="fas fa-file-import"></i> Import
+              <input type="file" hidden accept=".xlsx,.xls" onChange={handleInsuranceImportFile} />
+            </label>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setSelectedInsurance(null)
+                setIsInsuranceModalOpen(true)
+              }}
+            >
+              <i className="fas fa-plus"></i>
+              Thêm BHXH
+            </button>
+          </>
         )}
         {activeTab === 'tax' && (
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              setSelectedTax(null)
-              setIsTaxModalOpen(true)
-            }}
-          >
-            <i className="fas fa-plus"></i>
-            Thêm Thuế TNCN
-          </button>
+          <>
+            <button
+              className="btn btn-success"
+              onClick={exportTaxToExcel}
+            >
+              <i className="fas fa-file-excel"></i> Xuất Excel
+            </button>
+            <button
+              className="btn btn-info"
+              onClick={downloadTaxTemplate}
+            >
+              <i className="fas fa-download"></i> Tải mẫu
+            </button>
+            <label className="btn btn-primary" style={{ cursor: 'pointer', margin: 0 }}>
+              <i className="fas fa-file-import"></i> Import
+              <input type="file" hidden accept=".xlsx,.xls" onChange={handleTaxImportFile} />
+            </label>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setSelectedTax(null)
+                setIsTaxModalOpen(true)
+              }}
+            >
+              <i className="fas fa-plus"></i>
+              Thêm Thuế TNCN
+            </button>
+          </>
         )}
         {activeTab === 'dependents' && (
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              setSelectedDependent(null)
-              setIsDependentModalOpen(true)
-            }}
-          >
-            <i className="fas fa-plus"></i>
-            Thêm người phụ thuộc
-          </button>
+          <>
+            <button
+              className="btn btn-success"
+              onClick={exportDependentsToExcel}
+            >
+              <i className="fas fa-file-excel"></i> Xuất Excel
+            </button>
+            <button
+              className="btn btn-info"
+              onClick={downloadDependentsTemplate}
+            >
+              <i className="fas fa-download"></i> Tải mẫu
+            </button>
+            <label className="btn btn-primary" style={{ cursor: 'pointer', margin: 0 }}>
+              <i className="fas fa-file-import"></i> Import
+              <input type="file" hidden accept=".xlsx,.xls" onChange={handleDependentsImportFile} />
+            </label>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setSelectedDependent(null)
+                setIsDependentModalOpen(true)
+              }}
+            >
+              <i className="fas fa-plus"></i>
+              Thêm người phụ thuộc
+            </button>
+          </>
         )}
       </div>
 
@@ -563,6 +1080,15 @@ function Attendance() {
             <h3 className="card-title">Bảng 1: Bảng lương tổng hợp</h3>
             <div className="search-box" style={{ display: 'flex', gap: '10px' }}>
               <select
+                value={filterPayrollStatus}
+                onChange={(e) => setFilterPayrollStatus(e.target.value)}
+                style={{ padding: '8px', borderRadius: '4px' }}
+              >
+                <option value="">Tất cả trạng thái</option>
+                <option value="Đang tính">Đang tính</option>
+                <option value="Đã chốt">Đã chốt</option>
+              </select>
+              <select
                 value={filterPayrollPeriod}
                 onChange={(e) => setFilterPayrollPeriod(e.target.value)}
                 style={{ padding: '8px', borderRadius: '4px' }}
@@ -600,7 +1126,8 @@ function Attendance() {
                   <th>Lương ngày công</th>
                   <th>Thưởng nóng (VNĐ)</th>
                   <th>Tổng thu nhập</th>
-                  <th>Khấu trừ</th>
+                  <th>BHXH + Thuế TNCN</th>
+                  <th>Khấu trừ khác</th>
                   <th>Thực lĩnh</th>
                   <th>Trạng thái</th>
                   <th>Thao tác</th>
@@ -613,6 +1140,9 @@ function Attendance() {
                     const totalIncome = (payroll.luong3P || 0) + (payroll.luongNgayCong || 0) + (payroll.thuongNong || 0)
                     const totalDeductions = calculateTotalDeductions(payroll)
                     const netSalary = calculateNetSalary(payroll)
+                    const bhxhAndTax = (payroll.bhxh || 0) + (payroll.thueTNCN || 0)
+                    const otherDeductions = (payroll.khac || 0) + (payroll.tamUng || 0)
+
                     return (
                       <tr key={payroll.id}>
                         <td>{idx + 1}</td>
@@ -629,7 +1159,8 @@ function Attendance() {
                         <td>{formatMoney(payroll.luongNgayCong || 0)}</td>
                         <td>{formatMoney(payroll.thuongNong || 0)}</td>
                         <td style={{ fontWeight: 'bold' }}>{formatMoney(totalIncome)}</td>
-                        <td>{formatMoney(totalDeductions)}</td>
+                        <td>{formatMoney(bhxhAndTax)}</td>
+                        <td>{formatMoney(otherDeductions)}</td>
                         <td style={{ fontWeight: 'bold', color: 'var(--success)' }}>
                           {formatMoney(netSalary)}
                         </td>
@@ -688,7 +1219,7 @@ function Attendance() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan="16" className="empty-state">Chưa có dữ liệu lương</td>
+                    <td colSpan="17" className="empty-state">Chưa có dữ liệu lương</td>
                   </tr>
                 )}
               </tbody>
@@ -698,243 +1229,48 @@ function Attendance() {
       )}
 
       {/* Tab 3: BHXH */}
-      {activeTab === 'insurance' && (
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Bảng 1: Thông tin BHXH</h3>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>STT</th>
-                <th>Mã NV</th>
-                <th>Họ tên</th>
-                <th>Bộ phận</th>
-                <th>Số sổ BHXH</th>
-                <th>Ngày tham gia</th>
-                <th>Mức lương đóng BHXH</th>
-                <th>Tỷ lệ NLĐ (%)</th>
-                <th>Tỷ lệ DN (%)</th>
-                <th>Trạng thái</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {insuranceInfo.length > 0 ? (
-                insuranceInfo.map((insurance, idx) => {
-                  const employee = employees.find(e => e.id === insurance.employeeId)
-                  return (
-                    <tr key={insurance.id}>
-                      <td>{idx + 1}</td>
-                      <td>{insurance.employeeId || '-'}</td>
-                      <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
-                      <td>{employee ? (employee.bo_phan || employee.department || '-') : '-'}</td>
-                      <td>{escapeHtml(insurance.soSoBHXH || insurance.soSo || '-')}</td>
-                      <td>{insurance.ngayThamGia ? new Date(insurance.ngayThamGia).toLocaleDateString('vi-VN') : '-'}</td>
-                      <td>{formatMoney(insurance.mucLuongDong || insurance.mucLuong || 0)}</td>
-                      <td>{insurance.tyLeNLD || insurance.tyLeNhanVien || 10.5}%</td>
-                      <td>{insurance.tyLeDN || insurance.tyLeDoanhNghiep || 21.5}%</td>
-                      <td>
-                        <span className={`badge ${insurance.status === 'Đang tham gia' ? 'badge-success' :
-                          'badge-danger'
-                          }`}>
-                          {escapeHtml(insurance.status || 'Đang tham gia')}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="actions">
-                          <button
-                            className="view"
-                            onClick={() => {
-                              setSelectedInsurance(insurance)
-                              setIsInsuranceReadOnly(true)
-                              setIsInsuranceModalOpen(true)
-                            }}
-                          >
-                            <i className="fas fa-eye"></i>
-                          </button>
-                          <button
-                            className="edit"
-                            onClick={() => {
-                              setSelectedInsurance(insurance)
-                              setIsInsuranceReadOnly(false)
-                              setIsInsuranceModalOpen(true)
-                            }}
-                          >
-                            <i className="fas fa-edit"></i>
-                          </button>
-                          <button
-                            className="delete"
-                            onClick={() => handleDeleteInsurance(insurance.id)}
-                          >
-                            <i className="fas fa-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              ) : (
-                <tr>
-                  <td colSpan="11" className="empty-state">Chưa có thông tin BHXH</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Tab 4: Thuế TNCN */}
-      {activeTab === 'tax' && (
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Bảng 2: Thông tin Thuế TNCN</h3>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
+      {
+        activeTab === 'insurance' && (
+          <div className="card">
+            <div className="card-header">
+              <h3 className="card-title">Bảng 1: Thông tin BHXH</h3>
+            </div>
             <table>
               <thead>
                 <tr>
                   <th>STT</th>
                   <th>Mã NV</th>
                   <th>Họ tên</th>
-                  <th>Mã số thuế TNCN</th>
-                  <th>Thu nhập tính thuế</th>
-                  <th>Giảm trừ bản thân</th>
-                  <th>Tổng giảm trừ người phụ thuộc</th>
-                  <th>Thu nhập chịu thuế</th>
-                  <th>Biểu thuế</th>
-                  <th>Thuế TNCN phải nộp</th>
-                  <th>Kỳ áp dụng</th>
-                  <th>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {taxInfo.length > 0 ? (
-                  taxInfo.map((tax, idx) => {
-                    const employee = employees.find(e => e.id === tax.employeeId)
-
-                    // 1. Calculate Deductions
-                    const personalDeduction = TAX_CONFIG.PERSONAL_DEDUCTION
-
-                    const employeeDependents = dependents.filter(d =>
-                      d.employeeId === tax.employeeId &&
-                      d.status === 'Đang áp dụng'
-                    )
-                    const dependentDeduction = employeeDependents.length * TAX_CONFIG.DEPENDENT_DEDUCTION
-
-                    // BHXH Deduction (10.5% of Insurance Salary)
-                    const empInsurance = insuranceInfo.find(i => i.employeeId === tax.employeeId && i.status === 'Đang tham gia')
-                    const insuranceDeduction = empInsurance ? (Number(empInsurance.mucLuongDongBHXH || 0) * 0.105) : 0
-
-                    // 2. Calculate Assessable Income
-                    const inputIncome = Number(tax.thuNhapTinhThue || 0)
-                    const assessableIncome = Math.max(0, inputIncome - personalDeduction - dependentDeduction - insuranceDeduction)
-
-                    // 3. Calculate Tax using progressive formula
-                    const taxAmount = calculateProgressiveTax(assessableIncome)
-
-                    return (
-                      <tr key={tax.id}>
-                        <td>{idx + 1}</td>
-                        <td>{tax.employeeId || '-'}</td>
-                        <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
-                        <td>{escapeHtml(tax.maSoThue || tax.mst || '-')}</td>
-                        <td>{formatMoney(inputIncome)}</td>
-                        <td>{formatMoney(personalDeduction)}</td>
-                        <td>{formatMoney(dependentDeduction)}</td>
-                        <td>{formatMoney(assessableIncome)}</td>
-                        <td>{escapeHtml(tax.bieuThue || 'Lũy tiến')}</td>
-                        <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>
-                          {formatMoney(taxAmount)}
-                        </td>
-                        <td>{escapeHtml(tax.kyApDung || tax.period || '-')}</td>
-                        <td>
-                          <div className="actions">
-                            <button
-                              className="view"
-                              onClick={() => {
-                                setSelectedTax(tax)
-                                setIsTaxReadOnly(true)
-                                setIsTaxModalOpen(true)
-                              }}
-                            >
-                              <i className="fas fa-eye"></i>
-                            </button>
-                            <button
-                              className="edit"
-                              onClick={() => {
-                                setSelectedTax(tax)
-                                setIsTaxReadOnly(false)
-                                setIsTaxModalOpen(true)
-                              }}
-                            >
-                              <i className="fas fa-edit"></i>
-                            </button>
-                            <button
-                              className="delete"
-                              onClick={() => handleDeleteTax(tax.id)}
-                            >
-                              <i className="fas fa-trash"></i>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan="12" className="empty-state">Chưa có thông tin thuế TNCN</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Tab 5: Người phụ thuộc */}
-      {activeTab === 'dependents' && (
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Bảng 3: Quản lý người phụ thuộc của nhân sự</h3>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table>
-              <thead>
-                <tr>
-                  <th>STT</th>
-                  <th>Mã NV</th>
-                  <th>Họ tên NV</th>
-                  <th>Họ tên người phụ thuộc</th>
-                  <th>Quan hệ</th>
-                  <th>Ngày sinh</th>
-                  <th>CCCD/CMND</th>
-                  <th>Thời gian giảm trừ từ</th>
-                  <th>Thời gian giảm trừ đến</th>
+                  <th>Bộ phận</th>
+                  <th>Số sổ BHXH</th>
+                  <th>Ngày tham gia</th>
+                  <th>Mức lương đóng BHXH</th>
+                  <th>Tỷ lệ NLĐ (%)</th>
+                  <th>Tỷ lệ DN (%)</th>
                   <th>Trạng thái</th>
                   <th>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
-                {dependents.length > 0 ? (
-                  dependents.map((dependent, idx) => {
-                    const employee = employees.find(e => e.id === dependent.employeeId)
+                {insuranceInfo.length > 0 ? (
+                  insuranceInfo.map((insurance, idx) => {
+                    const employee = employees.find(e => e.id === insurance.employeeId)
                     return (
-                      <tr key={dependent.id}>
+                      <tr key={insurance.id}>
                         <td>{idx + 1}</td>
-                        <td>{dependent.employeeId || '-'}</td>
+                        <td>{insurance.employeeId || '-'}</td>
                         <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
-                        <td>{escapeHtml(dependent.hoTen || dependent.name || '-')}</td>
-                        <td>{escapeHtml(dependent.quanHe || dependent.relationship || '-')}</td>
-                        <td>{dependent.ngaySinh ? new Date(dependent.ngaySinh).toLocaleDateString('vi-VN') : '-'}</td>
-                        <td>{escapeHtml(dependent.cccd || dependent.cmnd || '-')}</td>
-                        <td>{dependent.tuNgay ? new Date(dependent.tuNgay).toLocaleDateString('vi-VN') : '-'}</td>
-                        <td>{dependent.denNgay ? new Date(dependent.denNgay).toLocaleDateString('vi-VN') : '-'}</td>
+                        <td>{employee ? (employee.bo_phan || employee.department || '-') : '-'}</td>
+                        <td>{escapeHtml(insurance.soSoBHXH || insurance.soSo || '-')}</td>
+                        <td>{insurance.ngayThamGia ? new Date(insurance.ngayThamGia).toLocaleDateString('vi-VN') : '-'}</td>
+                        <td>{formatMoney(insurance.mucLuongDong || insurance.mucLuong || 0)}</td>
+                        <td>{insurance.tyLeNLD || insurance.tyLeNhanVien || 10.5}%</td>
+                        <td>{insurance.tyLeDN || insurance.tyLeDoanhNghiep || 21.5}%</td>
                         <td>
-                          <span className={`badge ${dependent.status === 'Đang áp dụng' ? 'badge-success' :
+                          <span className={`badge ${insurance.status === 'Đang tham gia' ? 'badge-success' :
                             'badge-danger'
                             }`}>
-                            {escapeHtml(dependent.status || 'Đang áp dụng')}
+                            {escapeHtml(insurance.status || 'Đang tham gia')}
                           </span>
                         </td>
                         <td>
@@ -942,9 +1278,9 @@ function Attendance() {
                             <button
                               className="view"
                               onClick={() => {
-                                setSelectedDependent(dependent)
-                                setIsDependentReadOnly(true)
-                                setIsDependentModalOpen(true)
+                                setSelectedInsurance(insurance)
+                                setIsInsuranceReadOnly(true)
+                                setIsInsuranceModalOpen(true)
                               }}
                             >
                               <i className="fas fa-eye"></i>
@@ -952,16 +1288,16 @@ function Attendance() {
                             <button
                               className="edit"
                               onClick={() => {
-                                setSelectedDependent(dependent)
-                                setIsDependentReadOnly(false)
-                                setIsDependentModalOpen(true)
+                                setSelectedInsurance(insurance)
+                                setIsInsuranceReadOnly(false)
+                                setIsInsuranceModalOpen(true)
                               }}
                             >
                               <i className="fas fa-edit"></i>
                             </button>
                             <button
                               className="delete"
-                              onClick={() => handleDeleteDependent(dependent.id)}
+                              onClick={() => handleDeleteInsurance(insurance.id)}
                             >
                               <i className="fas fa-trash"></i>
                             </button>
@@ -972,14 +1308,215 @@ function Attendance() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan="11" className="empty-state">Chưa có người phụ thuộc</td>
+                    <td colSpan="11" className="empty-state">Chưa có thông tin BHXH</td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        )
+      }
+
+      {/* Tab 4: Thuế TNCN */}
+      {
+        activeTab === 'tax' && (
+          <div className="card">
+            <div className="card-header">
+              <h3 className="card-title">Bảng 2: Thông tin Thuế TNCN</h3>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>STT</th>
+                    <th>Mã NV</th>
+                    <th>Họ tên</th>
+                    <th>Mã số thuế TNCN</th>
+                    <th>Thu nhập tính thuế</th>
+                    <th>Giảm trừ bản thân</th>
+                    <th>Tổng giảm trừ người phụ thuộc</th>
+                    <th>Thu nhập chịu thuế</th>
+                    <th>Biểu thuế</th>
+                    <th>Thuế TNCN phải nộp</th>
+                    <th>Kỳ áp dụng</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {taxInfo.length > 0 ? (
+                    taxInfo.map((tax, idx) => {
+                      const employee = employees.find(e => e.id === tax.employeeId)
+
+                      // 1. Calculate Deductions
+                      const personalDeduction = TAX_CONFIG.PERSONAL_DEDUCTION
+
+                      const employeeDependents = dependents.filter(d =>
+                        d.employeeId === tax.employeeId &&
+                        d.status === 'Đang áp dụng'
+                      )
+                      const dependentDeduction = employeeDependents.length * TAX_CONFIG.DEPENDENT_DEDUCTION
+
+                      // BHXH Deduction (10.5% of Insurance Salary)
+                      const empInsurance = insuranceInfo.find(i => i.employeeId === tax.employeeId && i.status === 'Đang tham gia')
+                      const insuranceDeduction = empInsurance ? (Number(empInsurance.mucLuongDongBHXH || 0) * 0.105) : 0
+
+                      // 2. Calculate Assessable Income
+                      const inputIncome = Number(tax.thuNhapTinhThue || 0)
+                      const assessableIncome = Math.max(0, inputIncome - personalDeduction - dependentDeduction - insuranceDeduction)
+
+                      // 3. Calculate Tax using progressive formula
+                      const taxAmount = calculateProgressiveTax(assessableIncome)
+
+                      return (
+                        <tr key={tax.id}>
+                          <td>{idx + 1}</td>
+                          <td>{tax.employeeId || '-'}</td>
+                          <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
+                          <td>{escapeHtml(tax.maSoThue || tax.mst || '-')}</td>
+                          <td>{formatMoney(inputIncome)}</td>
+                          <td>{formatMoney(personalDeduction)}</td>
+                          <td>{formatMoney(dependentDeduction)}</td>
+                          <td>{formatMoney(assessableIncome)}</td>
+                          <td>{escapeHtml(tax.bieuThue || 'Lũy tiến')}</td>
+                          <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>
+                            {formatMoney(taxAmount)}
+                          </td>
+                          <td>{escapeHtml(tax.kyApDung || tax.period || '-')}</td>
+                          <td>
+                            <div className="actions">
+                              <button
+                                className="view"
+                                onClick={() => {
+                                  setSelectedTax(tax)
+                                  setIsTaxReadOnly(true)
+                                  setIsTaxModalOpen(true)
+                                }}
+                              >
+                                <i className="fas fa-eye"></i>
+                              </button>
+                              <button
+                                className="edit"
+                                onClick={() => {
+                                  setSelectedTax(tax)
+                                  setIsTaxReadOnly(false)
+                                  setIsTaxModalOpen(true)
+                                }}
+                              >
+                                <i className="fas fa-edit"></i>
+                              </button>
+                              <button
+                                className="delete"
+                                onClick={() => handleDeleteTax(tax.id)}
+                              >
+                                <i className="fas fa-trash"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="12" className="empty-state">Chưa có thông tin thuế TNCN</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Tab 5: Người phụ thuộc */}
+      {
+        activeTab === 'dependents' && (
+          <div className="card">
+            <div className="card-header">
+              <h3 className="card-title">Bảng 3: Quản lý người phụ thuộc của nhân sự</h3>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>STT</th>
+                    <th>Mã NV</th>
+                    <th>Họ tên NV</th>
+                    <th>Họ tên người phụ thuộc</th>
+                    <th>Quan hệ</th>
+                    <th>Ngày sinh</th>
+                    <th>CCCD/CMND</th>
+                    <th>Thời gian giảm trừ từ</th>
+                    <th>Thời gian giảm trừ đến</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dependents.length > 0 ? (
+                    dependents.map((dependent, idx) => {
+                      const employee = employees.find(e => e.id === dependent.employeeId)
+                      return (
+                        <tr key={dependent.id}>
+                          <td>{idx + 1}</td>
+                          <td>{dependent.employeeId || '-'}</td>
+                          <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
+                          <td>{escapeHtml(dependent.hoTen || dependent.name || '-')}</td>
+                          <td>{escapeHtml(dependent.quanHe || dependent.relationship || '-')}</td>
+                          <td>{dependent.ngaySinh ? new Date(dependent.ngaySinh).toLocaleDateString('vi-VN') : '-'}</td>
+                          <td>{escapeHtml(dependent.cccd || dependent.cmnd || '-')}</td>
+                          <td>{dependent.tuNgay ? new Date(dependent.tuNgay).toLocaleDateString('vi-VN') : '-'}</td>
+                          <td>{dependent.denNgay ? new Date(dependent.denNgay).toLocaleDateString('vi-VN') : '-'}</td>
+                          <td>
+                            <span className={`badge ${dependent.status === 'Đang áp dụng' ? 'badge-success' :
+                              'badge-danger'
+                              }`}>
+                              {escapeHtml(dependent.status || 'Đang áp dụng')}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="actions">
+                              <button
+                                className="view"
+                                onClick={() => {
+                                  setSelectedDependent(dependent)
+                                  setIsDependentReadOnly(true)
+                                  setIsDependentModalOpen(true)
+                                }}
+                              >
+                                <i className="fas fa-eye"></i>
+                              </button>
+                              <button
+                                className="edit"
+                                onClick={() => {
+                                  setSelectedDependent(dependent)
+                                  setIsDependentReadOnly(false)
+                                  setIsDependentModalOpen(true)
+                                }}
+                              >
+                                <i className="fas fa-edit"></i>
+                              </button>
+                              <button
+                                className="delete"
+                                onClick={() => handleDeleteDependent(dependent.id)}
+                              >
+                                <i className="fas fa-trash"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="11" className="empty-state">Chưa có người phụ thuộc</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      }
 
       {/* Modals */}
       <AttendanceImportModal
@@ -1064,7 +1601,7 @@ function Attendance() {
           setSelectedPayslip(null)
         }}
       />
-    </div>
+    </div >
   )
 }
 
