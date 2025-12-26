@@ -6,7 +6,7 @@ import KPIResultDetailModal from '../components/KPIResultDetailModal'
 import KPIResultImportModal from '../components/KPIResultImportModal'
 import KPITemplateModal from '../components/KPITemplateModal'
 import SeedKPIDataButton from '../components/SeedKPIDataButton'
-import { fbDelete, fbGet, fbPush } from '../services/firebase'
+import { fbDelete, fbGet, fbPush, fbUpdate } from '../services/firebase'
 import { escapeHtml, formatMoney } from '../utils/helpers'
 
 function KPI() {
@@ -149,6 +149,71 @@ function KPI() {
       alert('Đã xóa KPI nhân viên')
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)
+    }
+  }
+
+  // --- Inline KPI Update ---
+  const handleUpdateEmployeeKPISlot = async (empKPI, oldKpiId, newKpiId) => {
+    if (!empKPI || !empKPI.id) return
+    if (oldKpiId === newKpiId) return
+
+    try {
+      const currentValues = empKPI.kpiValues || {}
+
+      // We want to preserve key order
+      // Strategy: Reconstruct the object.
+      // 1. If oldKpiId exists in keys, we replace it at that position.
+      // 2. If it doesn't exist (adding new to empty slot?), append.
+      // Note: "Empty slot" in UI corresponds to index, but here we only have Keys.
+      // Wait, if user clicked on "Empty" slot, oldKpiId is '', so we don't know WHERE to insert?
+      // Actually, if it's empty, it usually appends. If it's replacing, it replaces.
+      // BUT: The user problem is replacing an EXISTING one shifts it to end.
+
+      const newKpiValues = {}
+      const keys = Object.keys(currentValues)
+
+      // Prepare new entry data
+      const oldVal = currentValues[oldKpiId]
+      const template = kpiTemplates.find(t => t.id === newKpiId)
+
+      const newEntry = newKpiId ? {
+        kpiId: newKpiId,
+        target: oldVal ? oldVal.target : 0,
+        weight: template?.weight || 0
+      } : null
+
+      let inserted = false
+
+      keys.forEach(key => {
+        if (key === oldKpiId) {
+          if (newEntry) {
+            newKpiValues[newKpiId] = newEntry
+          }
+          inserted = true
+        } else {
+          newKpiValues[key] = currentValues[key]
+        }
+      })
+
+      // If we are adding a brand new one (oldKpiId was empty/null)
+      if (!inserted && newEntry) {
+        newKpiValues[newKpiId] = newEntry
+      }
+
+      // Update Firebase
+      await fbUpdate(`hr/employeeKPIs/${empKPI.id}`, { kpiValues: newKpiValues })
+
+      // Update Local State directly
+      setEmployeeKPIs(prev => prev.map(item => {
+        if (item.id === empKPI.id) {
+          return { ...item, kpiValues: newKpiValues }
+        }
+        return item
+      }))
+
+    } catch (error) {
+      console.error("Error updating KPI slot:", error)
+      alert("Lỗi khi cập nhật KPI: " + error.message)
     }
   }
 
@@ -846,9 +911,33 @@ function KPI() {
 
                               {Array.from({ length: maxKpiCount }).map((_, i) => {
                                 const kpi = assignedKPIs[i]
+                                const currentKpiId = kpi ? (kpi.id || kpi.code) : '' // Prefer ID if available for value
+
                                 return (
                                   <React.Fragment key={i}>
-                                    <td>{kpi ? escapeHtml(kpi.code) : ''}</td>
+                                    <td>
+                                      <select
+                                        value={currentKpiId}
+                                        onChange={(e) => {
+                                          const newId = e.target.value
+                                          handleUpdateEmployeeKPISlot(empKPI, currentKpiId, newId)
+                                        }}
+                                        className="form-control-sm"
+                                        style={{ maxWidth: '120px', fontSize: '0.9em' }}
+                                        disabled={empKPI.status === 'Đã giao' || empKPI.status === 'Đã chốt'} // Disable if locked? Optional.
+                                      >
+                                        <option value="">-- Trống --</option>
+                                        {kpiTemplates.filter(t => t.status === 'Đang áp dụng').map(t => (
+                                          <option
+                                            key={t.id}
+                                            value={t.id}
+                                            disabled={assignedKPIs.some(ak => ak && (ak.id === t.id || ak.code === t.code) && ak !== kpi)} // Prevent duplicate selection
+                                          >
+                                            {t.code || t.id}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </td>
                                     <td>
                                       {kpi ? (
                                         <span style={{ fontWeight: 'bold' }}>
