@@ -23,14 +23,20 @@ const MemoizedInput = ({ value, onSave, onFocus, placeholder, type = 'text', ste
   }, [value])
 
   const handleChange = (e) => {
-    setLocalValue(e.target.value)
+    const newVal = e.target.value
+    setLocalValue(newVal)
   }
 
-  const handleBlur = () => {
-    if (localValue !== value) {
-      onSave(localValue)
-    }
-  }
+  // Debounce save (300ms) to update UI without clicking out
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localValue !== value) {
+        onSave(localValue)
+      }
+    }, 500) // 500ms delay
+
+    return () => clearTimeout(timer)
+  }, [localValue])
 
   return (
     <input
@@ -41,7 +47,6 @@ const MemoizedInput = ({ value, onSave, onFocus, placeholder, type = 'text', ste
       placeholder={placeholder}
       value={localValue}
       onChange={handleChange}
-      onBlur={handleBlur}
       onFocus={onFocus}
     />
   )
@@ -659,23 +664,23 @@ function Attendance() {
     }
   }
 
-  const handleAdjustmentChange = (empId, value) => {
+  const saveAdjustment = async (empId, value) => {
+    // Update State
     const newAdjustments = { ...attendanceAdjustments, [empId]: value }
     setAttendanceAdjustments(newAdjustments)
-  }
 
-  const saveAdjustment = async (empId, value) => {
+    // Save to Firebase
     await fbUpdate(`hr/attendanceAdjustments/${filterAttendanceMonth}`, { [empId]: value })
   }
 
-  const handleManualWorkdayChange = (empId, day, value) => {
+  const saveManualWorkday = async (empId, day, value) => {
+    // Update State
     const empManuals = { ...(manualWorkdays[empId] || {}) }
     empManuals[day] = value
     const newManuals = { ...manualWorkdays, [empId]: empManuals }
     setManualWorkdays(newManuals)
-  }
 
-  const saveManualWorkday = async (empId, day, value) => {
+    // Save to Firebase
     await fbUpdate(`hr/manualWorkdays/${filterAttendanceMonth}/${empId}`, { [day]: Number(value) })
   }
 
