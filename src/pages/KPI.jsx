@@ -803,7 +803,8 @@ function KPI() {
                           const totalWeight = calculateTotalWeight(empKPI)
 
                           // Get assigned KPIs as array [ {id, val}, ... ]
-                          const assignedKPIs = Object.entries(empKPI.kpiValues || {}).map(([kId, val]) => {
+                          // DEDUPLICATION LOGIC: Group by Code, prefer the entry matching current active template
+                          const rawKPIs = Object.entries(empKPI.kpiValues || {}).map(([kId, val]) => {
                             const template = kpiTemplates.find(t => t.id === kId || t.code === kId)
                             return {
                               id: kId,
@@ -811,6 +812,30 @@ function KPI() {
                               ...val
                             }
                           })
+
+                          // Filter to unique codes
+                          const uniqueAssigned = new Map()
+                          rawKPIs.forEach(kpi => {
+                            // If code not exists, set it
+                            if (!uniqueAssigned.has(kpi.code)) {
+                              uniqueAssigned.set(kpi.code, kpi)
+                            } else {
+                              // Conflict: We have 2 entries for same Code (Old vs New version)
+                              // Prefer the one that matches an Active Template ID
+                              const existing = uniqueAssigned.get(kpi.code)
+                              const currentIsActive = kpiTemplates.some(t => t.id === kpi.id && t.status === 'Đang áp dụng')
+                              const existingIsActive = kpiTemplates.some(t => t.id === existing.id && t.status === 'Đang áp dụng')
+
+                              // If current is active and existing isn't, swap
+                              if (currentIsActive && !existingIsActive) {
+                                uniqueAssigned.set(kpi.code, kpi)
+                              }
+                              // If both active or both inactive, maybe check Month? 
+                              // For now, assume the one matching an active template is the "New" one user just edited.
+                            }
+                          })
+
+                          const assignedKPIs = Array.from(uniqueAssigned.values())
 
                           return (
                             <tr key={empKPI.id}>
@@ -826,17 +851,12 @@ function KPI() {
                                     <td>{kpi ? escapeHtml(kpi.code) : ''}</td>
                                     <td>
                                       {kpi ? (
-                                        <span
-                                          style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: 'bold' }}
-                                          onClick={() => {
-                                            setSelectedEmployeeKPI(empKPI)
-                                            setTargetedKPIId(kpi.id)
-                                            setIsEmployeeKPIModalOpen(true)
-                                          }}
-                                        >
-                                          Nhập
+                                        <span style={{ fontWeight: 'bold' }}>
+                                          {kpi.unit === 'VNĐ' || kpi.unit === 'VND'
+                                            ? formatMoney(kpi.target)
+                                            : kpi.target} {kpi.unit}
                                         </span>
-                                      ) : ''}
+                                      ) : '-'}
                                     </td>
                                   </React.Fragment>
                                 )
