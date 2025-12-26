@@ -1,4 +1,3 @@
-import React from 'react'
 import { escapeHtml, formatMoney } from '../utils/helpers'
 
 function PayslipModal({ payroll, employee, isOpen, onClose }) {
@@ -129,11 +128,11 @@ function PayslipModal({ payroll, employee, isOpen, onClose }) {
             </div>
           </div>
         </div>
-        <div style={{ padding: '20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
+        <div className="modal-footer" style={{ padding: '20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
           <button className="btn" onClick={onClose}>
             Đóng
           </button>
-          <button 
+          <button
             className="btn btn-primary"
             onClick={() => window.print()}
             style={{ marginLeft: '10px' }}

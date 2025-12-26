@@ -12,7 +12,7 @@
   --success: #28a745;
   --warning: #ffc107;
   --info: #17a2b8;
-  --shadow: 0 2px 8px rgba(0,0,0,0.1);
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   --radius: 8px;
 }
 
@@ -56,7 +56,7 @@ body {
   background: #fff;
   padding: 5px;
   object-fit: contain;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .logo h1 {
@@ -112,7 +112,7 @@ body {
 
 .nav-item:hover,
 .nav-item.active {
-  background: rgba(0,177,79,0.1);
+  background: rgba(0, 177, 79, 0.1);
   color: var(--primary);
   border-left-color: var(--primary);
 }
@@ -277,7 +277,8 @@ table {
   border-collapse: collapse;
 }
 
-th, td {
+th,
+td {
   padding: 12px 15px;
   text-align: left;
   border-bottom: 1px solid var(--border);
@@ -329,7 +330,7 @@ tr:hover {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   z-index: 1000;
   align-items: center;
   justify-content: center;
@@ -346,7 +347,7 @@ tr:hover {
   max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .modal-header {
@@ -513,3 +514,126 @@ tr:hover {
   color: #fff;
 }
 
+/* Print Styles */
+/* Print Styles */
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+    /* Setting margin to 0 hides default browser headers/footers */
+  }
+
+  /* 1. Hide ALL main layout elements effectively removing them from flow */
+  .header,
+  .sidebar,
+  .page-header,
+  .tabs,
+  .card,
+  /* Hides the table container */
+  .search-box,
+  .actions,
+  .loadingState,
+  .emptyState,
+  .modal:not(.show) {
+    /* Hide closed modals */
+    display: none !important;
+  }
+
+  /* 2. Reset Layout Containers to be invisible wrappers */
+  .container,
+  .main,
+  #root,
+  body,
+  html {
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: white !important;
+    position: static !important;
+    /* Let flow naturally */
+  }
+
+  /* 3. Style the specific Payslip Modal */
+  .modal.show {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 1.5cm !important;
+    /* Add internal padding since page margin is 0 */
+    background: white !important;
+    display: block !important;
+    visibility: visible !important;
+    z-index: 9999 !important;
+    box-sizing: border-box !important;
+  }
+
+  .modal.show .modal-content {
+    box-shadow: none !important;
+    border: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    position: static !important;
+  }
+
+  /* Compact content specific for Payslip */
+  .modal-header {
+    padding: 10px 0 !important;
+    border-bottom: 2px solid #000 !important;
+    /* Black for better print contrast */
+    margin-bottom: 15px !important;
+  }
+
+  .modal-body {
+    padding: 0 !important;
+  }
+
+  h3 {
+    font-size: 16pt !important;
+    margin: 0 !important;
+    line-height: 1.2 !important;
+  }
+
+  h4 {
+    font-size: 12pt !important;
+    margin: 10pt 0 5pt 0 !important;
+    border-bottom-color: #000 !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  td,
+  th {
+    padding: 4pt 0 !important;
+    font-size: 10pt !important;
+    border-bottom: 1px solid #ddd !important;
+  }
+
+  th {
+    font-weight: bold !important;
+    color: #000 !important;
+  }
+
+  /* Hide print-irrelevant elements in Modal */
+  .modal-close,
+  .modal-footer,
+  button,
+  .btn,
+  i.fas {
+    display: none !important;
+  }
+
+  /* Force single page if possible */
+  .modal-content {
+    page-break-inside: avoid !important;
+  }
+}
