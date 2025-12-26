@@ -74,12 +74,14 @@ function EmployeeKPIModal({ employeeKPI, employees, kpiTemplates, targetedKPIId,
   const calculateTotalWeight = () => {
     return Object.values(formData.kpiValues).reduce((sum, kpi) => {
       const template = kpiTemplates.find(t => t.id === kpi.kpiId || t.code === kpi.kpiId)
-      return sum + (template?.weight || 0)
+      const weight = template?.weight ? Number(template.weight) : 0
+      return sum + weight
     }, 0)
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    console.log('Starting Save...', formData)
     try {
       const totalWeight = calculateTotalWeight()
       if (totalWeight !== 100 && !targetedKPIId) {
@@ -88,25 +90,77 @@ function EmployeeKPIModal({ employeeKPI, employees, kpiTemplates, targetedKPIId,
         }
       }
 
-      if (employeeKPI && employeeKPI.id) {
+      if (employeeKPI) {
+        if (!employeeKPI.id) {
+          alert('Lỗi hệ thống: Không tìm thấy ID bản ghi để cập nhật!')
+          return
+        }
+        console.log('Updating KPI:', employeeKPI.id)
         await fbUpdate(`hr/employeeKPIs/${employeeKPI.id}`, formData)
       } else {
+        console.log('Creating new KPI')
         await fbPush('hr/employeeKPIs', formData)
       }
       onSave()
       onClose()
       resetForm()
+      alert('Đã lưu thành công!') // Feedback for user
     } catch (error) {
+      console.error('Save error:', error)
       alert('Lỗi khi lưu: ' + error.message)
     }
   }
 
   if (!isOpen) return null
 
-  // Filter templates: if targetedKPIId is present, show only that template
-  const activeTemplates = kpiTemplates
-    .filter(t => t.status === 'Đang áp dụng')
-    .filter(t => !targetedKPIId || t.id === targetedKPIId || t.code === targetedKPIId)
+  // Filter templates: Distinct by Code, prioritizing the one matching the selected month
+  // 1. Get all active templates
+  // 2. Group by Code
+  // 3. For each group, find the one with `month` <= selectedMonth (closest)
+  const getRelevantTemplates = () => {
+    const active = kpiTemplates.filter(t => t.status === 'Đang áp dụng')
+
+    // Detailed specific target override - look in ALL templates, ignore status
+    if (targetedKPIId) {
+      return kpiTemplates.filter(t => t.id === targetedKPIId || t.code === targetedKPIId)
+    }
+
+    const uniqueMap = new Map()
+    const selectedDate = new Date(formData.month)
+
+    active.forEach(t => {
+      const currentBest = uniqueMap.get(t.code)
+      const tDate = t.month ? new Date(t.month) : new Date(0) // Default to old date if no month
+
+      if (!currentBest) {
+        uniqueMap.set(t.code, t)
+      } else {
+        const bestDate = currentBest.month ? new Date(currentBest.month) : new Date(0)
+
+        // Logic: prefer dates that are <= selectedDate
+        // If both are <= selectedDate, pick the later one (closest to assignment)
+        // If one is <= and one is >, pick the <= one
+
+        const tValid = tDate <= selectedDate
+        const bestValid = bestDate <= selectedDate
+
+        if (tValid && !bestValid) {
+          uniqueMap.set(t.code, t)
+        } else if (tValid && bestValid) {
+          if (tDate > bestDate) uniqueMap.set(t.code, t)
+        } else if (!tValid && !bestValid) {
+          // Both in future? Pick earlier one? Or just keep current?
+          // Usually ideally shouldn't happen if we only assign valid ones.
+          // Fallback: pick the one closest to now (earlier)
+          if (tDate < bestDate) uniqueMap.set(t.code, t)
+        }
+      }
+    })
+
+    return Array.from(uniqueMap.values())
+  }
+
+  const activeTemplates = getRelevantTemplates()
 
   return (
     <div className="modal show" onClick={onClose}>

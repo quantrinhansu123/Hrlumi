@@ -3,7 +3,7 @@ import { formatMoney } from '../utils/helpers'
 import { useEffect, useState } from 'react'
 import { fbUpdate } from '../services/firebase'
 
-function KPIResultDetailModal({ result, employees, kpiTemplates, isOpen, onClose, kpiConversions = [], isEditing = false, onSave }) {
+function KPIResultDetailModal({ result, employees, employeeKPIs, kpiTemplates, isOpen, onClose, kpiConversions = [], isEditing = false, onSave }) {
     const [editedResults, setEditedResults] = useState({})
 
     useEffect(() => {
@@ -16,15 +16,34 @@ function KPIResultDetailModal({ result, employees, kpiTemplates, isOpen, onClose
 
     const employee = employees.find(e => e.id === result.employeeId)
 
-    // Calculate total score based on current edited state
+    // Helper to find Assignment Record
+    const getAssignment = () => {
+        if (!result || !employeeKPIs) return null
+        return employeeKPIs.find(e => e.employeeId === result.employeeId && e.month === result.month)
+    }
+
+    // Helper to get Target & Weight from Assignment (Table 2)
+    // If NOT found in Assignment, fallback to Template default or existing Result
+    const getKPIParams = (kpiId) => {
+        const assignment = getAssignment()
+        const assignedVal = assignment?.kpiValues?.[kpiId]
+
+        // Priority: Assignment Table 2 > Template Default > Existing Result Stored Value
+        const template = kpiTemplates.find(t => t.id === kpiId || t.code === kpiId)
+
+        // Target: Must come from Assignment to be "Linked"
+        const target = assignedVal?.target !== undefined ? assignedVal.target : (template?.target || 0)
+
+        // Weight: Must come from Assignment
+        const weight = assignedVal?.weight !== undefined ? assignedVal.weight : (template?.weight || 0)
+
+        return { target: Number(target), weight: Number(weight) }
+    }
+
     const calculateTotalScore = () => {
         if (!editedResults) return 0
         return Object.values(editedResults).reduce((sum, res) => {
-            // If weight is not stored in result, find it from template.
-            // But result usually stores weight.
-            // We need to use formula: conversionPercent * weight / 100
-            const template = kpiTemplates.find(t => t.id === res.kpiId || t.code === res.kpiId)
-            const weight = template?.weight || res.weight || 0
+            const { weight } = getKPIParams(res.kpiId || res.kpiCode) // Fetch live weight
             const conversion = res.conversionPercent || 0
             return sum + (conversion * weight / 100)
         }, 0)
@@ -38,51 +57,38 @@ function KPIResultDetailModal({ result, employees, kpiTemplates, isOpen, onClose
         const conversions = kpiConversions.filter(c => c.kpiId === template.id || c.kpiCode === template.code)
 
         let percent = 0
-        if (template.unit === 'Percent' || template.unit === '%') {
-            // Simple calculation if no conversion table? 
-            // Or assumes actual is the %? 
-            // Default logic usually: (Actual / Target) * 100
-            if (target > 0) percent = (actual / target) * 100
-            else percent = 0
-        } else {
-            if (target > 0) percent = (actual / target) * 100
+        if (target > 0) percent = (actual / target) * 100
+
+        // Sort conversions by fromPercent ASCENDING to match user expectation (lower range first on overlap)
+        const sortedConversions = [...conversions].sort((a, b) => parseFloat(a.fromPercent) - parseFloat(b.fromPercent))
+
+        const match = sortedConversions.find(c => {
+            const from = parseFloat(c.fromPercent)
+            const to = c.toPercent ? parseFloat(c.toPercent) : Infinity
+            return percent >= from && percent <= to
+        })
+
+        if (match) return parseFloat(match.conversionPercent)
+
+        // Default logic if no table match found?
+        // If they have a table, but value is outside range (e.g. > max), usually capped?
+        // For now return 0 or maybe the percent itself if no table exists at all?
+        if (conversions.length === 0) {
+            if (template.unit === 'Percent' || template.unit === '%') return parseFloat(percent.toFixed(2))
+            return parseFloat(percent.toFixed(2)) // Default fallback
         }
 
-        // Apply conversion table if exists
-        if (conversions.length > 0) {
-            // Find matching range
-            // Logic: find row where actual percent falls into [from, to]
-            // Actually usually based on % completion (actual/target)*100
-
-            // Re-calculate basic completion percent
-            let completion = 0
-            if (target !== 0) completion = (actual / target) * 100
-
-            const match = conversions.find(c => {
-                const from = parseFloat(c.fromPercent)
-                const to = c.toPercent ? parseFloat(c.toPercent) : Infinity
-                return completion >= from && completion <= to
-            })
-
-            if (match) return parseFloat(match.conversionPercent)
-
-            // If explicit ranges defined but no match? Usually 0 or max?
-            // Fallback to completion if no table?
-            // If table exists but no match, usually means 0
-            return 0
-        }
-
-        // Default: cap at 100? or allow > 100?
-        // Usually KPI allows > 100%
-        return parseFloat(percent.toFixed(2))
+        return 0
     }
 
     const handleChangeActual = (kpiId, value) => {
-        const val = parseFloat(value)
+        const val = parseFloat(value) || 0
         setEditedResults(prev => {
             const current = prev[kpiId] || {}
-            // Recalculate completion and conversion
-            const target = current.target || 0
+
+            // LINKED LOGIC: Fetch Target from Assignment (Table 2)
+            const { target, weight } = getKPIParams(kpiId)
+
             let completion = 0
             if (target !== 0) completion = (val / target) * 100
 
@@ -92,7 +98,10 @@ function KPIResultDetailModal({ result, employees, kpiTemplates, isOpen, onClose
                 ...prev,
                 [kpiId]: {
                     ...current,
+                    kpiId, // Ensure ID is present
                     actual: val,
+                    target: target, // Save the linked target for reference
+                    weight: weight, // Save the linked weight
                     completionPercent: parseFloat(completion.toFixed(2)),
                     conversionPercent: conversion
                 }

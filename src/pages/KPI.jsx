@@ -415,7 +415,8 @@ function KPI() {
     if (!employeeKPI.kpiValues) return 0
     return Object.values(employeeKPI.kpiValues).reduce((sum, kpi) => {
       const template = getKPITemplate(kpi.kpiId)
-      return sum + (template?.weight || kpi.weight || 0)
+      const weight = template?.weight || kpi.weight || 0
+      return sum + Number(weight)
     }, 0)
   }
 
@@ -1047,25 +1048,25 @@ function KPI() {
               </div>
             </div>
             <div style={{ overflowX: 'auto' }}>
-              <table>
+              <table className="table" style={{ fontSize: '13px', minWidth: '100%' }}>
                 <thead>
                   <tr>
                     <th>STT</th>
-                    <th>Mã NV</th>
-                    <th>Họ và tên</th>
-                    <th>Bộ phận</th>
-                    <th>Vị trí</th>
-                    <th>Ca</th>
-                    <th>Tháng</th>
-                    {kpiTemplates.filter(t => t.status === 'Đang áp dụng').map(template => (
-                      <th key={template.id}>{escapeHtml(template.code || template.id)} (Thực tế)</th>
+                    <th style={{ whiteSpace: 'nowrap' }}>Mã NV</th>
+                    <th style={{ whiteSpace: 'nowrap' }}>Họ và tên</th>
+                    <th style={{ whiteSpace: 'nowrap' }}>Bộ phận</th>
+                    <th style={{ whiteSpace: 'nowrap' }}>Vị trí</th>
+                    <th style={{ whiteSpace: 'nowrap' }}>Ca</th>
+                    <th style={{ whiteSpace: 'nowrap' }}>Tháng</th>
+                    {/* Generic Headers matching Table 2 structure */}
+                    {Array.from({ length: 3 }).map((_, idx) => (
+                      <th key={`h-kpi-${idx}`} style={{ whiteSpace: 'nowrap' }}>KPI {idx + 1}</th>
                     ))}
-                    {kpiTemplates.filter(t => t.status === 'Đang áp dụng').map(template => (
-                      <th key={`conv-${template.id}`}>% Quy đổi {escapeHtml(template.code || template.id)}</th>
+                    {Array.from({ length: 3 }).map((_, idx) => (
+                      <th key={`h-conv-${idx}`} style={{ whiteSpace: 'nowrap' }}>% Quy đổi KPI {idx + 1}</th>
                     ))}
-                    <th>KPI tổng (%)</th>
-                    <th>Trạng thái</th>
-                    <th>Thao tác</th>
+                    <th style={{ whiteSpace: 'nowrap' }}>KPI tổng (%)</th>
+                    <th style={{ whiteSpace: 'nowrap' }}>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1073,42 +1074,70 @@ function KPI() {
                     filteredResults.map((result, idx) => {
                       const employee = employees.find(e => e.id === result.employeeId)
                       const totalKPI = result.totalKPI || result.kpiTong || 0
-                      const status = totalKPI >= 100 ? 'Đạt' : 'Chưa đạt'
+
+                      // Find Assignment Record (Table 2) for this employee/month
+                      // This defines what "KPI 1", "KPI 2" etc. means for this person.
+                      const assignment = employeeKPIs.find(e =>
+                        e.employeeId === result.employeeId && e.month === result.month
+                      )
+
+                      // Get assigned KPIs list exactly as Table 2 does
+                      const assignedKPIs = assignment
+                        ? Object.entries(assignment.kpiValues || {}).map(([kId, val]) => {
+                          const template = kpiTemplates.find(t => t.id === kId || t.code === kId)
+                          return {
+                            id: kId,
+                            code: template ? (template.code || template.id) : kId,
+                            name: template ? template.name : '',
+                            unit: template ? template.unit : '',
+                            ...val
+                          }
+                        })
+                        : [] // No assignment found?
+
+                      // Ensure we check up to 3 slots
+
                       return (
                         <tr key={result.id}>
                           <td>{idx + 1}</td>
-                          <td>{employee ? (employee.ma_nhan_vien || employee.employeeCode || employee.code || '-') : '-'}</td>
-                          <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
-                          <td>{escapeHtml(result.department || '-')}</td>
-                          <td>{employee ? (employee.vi_tri || '-') : '-'}</td>
+                          <td style={{ whiteSpace: 'nowrap' }}>{employee ? (employee.ma_nhan_vien || employee.employeeCode || employee.code || '-') : '-'}</td>
+                          <td style={{ whiteSpace: 'nowrap' }}>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
+                          <td style={{ whiteSpace: 'nowrap' }}>{escapeHtml(result.department || '-')}</td>
+                          <td style={{ whiteSpace: 'nowrap' }}>{employee ? (employee.vi_tri || '-') : '-'}</td>
                           <td>{employee ? (employee.shift || 'Ngày') : '-'}</td>
-                          <td>{escapeHtml(result.month || '-')}</td>
-                          {kpiTemplates.filter(t => t.status === 'Đang áp dụng').map(template => {
-                            const kpiResult = result.kpiResults?.[template.id] || result.kpiResults?.[template.code]
+                          <td style={{ whiteSpace: 'nowrap' }}>{escapeHtml(result.month || '-')}</td>
+
+                          {/* Render Actuals based on Assignment Slots */}
+                          {Array.from({ length: 3 }).map((_, i) => {
+                            const kpi = assignedKPIs[i] // The KPI assigned at this slot
+                            // Get the Result for this specific KPI
+                            // The result object stores keys by TemplateID
+                            const kpiResult = kpi ? (result.kpiResults?.[kpi.id] || result.kpiResults?.[kpi.code]) : null
+
                             return (
-                              <td key={template.id}>
+                              <td key={`val-${i}`} style={{ whiteSpace: 'nowrap' }}>
                                 {kpiResult?.actual !== undefined ? (
-                                  template.unit === 'VNĐ' || template.unit === 'VND'
+                                  kpi.unit === 'VNĐ' || kpi.unit === 'VND'
                                     ? formatMoney(kpiResult.actual)
                                     : kpiResult.actual
                                 ) : '-'}
                               </td>
                             )
                           })}
-                          {kpiTemplates.filter(t => t.status === 'Đang áp dụng').map(template => {
-                            const kpiResult = result.kpiResults?.[template.id] || result.kpiResults?.[template.code]
+
+                          {/* Render Conversions based on Assignment Slots */}
+                          {Array.from({ length: 3 }).map((_, i) => {
+                            const kpi = assignedKPIs[i]
+                            const kpiResult = kpi ? (result.kpiResults?.[kpi.id] || result.kpiResults?.[kpi.code]) : null
+
                             return (
-                              <td key={`conv-${template.id}`}>
+                              <td key={`conv-${i}`} style={{ whiteSpace: 'nowrap' }}>
                                 {kpiResult?.conversionPercent !== undefined ? `${kpiResult.conversionPercent}%` : '-'}
                               </td>
                             )
                           })}
-                          <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{totalKPI.toFixed(1)}%</td>
-                          <td>
-                            <span className={`badge ${status === 'Đạt' ? 'badge-success' : 'badge-danger'}`}>
-                              {status}
-                            </span>
-                          </td>
+
+                          <td style={{ fontWeight: 'bold', color: 'var(--primary)', whiteSpace: 'nowrap' }}>{totalKPI.toFixed(1)}%</td>
                           <td>
                             <div className="actions">
                               <button
@@ -1439,6 +1468,7 @@ function KPI() {
       <KPIResultDetailModal
         result={selectedResultForDetail}
         employees={employees}
+        employeeKPIs={employeeKPIs} // Link to Assignments
         kpiTemplates={kpiTemplates}
         isOpen={isResultDetailModalOpen}
         onClose={() => {
