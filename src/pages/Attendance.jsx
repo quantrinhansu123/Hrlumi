@@ -9,12 +9,47 @@ import PayslipModal from '../components/PayslipModal'
 import SeedAttendanceDataButton from '../components/SeedAttendanceDataButton'
 import SeedPayrollDataButton from '../components/SeedPayrollDataButton'
 import TaxModal from '../components/TaxModal'
-import { fbDelete, fbGet } from '../services/firebase'
+import { fbDelete, fbGet, fbPush, fbUpdate } from '../services/firebase'
 import { TAX_CONFIG } from '../utils/constants'
 import { calculateProgressiveTax, escapeHtml, formatMoney, normalizeString } from '../utils/helpers'
 
+
+// Memoized Input Component to prevent re-renders on every keystroke
+const MemoizedInput = ({ value, onSave, onFocus, placeholder, type = 'text', step, style, className }) => {
+  const [localValue, setLocalValue] = useState(value || '')
+
+  useEffect(() => {
+    setLocalValue(value || '')
+  }, [value])
+
+  const handleChange = (e) => {
+    setLocalValue(e.target.value)
+  }
+
+  const handleBlur = () => {
+    if (localValue !== value) {
+      onSave(localValue)
+    }
+  }
+
+  return (
+    <input
+      type={type}
+      step={step}
+      className={className}
+      style={style}
+      placeholder={placeholder}
+      value={localValue}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      onFocus={onFocus}
+    />
+  )
+}
+
 function Attendance() {
   const [activeTab, setActiveTab] = useState('attendance')
+
   const [attendanceLogs, setAttendanceLogs] = useState([])
   const [payrolls, setPayrolls] = useState([])
   const [insuranceInfo, setInsuranceInfo] = useState([])
@@ -51,7 +86,9 @@ function Attendance() {
   const [filterPayrollPeriod, setFilterPayrollPeriod] = useState('')
   const [filterPayrollDept, setFilterPayrollDept] = useState('')
   const [filterPayrollStatus, setFilterPayrollStatus] = useState('')
-  const [filterAttendanceMonth, setFilterAttendanceMonth] = useState('')
+  const [attendanceAdjustments, setAttendanceAdjustments] = useState({})
+  const [manualWorkdays, setManualWorkdays] = useState({}) // New State for Manual Overrides
+  const [filterAttendanceMonth, setFilterAttendanceMonth] = useState(new Date().toISOString().slice(0, 7))
   const [filterAttendanceEmployee, setFilterAttendanceEmployee] = useState('')
 
   useEffect(() => {
@@ -79,7 +116,17 @@ function Attendance() {
       // Load attendance and payroll data
       const hrData = await fbGet('hr')
       const logs = hrData?.attendanceLogs ? Object.entries(hrData.attendanceLogs).map(([k, v]) => ({ ...v, id: k })) : []
-      setAttendanceLogs(logs)
+      setAttendanceLogs(logs ? Object.values(logs) : [])
+
+      // Fetch Adjustments for this month
+      // Path: hr/attendanceAdjustments/YYYY-MM/{employeeId: "1,5"}
+      const adjustments = await fbGet(`hr/attendanceAdjustments/${filterAttendanceMonth}`)
+      setAttendanceAdjustments(adjustments || {})
+
+      // Fetch Manual Workdays
+      // Path: hr/manualWorkdays/YYYY-MM/{employeeId}/{day} = value
+      const manuals = await fbGet(`hr/manualWorkdays/${filterAttendanceMonth}`)
+      setManualWorkdays(manuals || {})
 
       const payrollList = hrData?.payrolls ? Object.entries(hrData.payrolls).map(([k, v]) => ({ ...v, id: k })) : []
       setPayrolls(payrollList)
@@ -537,10 +584,14 @@ function Attendance() {
           hours = typeof log.soGio === 'string' ? parseFloat(log.soGio) : Number(log.soGio)
         }
 
-        // Logic: >= 8h => 1 công. < 8h => 0 công (hoặc 0.5?)
-        // Request says: "đủ từ 8h trở lên => tính là 1 công. dưới 8h không tính"
+        // Logic updated:
+        // >= 8h => 1 công
+        // >= 4h & < 8h => 0.5 công
+        // < 4h => 0 công
         if (hours >= 8) {
           empWorkdays[log.employeeId] = (empWorkdays[log.employeeId] || 0) + 1
+        } else if (hours >= 4) {
+          empWorkdays[log.employeeId] = (empWorkdays[log.employeeId] || 0) + 0.5
         }
       })
 
@@ -606,6 +657,26 @@ function Attendance() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleAdjustmentChange = (empId, value) => {
+    const newAdjustments = { ...attendanceAdjustments, [empId]: value }
+    setAttendanceAdjustments(newAdjustments)
+  }
+
+  const saveAdjustment = async (empId, value) => {
+    await fbUpdate(`hr/attendanceAdjustments/${filterAttendanceMonth}`, { [empId]: value })
+  }
+
+  const handleManualWorkdayChange = (empId, day, value) => {
+    const empManuals = { ...(manualWorkdays[empId] || {}) }
+    empManuals[day] = value
+    const newManuals = { ...manualWorkdays, [empId]: empManuals }
+    setManualWorkdays(newManuals)
+  }
+
+  const saveManualWorkday = async (empId, day, value) => {
+    await fbUpdate(`hr/manualWorkdays/${filterAttendanceMonth}/${empId}`, { [day]: Number(value) })
   }
 
   const handleBatchExportPayslips = () => {
@@ -884,6 +955,12 @@ function Attendance() {
           ⏰ Chấm công
         </div>
         <div
+          className={`tab ${activeTab === 'workday_summary' ? 'active' : ''}`}
+          onClick={() => setActiveTab('workday_summary')}
+        >
+          📈 Tổng hợp công
+        </div>
+        <div
           className={`tab ${activeTab === 'payroll' ? 'active' : ''}`}
           onClick={() => setActiveTab('payroll')}
         >
@@ -908,6 +985,181 @@ function Attendance() {
           👨‍👩‍👧 Người phụ thuộc
         </div>
       </div>
+
+      {/* Tab: Tổng hợp công */}
+      {activeTab === 'workday_summary' && (
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">Bảng tổng hợp công</h3>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="🔍 Tìm nhân viên..."
+                value={filterAttendanceEmployee}
+                onChange={(e) => setFilterAttendanceEmployee(e.target.value)}
+                style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ddd', minWidth: '200px' }}
+              />
+              <select
+                value={filterAttendanceMonth}
+                onChange={(e) => setFilterAttendanceMonth(e.target.value)}
+                style={{ padding: '8px', borderRadius: '4px' }}
+              >
+                <option value="">Chọn tháng</option>
+                {[...new Set(attendanceLogs.map(log => {
+                  const date = new Date(log.date || log.timestamp)
+                  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+                }))].sort().map(month => (
+                  <option key={month} value={month}>{month}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ padding: '0', overflow: 'auto', maxHeight: '75vh', border: '1px solid #ddd', borderRadius: '4px' }}>
+            {!filterAttendanceMonth ? (
+              <div className="empty-state">Vui lòng chọn tháng để xem bảng công</div>
+            ) : (
+              <table className="table table-bordered table-sm" style={{ fontSize: '0.85rem', width: 'max-content' }}>
+                <thead>
+                  <tr style={{ background: '#f8f9fa' }}>
+                    <th style={{ minWidth: '50px', position: 'sticky', left: 0, background: '#fff', zIndex: 10 }}>STT</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', left: '50px', background: '#fff', zIndex: 10 }}>Họ tên</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', left: '200px', background: '#fff', zIndex: 10 }}>Có phép (Ngày)</th>
+                    {(() => {
+                      const [year, month] = filterAttendanceMonth.split('-').map(Number)
+                      const daysInMonth = new Date(year, month, 0).getDate()
+                      return Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => (
+                        <th key={day} style={{ width: '40px', textAlign: 'center' }}>{day}</th>
+                      ))
+                    })()}
+                    <th style={{ width: '60px', textAlign: 'center', background: '#e8f5e9' }}>Tổng</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {employees
+                    .filter(emp => {
+                      if (!filterAttendanceEmployee) return true
+                      const name = emp.ho_va_ten || emp.name || ''
+                      return normalizeString(name).includes(normalizeString(filterAttendanceEmployee))
+                    })
+                    .map((emp, empIdx) => {
+                      const [year, month] = filterAttendanceMonth.split('-').map(Number)
+                      const daysInMonth = new Date(year, month, 0).getDate()
+                      let totalWorkdays = 0
+
+                      return (
+                        <tr key={emp.id}>
+                          <td style={{ position: 'sticky', left: 0, background: '#fff', zIndex: 5 }}>{empIdx + 1}</td>
+                          <td style={{ position: 'sticky', left: '50px', background: '#fff', zIndex: 5, fontWeight: '500' }}>
+                            {emp.ho_va_ten || emp.name}
+                          </td>
+                          <td style={{ position: 'sticky', left: '200px', background: '#fff', zIndex: 5 }}>
+                            <MemoizedInput
+                              value={attendanceAdjustments[emp.id] || ''}
+                              onSave={(val) => saveAdjustment(emp.id, val)}
+                              placeholder="VD: 1,5"
+                              className="form-control form-control-sm"
+                              style={{ fontSize: '0.8rem', textAlign: 'center' }}
+                            />
+                          </td>
+                          {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
+                            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                            const log = attendanceLogs.find(l =>
+                              l.employeeId === emp.id &&
+                              (l.date === dateStr || (l.timestamp && new Date(l.timestamp || 0).toISOString().startsWith(dateStr)))
+                            )
+
+                            let cellContent = ''
+                            let cellClass = ''
+                            let val = 0
+
+                            if (log) {
+                              let hours = 0
+                              if (log.hours !== undefined && log.hours !== null) hours = Number(log.hours)
+                              else if (log.soGio !== undefined && log.soGio !== null) hours = Number(log.soGio)
+
+                              if (hours >= 8) {
+                                val = 1
+                                cellContent = '1.0'
+                                cellClass = 'text-success'
+                              } else if (hours >= 4) {
+                                val = 0.5
+                                cellContent = '0.5'
+                                cellClass = 'text-warning'
+                              } else {
+                                val = 0
+                                cellContent = '0'
+                                cellClass = 'text-muted'
+                              }
+                            }
+
+                            // Override logic if "Has Permission"
+                            const permissionDays = (attendanceAdjustments[emp.id] || '')
+                              .split(',')
+                              .map(d => parseInt(d.trim()))
+                              .filter(n => !isNaN(n))
+
+                            if (permissionDays.includes(day)) {
+                              // Force 1 workday OR Manual Value
+                              const manualVal = manualWorkdays[emp.id]?.[day]
+                              val = (manualVal !== undefined && manualVal !== null) ? Number(manualVal) : 1
+
+                              // Render Input for Manual Edit
+                              cellContent = (
+                                <MemoizedInput
+                                  type="number"
+                                  step="0.5"
+                                  value={val}
+                                  onFocus={(e) => e.target.select()}
+                                  onSave={(val) => saveManualWorkday(emp.id, day, val)}
+                                  className="form-control form-control-sm"
+                                  style={{
+                                    width: '45px',
+                                    height: '24px',
+                                    padding: '0 2px',
+                                    textAlign: 'center',
+                                    fontSize: '0.8rem',
+                                    margin: '0 auto',
+                                    background: '#fff'
+                                  }}
+                                />
+                              )
+                              // Green background (Visual cue)
+                              cellClass = '' // Reset class
+                            }
+
+                            totalWorkdays += val
+
+                            return (
+                              <td
+                                key={day}
+                                className={cellClass}
+                                style={{
+                                  textAlign: 'center',
+                                  border: '1px solid #dee2e6',
+                                  background: permissionDays.includes(day) ? '#d4edda' : 'inherit', // Green background
+                                  padding: permissionDays.includes(day) ? '4px' : '8px' // Adjust padding for input
+                                }}
+                              >
+                                {cellContent}
+                              </td>
+                            )
+                          })}
+                          <td style={{ textAlign: 'center', fontWeight: 'bold', background: '#e8f5e9' }}>
+                            {totalWorkdays}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                </tbody>
+              </table>
+            )}
+          </div>
+          <div style={{ padding: '10px', fontSize: '0.85rem' }}>
+            <strong>Chú thích:</strong> <span style={{ display: 'inline-block', width: '15px', height: '15px', background: '#d4edda', border: '1px solid #c3e6cb', verticalAlign: 'middle', marginRight: '5px' }}></span> Có phép (Được tính đủ công)
+          </div>
+        </div>
+      )}
 
       {/* Tab 1: Chấm công */}
       {activeTab === 'attendance' && (
