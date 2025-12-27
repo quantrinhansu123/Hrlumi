@@ -115,7 +115,7 @@ function Salary() {
     if (!confirm('Bạn có chắc muốn xóa bậc lương này?')) return
     try {
       await fbDelete(`hr/salaryGrades/${id}`)
-      loadData()
+      setSalaryGrades(prev => prev.filter(item => item.id !== id))
       alert('Đã xóa bậc lương')
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)
@@ -126,7 +126,7 @@ function Salary() {
     if (!confirm('Bạn có chắc muốn xóa bậc lương nhân viên này?')) return
     try {
       await fbDelete(`hr/employeeSalaries/${id}`)
-      loadData()
+      setEmployeeSalaries(prev => prev.filter(item => item.id !== id))
       alert('Đã xóa bậc lương nhân viên')
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)
@@ -602,7 +602,7 @@ function Salary() {
     if (!confirm('Bạn có chắc muốn xóa lịch sử thăng tiến này?')) return
     try {
       await fbDelete(`hr/promotionHistory/${id}`)
-      loadData()
+      setPromotionHistory(prev => prev.filter(item => item.id !== id))
       alert('Đã xóa lịch sử thăng tiến')
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)

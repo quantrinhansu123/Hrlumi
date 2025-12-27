@@ -1,13 +1,14 @@
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
 import { formatMoney, normalizeString } from '../utils/helpers'
 
 function TaxModal({ tax, employees, dependents, insuranceList, isOpen, onClose, onSave, readOnly = false }) {
+  const mouseDownTarget = useRef(null)
   const [formData, setFormData] = useState({
     employeeId: '',
     maSoThue: '',
-    thuNhapTinhThue: 0,
+    thuNhapTinhThue: '',
     giamTruBanThan: 15500000,
     bieuThue: 'Lũy tiến',
     kyApDung: ''
@@ -43,7 +44,7 @@ function TaxModal({ tax, employees, dependents, insuranceList, isOpen, onClose, 
     setFormData({
       employeeId: '',
       maSoThue: '',
-      thuNhapTinhThue: 0,
+      thuNhapTinhThue: '',
       giamTruBanThan: 15500000,
       bieuThue: 'Lũy tiến',
       kyApDung: monthStr
@@ -53,7 +54,7 @@ function TaxModal({ tax, employees, dependents, insuranceList, isOpen, onClose, 
   }
 
   const handleChange = (e) => {
-    const value = e.target.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value
+    const value = e.target.value
     setFormData({
       ...formData,
       [e.target.name]: value
@@ -118,11 +119,13 @@ function TaxModal({ tax, employees, dependents, insuranceList, isOpen, onClose, 
         }
       }
 
-      const taxableIncome = Math.max(0, formData.thuNhapTinhThue - personalDeduction - totalDependentDeduction - insuranceDeduction)
+      const taxableIncome = Math.max(0, (Number(formData.thuNhapTinhThue) || 0) - personalDeduction - totalDependentDeduction - insuranceDeduction)
       const thuePhaiNop = calculateTax()
 
       const data = {
         ...formData,
+        thuNhapTinhThue: Number(formData.thuNhapTinhThue) || 0,
+        giamTruBanThan: Number(formData.giamTruBanThan) || 0,
         tongGiamTruNguoiPhuThuoc: totalDependentDeduction,
         giamTruBHXH: insuranceDeduction, // Save this for visibility
         thuNhapChiuThue: taxableIncome,
@@ -160,7 +163,15 @@ function TaxModal({ tax, employees, dependents, insuranceList, isOpen, onClose, 
   const thuePhaiNop = calculateTax()
 
   return (
-    <div className="modal show" onClick={onClose}>
+    <div
+      className="modal show"
+      onMouseDown={(e) => { mouseDownTarget.current = e.target }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && mouseDownTarget.current === e.currentTarget) {
+          onClose()
+        }
+      }}
+    >
       <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px' }}>
         <div className="modal-header">
           <h3>

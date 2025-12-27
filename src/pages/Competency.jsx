@@ -163,7 +163,7 @@ function Competency() {
     if (!confirm('Bạn có chắc muốn xóa năng lực này?')) return
     try {
       await fbDelete(`hr/competencyFramework/${id}`)
-      loadData()
+      setCompetencyFramework(prev => prev.filter(item => item.id !== id))
       alert('Đã xóa năng lực')
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)
@@ -174,8 +174,19 @@ function Competency() {
     if (!confirm('Bạn có chắc muốn xóa chương trình đào tạo này?')) return
     try {
       await fbDelete(`hr/trainings/${id}`)
-      loadData()
+      setTrainingPrograms(prev => prev.filter(item => item.id !== id))
       alert('Đã xóa chương trình đào tạo')
+    } catch (error) {
+      alert('Lỗi khi xóa: ' + error.message)
+    }
+  }
+
+  const handleDeleteParticipant = async (id) => {
+    if (!confirm('Bạn có chắc muốn xóa học viên này khỏi chương trình đào tạo?')) return
+    try {
+      await fbDelete(`hr/trainingParticipants/${id}`)
+      setTrainingParticipants(prev => prev.filter(item => item.id !== id))
+      alert('Đã xóa học viên khỏi chương trình')
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)
     }
@@ -1920,14 +1931,7 @@ function Competency() {
                               </button>
                               <button
                                 className="delete"
-                                onClick={() => {
-                                  if (confirm('Bạn có chắc muốn xóa học viên này khỏi chương trình đào tạo?')) {
-                                    fbDelete(`hr/trainingParticipants/${participant.id}`).then(() => {
-                                      loadData()
-                                      alert('Đã xóa học viên khỏi chương trình')
-                                    }).catch(err => alert('Lỗi: ' + err.message))
-                                  }
-                                }}
+                                onClick={() => handleDeleteParticipant(participant.id)}
                                 title="Xóa học viên"
                               >
                                 <i className="fas fa-trash"></i>

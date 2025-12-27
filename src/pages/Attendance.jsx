@@ -156,7 +156,7 @@ function Attendance() {
     if (!confirm('Bạn có chắc muốn xóa bản ghi chấm công này?')) return
     try {
       await fbDelete(`hr/attendanceLogs/${id}`)
-      loadData()
+      setAttendanceLogs(prev => prev.filter(item => item.id !== id))
       alert('Đã xóa bản ghi chấm công')
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)
@@ -168,7 +168,8 @@ function Attendance() {
     try {
       setLoading(true)
       await fbDelete('hr/attendanceLogs')
-      loadData()
+      setAttendanceLogs([])
+      setLoading(false)
       alert('Đã xóa toàn bộ dữ liệu chấm công thành công!')
     } catch (error) {
       alert('Lỗi khi xóa dữ liệu: ' + error.message)
@@ -180,7 +181,7 @@ function Attendance() {
     if (!confirm('Bạn có chắc muốn xóa thông tin BHXH này?')) return
     try {
       await fbDelete(`hr/insuranceInfo/${id}`)
-      loadData()
+      setInsuranceInfo(prev => prev.filter(item => item.id !== id))
       alert('Đã xóa thông tin BHXH')
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)
@@ -191,7 +192,7 @@ function Attendance() {
     if (!confirm('Bạn có chắc muốn xóa thông tin thuế này?')) return
     try {
       await fbDelete(`hr/taxInfo/${id}`)
-      loadData()
+      setTaxInfo(prev => prev.filter(item => item.id !== id))
       alert('Đã xóa thông tin thuế')
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)
@@ -202,7 +203,7 @@ function Attendance() {
     if (!confirm('Bạn có chắc muốn xóa người phụ thuộc này?')) return
     try {
       await fbDelete(`hr/dependents/${id}`)
-      loadData()
+      setDependents(prev => prev.filter(item => item.id !== id))
       alert('Đã xóa người phụ thuộc')
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)
@@ -219,7 +220,7 @@ function Attendance() {
     if (!confirm('Bạn có chắc muốn xóa bảng lương này?')) return
     try {
       await fbDelete(`hr/payrolls/${id}`)
-      loadData()
+      setPayrolls(prev => prev.filter(item => item.id !== id))
       alert('Đã xóa bảng lương')
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)

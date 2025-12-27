@@ -79,8 +79,8 @@ function Employees() {
 
     try {
       await fbDelete(`employees/${id}`)
+      setEmployees(prev => prev.filter(item => item.id !== id))
       alert(`Đã xóa nhân viên "${name}"`)
-      loadEmployees()
     } catch (error) {
       alert(`Lỗi: ${error.message}`)
     }

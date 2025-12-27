@@ -74,7 +74,7 @@ function Tasks() {
     if (!confirm('Bạn có chắc muốn xóa công việc này?')) return
     try {
       await fbDelete(`hr/tasks/${id}`)
-      loadData()
+      setTasks(prev => prev.filter(t => t.id !== id))
       alert('Đã xóa công việc')
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)

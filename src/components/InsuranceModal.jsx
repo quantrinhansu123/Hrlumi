@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
 import { formatMoney, normalizeString } from '../utils/helpers'
 
 function InsuranceModal({ insurance, employees, employeeSalaries, salaryGrades, isOpen, onClose, onSave, readOnly = false }) {
+  const mouseDownTarget = useRef(null)
   const [formData, setFormData] = useState({
     employeeId: '',
     soSoBHXH: '',
     ngayThamGia: '',
-    mucLuongDong: 0,
+    mucLuongDong: '',
     tyLeNLD: 10.5,
     tyLeDN: 21.5,
     status: 'Đang tham gia'
@@ -42,7 +43,7 @@ function InsuranceModal({ insurance, employees, employeeSalaries, salaryGrades, 
       employeeId: '',
       soSoBHXH: '',
       ngayThamGia: '',
-      mucLuongDong: 0,
+      mucLuongDong: '',
       tyLeNLD: 10.5,
       tyLeDN: 21.5,
       status: 'Đang tham gia'
@@ -52,46 +53,58 @@ function InsuranceModal({ insurance, employees, employeeSalaries, salaryGrades, 
   }
 
   const handleChange = (e) => {
-    const value = e.target.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value
+    const { name, value, type } = e.target
+
+    // Keep value as string for better UX (typing decimals, leading zeros)
+    const finalValue = value
 
     // Auto-fill Salary from Grade if Employee changes
-    if (e.target.name === 'employeeId') {
-      const empId = value
+    if (name === 'employeeId') {
+      const empId = finalValue
       // Find salary in employeeSalaries
       const empSalaryRecord = employeeSalaries?.find(es => es.employeeId === empId)
-      let salaryValue = 0
+      let salaryValue = ''
 
       if (empSalaryRecord) {
         const grade = salaryGrades?.find(g => g.id === empSalaryRecord.salaryGradeId)
         if (grade) {
-          salaryValue = grade.salary || 0
+          salaryValue = grade.salary || ''
         }
       }
 
-      if (salaryValue > 0) {
+      if (salaryValue) {
         setFormData(prev => ({
           ...prev,
-          [e.target.name]: value,
+          [name]: finalValue,
           mucLuongDong: salaryValue
         }))
         return
       }
     }
 
-    setFormData({
-      ...formData,
-      [e.target.name]: value
-    })
+    setFormData(prev => ({
+      ...prev,
+      [name]: finalValue
+    }))
   }
+
+
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (readOnly) return
     try {
+      const payload = {
+        ...formData,
+        mucLuongDong: formData.mucLuongDong === '' ? 0 : Number(formData.mucLuongDong),
+        tyLeNLD: Number(formData.tyLeNLD),
+        tyLeDN: Number(formData.tyLeDN)
+      }
+
       if (insurance && insurance.id) {
-        await fbUpdate(`hr/insuranceInfo/${insurance.id}`, formData)
+        await fbUpdate(`hr/insuranceInfo/${insurance.id}`, payload)
       } else {
-        await fbPush('hr/insuranceInfo', formData)
+        await fbPush('hr/insuranceInfo', payload)
       }
       onSave()
       onClose()
@@ -104,7 +117,15 @@ function InsuranceModal({ insurance, employees, employeeSalaries, salaryGrades, 
   if (!isOpen) return null
 
   return (
-    <div className="modal show" onClick={onClose}>
+    <div
+      className="modal show"
+      onMouseDown={(e) => { mouseDownTarget.current = e.target }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && mouseDownTarget.current === e.currentTarget) {
+          onClose()
+        }
+      }}
+    >
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>

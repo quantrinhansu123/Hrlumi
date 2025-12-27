@@ -82,7 +82,7 @@ function Recruitment() {
     if (!confirm('Bạn có chắc muốn xóa nhu cầu tuyển dụng này?')) return
     try {
       await fbDelete(`hr/recruitmentPlans/${id}`)
-      await loadData()
+      setPlans(prev => prev.filter(item => item.id !== id))
       alert('Đã xóa nhu cầu tuyển dụng')
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)
@@ -93,7 +93,7 @@ function Recruitment() {
     if (!confirm('Bạn có chắc muốn xóa CV này?')) return
     try {
       await fbDelete(`hr/candidates/${id}`)
-      await loadData()
+      setCandidates(prev => prev.filter(item => item.id !== id))
       alert('Đã xóa CV ứng viên')
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)

@@ -100,7 +100,7 @@ function KPI() {
     if (!confirm('Bạn có chắc muốn xóa KPI này?')) return
     try {
       await fbDelete(`hr/kpiTemplates/${id}`)
-      loadData()
+      setKpiTemplates(prev => prev.filter(item => item.id !== id))
       alert('Đã xóa KPI')
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)
@@ -145,12 +145,13 @@ function KPI() {
     if (!confirm('Bạn có chắc muốn xóa KPI của nhân viên này?')) return
     try {
       await fbDelete(`hr/employeeKPIs/${id}`)
-      loadData()
-      alert('Đã xóa KPI nhân viên')
+      setEmployeeKPIs(prev => prev.filter(item => item.id !== id))
     } catch (error) {
       alert('Lỗi khi xóa: ' + error.message)
     }
   }
+  // --- Deduplicate Functions ---
+
 
   // --- Inline KPI Update ---
   const handleUpdateEmployeeKPISlot = async (empKPI, oldKpiId, newKpiId) => {
@@ -475,6 +476,7 @@ function KPI() {
     return kpiTemplates.find(k => k.id === kpiId || k.code === kpiId)
   }
 
+
   // Calculate total weight for employee KPI
   const calculateTotalWeight = (employeeKPI) => {
     if (!employeeKPI.kpiValues) return 0
@@ -483,6 +485,54 @@ function KPI() {
       const weight = template?.weight || kpi.weight || 0
       return sum + Number(weight)
     }, 0)
+  }
+
+  // --- Deduplicate Functions ---
+  const handleCleanupDuplicates = async () => {
+    if (!confirm('Bạn có chắc muốn xóa các bản ghi KPI trùng lặp (giữ lại bản ghi có tổng trọng số cao nhất)? Hành động này không thể hoàn tác.')) return
+
+    try {
+      setLoading(true)
+      const groups = {}
+
+      // Group by Employee + Month
+      employeeKPIs.forEach(item => {
+        const key = `${item.employeeId}_${item.month}`
+        if (!groups[key]) groups[key] = []
+        groups[key].push(item)
+      })
+
+      let deletedCount = 0
+      const deletedIds = []
+      for (const key in groups) {
+        if (groups[key].length > 1) {
+          // Sort descending by total weight (completeness)
+          // If weights equal, maybe prefer update time? But we don't have it easily.
+          // Prefer the one with more keys in kpiValues?
+          const sorted = groups[key].sort((a, b) => {
+            const weightA = calculateTotalWeight(a)
+            const weightB = calculateTotalWeight(b)
+            return weightB - weightA
+          })
+
+          // Keep sorted[0], delete rest
+          const toDelete = sorted.slice(1)
+          for (const item of toDelete) {
+            await fbDelete(`hr/employeeKPIs/${item.id}`)
+            deletedCount++
+            deletedIds.push(item.id)
+          }
+        }
+      }
+
+      setEmployeeKPIs(prev => prev.filter(item => !deletedIds.includes(item.id)))
+      alert(`Đã xóa ${deletedCount} bản ghi trùng lặp.`)
+
+    } catch (e) {
+      console.error("Cleanup error:", e)
+      alert("Lỗi khi dọn dẹp: " + e.message)
+      setLoading(false)
+    }
   }
 
   // Filter employee KPIs
@@ -556,7 +606,16 @@ function KPI() {
         {activeTab === 'assignment' && (
           <>
 
+
             <SeedKPIDataButton onComplete={loadData} />
+            <button
+              className="btn btn-warning"
+              style={{ marginLeft: '10px', color: '#fff' }}
+              onClick={handleCleanupDuplicates}
+              title="Xóa các bản ghi trùng lặp (giữ lại bản ghi đầy đủ nhất)"
+            >
+              <i className="fas fa-broom"></i> Xóa trùng
+            </button>
 
           </>
         )}
@@ -915,29 +974,7 @@ function KPI() {
 
                                 return (
                                   <React.Fragment key={i}>
-                                    <td>
-                                      <select
-                                        value={currentKpiId}
-                                        onChange={(e) => {
-                                          const newId = e.target.value
-                                          handleUpdateEmployeeKPISlot(empKPI, currentKpiId, newId)
-                                        }}
-                                        className="form-control-sm"
-                                        style={{ maxWidth: '120px', fontSize: '0.9em' }}
-                                        disabled={empKPI.status === 'Đã giao' || empKPI.status === 'Đã chốt'} // Disable if locked? Optional.
-                                      >
-                                        <option value="">-- Trống --</option>
-                                        {kpiTemplates.filter(t => t.status === 'Đang áp dụng').map(t => (
-                                          <option
-                                            key={t.id}
-                                            value={t.id}
-                                            disabled={assignedKPIs.some(ak => ak && (ak.id === t.id || ak.code === t.code) && ak !== kpi)} // Prevent duplicate selection
-                                          >
-                                            {t.code || t.id}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </td>
+                                    <td>{kpi ? escapeHtml(kpi.code) : ''}</td>
                                     <td>
                                       {kpi ? (
                                         <span style={{ fontWeight: 'bold' }}>
@@ -982,6 +1019,15 @@ function KPI() {
                                       title="Xem chi tiết"
                                     >
                                       <i className="fas fa-eye"></i>
+                                    </button>
+                                  )}
+                                  {(empKPI.status === 'Chưa chốt' || !empKPI.status) && (
+                                    <button
+                                      className="delete"
+                                      onClick={() => handleDeleteEmployeeKPI(empKPI.id)}
+                                      title="Xóa"
+                                    >
+                                      <i className="fas fa-trash"></i>
                                     </button>
                                   )}
                                 </div>
@@ -1277,7 +1323,7 @@ function KPI() {
                                   if (confirm('Bạn có chắc muốn xóa kết quả đánh giá này?')) {
                                     try {
                                       await fbDelete(`hr/kpiResults/${result.id}`)
-                                      loadData()
+                                      setKpiResults(prev => prev.filter(r => r.id !== result.id))
                                     } catch (error) {
                                       alert('Lỗi khi xóa: ' + error.message)
                                     }
@@ -1366,6 +1412,7 @@ function KPI() {
       <EmployeeKPIModal
         employeeKPI={selectedEmployeeKPI}
         employees={employees}
+        existingKPIs={employeeKPIs}
         kpiTemplates={kpiTemplates}
         targetedKPIId={targetedKPIId} // NEW prop
         isOpen={isEmployeeKPIModalOpen}
@@ -1420,23 +1467,40 @@ function KPI() {
                       </tr>
                     </thead>
                     <tbody>
-                      {kpiTemplates.filter(t => t.status === 'Đang áp dụng').map((template, idx) => {
-                        const kpiValue = selectedEmployeeKPIView.kpiValues?.[template.id] || selectedEmployeeKPIView.kpiValues?.[template.code] || {}
-                        return (
-                          <tr key={template.id}>
+                      {(() => {
+                        const values = selectedEmployeeKPIView.kpiValues || {}
+                        const rows = Object.entries(values).map(([key, val]) => {
+                          const lookupId = val.kpiId || key
+                          const template = kpiTemplates.find(t => t.id === lookupId || t.code === lookupId)
+                          return {
+                            ...val,
+                            template: template || { code: lookupId, name: 'Unknown', unit: '-', weight: 0 }
+                          }
+                        })
+
+                        if (rows.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan="6" className="text-center">Chưa có KPI nào được giao</td>
+                            </tr>
+                          )
+                        }
+
+                        return rows.map((row, idx) => (
+                          <tr key={idx}>
                             <td>{idx + 1}</td>
-                            <td>{escapeHtml(template.code || template.id || '-')}</td>
-                            <td>{escapeHtml(template.name || '-')}</td>
-                            <td>{escapeHtml(template.unit || '-')}</td>
+                            <td>{escapeHtml(row.template.code || row.template.id || '-')}</td>
+                            <td>{escapeHtml(row.template.name || '-')}</td>
+                            <td>{escapeHtml(row.template.unit || '-')}</td>
                             <td>
-                              {template.unit === 'VNĐ' || template.unit === 'VND'
-                                ? formatMoney(kpiValue.target || 0)
-                                : kpiValue.target || 0}
+                              {(row.template.unit === 'VNĐ' || row.template.unit === 'VND')
+                                ? formatMoney(row.target || 0)
+                                : row.target || 0}
                             </td>
-                            <td>{template.weight || 0}%</td>
+                            <td>{row.template.weight || 0}%</td>
                           </tr>
-                        )
-                      })}
+                        ))
+                      })()}
                     </tbody>
                   </table>
                 </div>

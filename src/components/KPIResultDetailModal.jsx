@@ -157,57 +157,67 @@ function KPIResultDetailModal({ result, employees, employeeKPIs, kpiTemplates, i
                                 </tr>
                             </thead>
                             <tbody>
-                                {kpiTemplates.filter(t => t.status === 'Đang áp dụng').map((template, idx) => {
-                                    // Use editedResults if editing, else result.kpiResults
+                                {(() => {
                                     const source = isEditing ? editedResults : result.kpiResults
-                                    const kpiRes = source?.[template.id] || source?.[template.code]
+                                    return Object.keys(source || {}).map((kpiKey, idx) => {
+                                        const kpiRes = source[kpiKey]
+                                        // Find template info
+                                        const template = kpiTemplates.find(t => t.id === kpiKey || t.code === kpiKey || (kpiRes && t.id === kpiRes.kpiId)) || {
+                                            id: kpiKey,
+                                            code: kpiKey,
+                                            name: `KPI: ${kpiKey}`,
+                                            unit: '',
+                                            weight: 0
+                                        }
 
-                                    if (!kpiRes) return null
+                                        if (!kpiRes) return null
 
-                                    return (
-                                        <tr key={template.id}>
-                                            <td>{idx + 1}</td>
-                                            <td>
-                                                <div>{template.name}</div>
-                                                <small style={{ color: '#666' }}>{template.code}</small>
-                                            </td>
-                                            <td>
-                                                {template.unit === 'VNĐ' || template.unit === 'VND'
-                                                    ? formatMoney(kpiRes.target)
-                                                    : kpiRes.target} {template.unit}
-                                            </td>
-                                            <td>
-                                                {isEditing ? (
-                                                    <input
-                                                        type="number"
-                                                        value={kpiRes.actual}
-                                                        onChange={(e) => handleChangeActual(template.id, e.target.value)}
-                                                        style={{ width: '100px', fontWeight: 'bold' }}
-                                                    />
-                                                ) : (
-                                                    <span style={{ fontWeight: 'bold' }}>
-                                                        {template.unit === 'VNĐ' || template.unit === 'VND'
-                                                            ? formatMoney(kpiRes.actual)
-                                                            : kpiRes.actual}
+                                        return (
+                                            <tr key={template.id}>
+                                                <td>{idx + 1}</td>
+                                                <td>
+                                                    <div>{template.name}</div>
+                                                    <small style={{ color: '#666' }}>{template.code}</small>
+                                                </td>
+                                                <td>
+                                                    {template.unit === 'VNĐ' || template.unit === 'VND'
+                                                        ? formatMoney(kpiRes.target)
+                                                        : kpiRes.target} {template.unit}
+                                                </td>
+                                                <td>
+                                                    {isEditing ? (
+                                                        <input
+                                                            type="number"
+                                                            value={kpiRes.actual}
+                                                            onChange={(e) => handleChangeActual(template.id, e.target.value)}
+                                                            style={{ width: '100px', fontWeight: 'bold' }}
+                                                        />
+                                                    ) : (
+                                                        <span style={{ fontWeight: 'bold' }}>
+                                                            {template.unit === 'VNĐ' || template.unit === 'VND'
+                                                                ? formatMoney(kpiRes.actual)
+                                                                : kpiRes.actual}
+                                                        </span>
+                                                    )}
+                                                    {template.unit !== 'VNĐ' && template.unit !== 'VND' ? ` ${template.unit}` : ''}
+                                                </td>
+                                                <td>
+                                                    <span className={`badge ${kpiRes.completionPercent >= 100 ? 'badge-success' : 'badge-warning'}`}>
+                                                        {kpiRes.completionPercent}%
                                                     </span>
-                                                )}
-                                                {template.unit !== 'VNĐ' && template.unit !== 'VND' ? ` ${template.unit}` : ''}
-                                            </td>
-                                            <td>
-                                                <span className={`badge ${kpiRes.completionPercent >= 100 ? 'badge-success' : 'badge-warning'}`}>
-                                                    {kpiRes.completionPercent}%
-                                                </span>
-                                            </td>
-                                            <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>
-                                                {kpiRes.conversionPercent}%
-                                            </td>
-                                            <td>{template.weight}%</td>
-                                            <td style={{ fontStyle: 'italic', color: '#666' }}>
-                                                {kpiRes.source || 'Hệ thống'}
-                                            </td>
-                                        </tr>
-                                    )
-                                })}
+                                                </td>
+                                                <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>
+                                                    {kpiRes.conversionPercent}%
+                                                </td>
+                                                <td>{template.weight}%</td>
+                                                <td style={{ fontStyle: 'italic', color: '#666' }}>
+                                                    {kpiRes.source || 'Hệ thống'}
+                                                </td>
+                                            </tr>
+                                        )
+                                    })
+                                })()
+                                }
                             </tbody>
                         </table>
                     </div>
