@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fbGet } from '../services/firebase'
 import { escapeHtml } from '../utils/helpers'
-import SeedEmployeeStatusButton from './SeedEmployeeStatusButton'
 
 function StatusHistoryView({ employees, onDataChange }) {
     const [logs, setLogs] = useState([])
@@ -34,11 +33,6 @@ function StatusHistoryView({ employees, onDataChange }) {
         }
     }
 
-    const handleSeedComplete = () => {
-        loadData()
-        if (onDataChange) onDataChange()
-    }
-
     const filterByDate = (items) => {
         if (!fromDate && !toDate) return items
         return items.filter(item => {
@@ -56,6 +50,7 @@ function StatusHistoryView({ employees, onDataChange }) {
     const summaryStats = {
         thuViec: filteredLogs.filter(l => l.newStatus === 'Thử việc').length,
         chinhThuc: filteredLogs.filter(l => l.newStatus === 'Chính thức').length,
+        tamNghi: filteredLogs.filter(l => l.newStatus === 'Tạm nghỉ').length,
         nghiViec: filteredLogs.filter(l => l.newStatus === 'Nghỉ việc').length
     }
 
@@ -143,7 +138,6 @@ function StatusHistoryView({ employees, onDataChange }) {
                         <i className="fas fa-sync"></i>
                         Làm mới
                     </button>
-                    <SeedEmployeeStatusButton employees={employees} onComplete={handleSeedComplete} />
                 </div>
             </div>
 
@@ -172,6 +166,10 @@ function StatusHistoryView({ employees, onDataChange }) {
                                 <tr>
                                     <td>Tổng nhân viên Chính thức</td>
                                     <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#388e3c', fontSize: '1.2rem' }}>{summaryStats.chinhThuc}</td>
+                                </tr>
+                                <tr>
+                                    <td>Tổng nhân viên Tạm nghỉ</td>
+                                    <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#f57c00', fontSize: '1.2rem' }}>{summaryStats.tamNghi}</td>
                                 </tr>
                                 <tr>
                                     <td>Tổng nhân viên Nghỉ việc</td>

@@ -438,6 +438,29 @@ function Employees() {
                             Upload Excel
                         </button>
                         <button
+                            className="btn btn-secondary"
+                            onClick={async () => {
+                                if (confirm('CẢNH BÁO: Hành động này sẽ XÓA TOÀN BỘ dữ liệu nhân viên và lịch sử trạng thái hiện tại.\n\nBạn có chắc muốn làm sạch hệ thống để nhập liệu thật không?')) {
+                                    try {
+                                        setLoading(true)
+                                        await fbDelete('employees')
+                                        await fbDelete('hr/employee_status_history')
+                                        setEmployees([])
+                                        alert('Đã xóa sạch dữ liệu hệ thống!')
+                                        loadEmployees()
+                                    } catch (e) {
+                                        alert('Lỗi: ' + e.message)
+                                        setLoading(false)
+                                    }
+                                }
+                            }}
+                            style={{ marginRight: '10px', background: '#d32f2f', borderColor: '#d32f2f', color: '#fff' }}
+                            title="Xóa toàn bộ dữ liệu mẫu"
+                        >
+                            <i className="fas fa-trash-alt"></i>
+                            Làm sạch dữ liệu
+                        </button>
+                        <button
                             className="btn btn-info"
                             onClick={downloadTemplate}
                             style={{
