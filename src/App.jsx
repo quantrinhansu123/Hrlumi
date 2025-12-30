@@ -4,7 +4,6 @@ import Attendance from './pages/Attendance'
 import Competency from './pages/Competency'
 import Dashboard from './pages/Dashboard'
 import Employees from './pages/Employees'
-import EmployeeStatusHistory from './pages/EmployeeStatusHistory'
 import KPI from './pages/KPI'
 import Recruitment from './pages/Recruitment'
 import Salary from './pages/Salary'
@@ -18,7 +17,6 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/employees" element={<Employees />} />
-          <Route path="/status-history" element={<EmployeeStatusHistory />} />
           <Route path="/recruitment" element={<Recruitment />} />
           <Route path="/salary" element={<Salary />} />
           <Route path="/competency" element={<Competency />} />
@@ -32,4 +30,3 @@ function App() {
 }
 
 export default App
-

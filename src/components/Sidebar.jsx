@@ -1,4 +1,3 @@
-import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
 
 function Sidebar() {
@@ -9,7 +8,6 @@ function Sidebar() {
     { path: '/employees', icon: 'fas fa-users', label: 'Hồ sơ nhân sự' },
     { path: '/recruitment', icon: 'fas fa-user-plus', label: 'Tuyển dụng' },
     { path: '/salary', icon: 'fas fa-dollar-sign', label: 'Bậc lương & Thăng tiến' },
-    { path: '/status-history', icon: 'fas fa-history', label: 'Trạng thái nhân sự' },
     { path: '/competency', icon: 'fas fa-graduation-cap', label: 'Năng lực nhân sự' },
     { path: '/kpi', icon: 'fas fa-bullseye', label: 'KPI' },
     { path: '/tasks', icon: 'fas fa-clipboard-list', label: 'Giao việc' },
@@ -33,4 +31,3 @@ function Sidebar() {
 }
 
 export default Sidebar
-
