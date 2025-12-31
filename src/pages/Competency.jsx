@@ -1281,20 +1281,20 @@ function Competency() {
             </div>
             {filterDept ? (
               matrixPositions.length > 0 ? (
-                <div style={{ overflowX: 'auto', padding: '15px' }}>
-                  <table>
+                <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: '500px', border: '1px solid #e0e0e0', padding: 0 }}>
+                  <table style={{ minWidth: '101%', marginBottom: 0 }}>
                     <thead>
                       <tr>
-                        <th rowSpan="2">STT</th>
-                        <th rowSpan="2">Nhóm năng lực</th>
-                        <th rowSpan="2">Tên năng lực</th>
+                        <th rowSpan="2" style={{ position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 12, minWidth: '50px' }}>STT</th>
+                        <th rowSpan="2" style={{ position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 12, minWidth: '150px' }}>Nhóm năng lực</th>
+                        <th rowSpan="2" style={{ position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 12, minWidth: '200px' }}>Tên năng lực</th>
                         {matrixPositions.map(pos => (
-                          <th key={pos}>{pos}</th>
+                          <th key={pos} style={{ position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 12, minWidth: '100px' }}>{pos}</th>
                         ))}
                       </tr>
                       <tr>
                         {matrixPositions.map((pos, idx) => (
-                          <th key={`code_${pos}`} style={{ fontSize: '0.85em', color: '#666', background: '#f8f9fa' }}>B{idx + 1}</th>
+                          <th key={`code_${pos}`} style={{ fontSize: '0.85em', color: '#666', background: '#f8f9fa', position: 'sticky', top: '40px', zIndex: 11 }}>B{idx + 1}</th>
                         ))}
                       </tr>
                     </thead>
@@ -1338,18 +1338,18 @@ function Competency() {
             <div className="card-header">
               <h3 className="card-title">Bảng 3: Danh sách chi tiết khung năng lực</h3>
             </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table>
+            <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: '500px', border: '1px solid #e0e0e0' }}>
+              <table style={{ minWidth: '101%', marginBottom: 0 }}>
                 <thead>
                   <tr>
-                    <th>STT</th>
-                    <th>Bộ phận</th>
-                    <th>Vị trí</th>
-                    <th>Nhóm năng lực</th>
-                    <th>Tên năng lực</th>
-                    <th>Level yêu cầu</th>
-                    <th>Trạng thái</th>
-                    <th>Thao tác</th>
+                    <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Bộ phận</th>
+                    <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Vị trí</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Nhóm năng lực</th>
+                    <th style={{ minWidth: '250px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tên năng lực</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Level yêu cầu</th>
+                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Trạng thái</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1561,17 +1561,17 @@ function Competency() {
                 </div>
 
                 {assessmentForm.items.length > 0 ? (
-                  <div style={{ overflowX: 'auto', marginBottom: '15px' }}>
-                    <table>
+                  <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: '400px', marginBottom: '15px', border: '1px solid #e0e0e0' }}>
+                    <table style={{ minWidth: '101%', marginBottom: 0 }}>
                       <thead>
                         <tr>
-                          <th>STT</th>
-                          <th>Nhóm năng lực</th>
-                          <th>Tên năng lực</th>
-                          <th>Level yêu cầu</th>
-                          <th>Level đạt được</th>
-                          <th>Điểm chênh lệch</th>
-                          <th>Nhận xét</th>
+                          <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                          <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Nhóm năng lực</th>
+                          <th style={{ minWidth: '250px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tên năng lực</th>
+                          <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Level yêu cầu</th>
+                          <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Level đạt được</th>
+                          <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Điểm chênh lệch</th>
+                          <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Nhận xét</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1669,21 +1669,21 @@ function Competency() {
                   </select>
                 </div>
               </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table>
+              <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
+                <table style={{ minWidth: '101%', marginBottom: 0 }}>
                   <thead>
                     <tr>
-                      <th>STT</th>
-                      <th>Kỳ đánh giá</th>
-                      <th>Mã NV</th>
-                      <th>Họ và tên</th>
-                      <th>Bộ phận</th>
-                      <th>Vị trí</th>
-                      <th>Điểm YC</th>
-                      <th>Điểm KQ</th>
-                      <th>Kết quả</th>
-                      <th>Ngày đánh giá</th>
-                      <th>Thao tác</th>
+                      <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                      <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Kỳ đánh giá</th>
+                      <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã NV</th>
+                      <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Họ và tên</th>
+                      <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Bộ phận</th>
+                      <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Vị trí</th>
+                      <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Điểm YC</th>
+                      <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Điểm KQ</th>
+                      <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Kết quả</th>
+                      <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ngày đánh giá</th>
+                      <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1762,94 +1762,96 @@ function Competency() {
               <div className="card-header">
                 <h3 className="card-title">Bảng 1: Danh sách chương trình đào tạo</h3>
               </div>
-              <table>
-                <thead>
-                  <tr>
-                    <th>STT</th>
-                    <th>Mã chương trình</th>
-                    <th>Tên chương trình đào tạo</th>
-                    <th>Hình thức đào tạo</th>
-                    <th>Đơn vị đào tạo</th>
-                    <th>Thời gian bắt đầu</th>
-                    <th>Thời gian kết thúc</th>
-                    <th>Mục tiêu đào tạo</th>
-                    <th>Trạng thái</th>
-                    <th>Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {trainingPrograms.length > 0 ? (
-                    trainingPrograms.map((training, idx) => (
-                      <tr key={training.id}>
-                        <td>{idx + 1}</td>
-                        <td>{training.code || training.id || '-'}</td>
-                        <td>{training.name || '-'}</td>
-                        <td>{training.format || training.hinhThuc || '-'}</td>
-                        <td>{training.provider || training.donVi || '-'}</td>
-                        <td>{training.startDate ? new Date(training.startDate).toLocaleDateString('vi-VN') : '-'}</td>
-                        <td>{training.endDate ? new Date(training.endDate).toLocaleDateString('vi-VN') : '-'}</td>
-                        <td>{training.objective || training.mucTieu || '-'}</td>
-                        <td>
-                          <span className={`badge ${training.status === 'Đã kết thúc' ? 'badge-success' :
-                            training.status === 'Đang diễn ra' ? 'badge-info' :
-                              training.status === 'Sắp diễn ra' ? 'badge-warning' :
-                                'badge-danger'
-                            }`}>
-                            {training.status || '-'}
-                          </span>
-                        </td>
-                        <td>
-                          <div className="actions">
-                            <button
-                              className="edit"
-                              onClick={() => {
-                                setSelectedTraining(training)
-                                setIsTrainingModalOpen(true)
-                              }}
-                            >
-                              <i className="fas fa-edit"></i>
-                            </button>
-                            <button
-                              className="delete"
-                              onClick={() => handleDeleteTraining(training.id)}
-                            >
-                              <i className="fas fa-trash"></i>
-                            </button>
-                            <button
-                              className="view"
-                              onClick={() => {
-                                setSelectedTraining(training)
-                                setParticipantInitialView('participants')
-                                setIsParticipantModalOpen(true)
-                              }}
-                              title="Gán học viên"
-                            >
-                              <i className="fas fa-user-plus"></i>
-                            </button>
-                            {training.status === 'Đã kết thúc' && (
+              <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
+                <table style={{ minWidth: '101%', marginBottom: 0 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                      <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã chương trình</th>
+                      <th style={{ minWidth: '250px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tên chương trình đào tạo</th>
+                      <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Hình thức đào tạo</th>
+                      <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Đơn vị đào tạo</th>
+                      <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thời gian bắt đầu</th>
+                      <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thời gian kết thúc</th>
+                      <th style={{ minWidth: '250px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mục tiêu đào tạo</th>
+                      <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Trạng thái</th>
+                      <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trainingPrograms.length > 0 ? (
+                      trainingPrograms.map((training, idx) => (
+                        <tr key={training.id}>
+                          <td>{idx + 1}</td>
+                          <td>{training.code || training.id || '-'}</td>
+                          <td>{training.name || '-'}</td>
+                          <td>{training.format || training.hinhThuc || '-'}</td>
+                          <td>{training.provider || training.donVi || '-'}</td>
+                          <td>{training.startDate ? new Date(training.startDate).toLocaleDateString('vi-VN') : '-'}</td>
+                          <td>{training.endDate ? new Date(training.endDate).toLocaleDateString('vi-VN') : '-'}</td>
+                          <td>{training.objective || training.mucTieu || '-'}</td>
+                          <td>
+                            <span className={`badge ${training.status === 'Đã kết thúc' ? 'badge-success' :
+                              training.status === 'Đang diễn ra' ? 'badge-info' :
+                                training.status === 'Sắp diễn ra' ? 'badge-warning' :
+                                  'badge-danger'
+                              }`}>
+                              {training.status || '-'}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="actions">
+                              <button
+                                className="edit"
+                                onClick={() => {
+                                  setSelectedTraining(training)
+                                  setIsTrainingModalOpen(true)
+                                }}
+                              >
+                                <i className="fas fa-edit"></i>
+                              </button>
+                              <button
+                                className="delete"
+                                onClick={() => handleDeleteTraining(training.id)}
+                              >
+                                <i className="fas fa-trash"></i>
+                              </button>
                               <button
                                 className="view"
                                 onClick={() => {
                                   setSelectedTraining(training)
-                                  setParticipantInitialView('results')
+                                  setParticipantInitialView('participants')
                                   setIsParticipantModalOpen(true)
                                 }}
-                                title="Xem chi tiết & kết quả"
+                                title="Gán học viên"
                               >
-                                <i className="fas fa-eye"></i>
+                                <i className="fas fa-user-plus"></i>
                               </button>
-                            )}
-                          </div>
-                        </td>
+                              {training.status === 'Đã kết thúc' && (
+                                <button
+                                  className="view"
+                                  onClick={() => {
+                                    setSelectedTraining(training)
+                                    setParticipantInitialView('results')
+                                    setIsParticipantModalOpen(true)
+                                  }}
+                                  title="Xem chi tiết & kết quả"
+                                >
+                                  <i className="fas fa-eye"></i>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="10" className="empty-state">Chưa có chương trình đào tạo</td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="10" className="empty-state">Chưa có chương trình đào tạo</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Bảng 2: Danh sách học viên tham gia */}
@@ -1867,87 +1869,89 @@ function Competency() {
                   ))}
                 </select>
               </div>
-              <table>
-                <thead>
-                  <tr>
-                    <th>STT</th>
-                    <th>Mã NV</th>
-                    <th>Họ và tên</th>
-                    <th>Bộ phận</th>
-                    <th>Vị trí</th>
-                    <th>Chương trình đào tạo</th>
-                    <th>Tình trạng tham gia</th>
-                    <th>Tỷ lệ tham dự (%)</th>
-                    <th>Ghi chú</th>
-                    <th>Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredParticipants.length > 0 ? (
-                    filteredParticipants.map((participant, idx) => {
-                      const employee = employees.find(e => e.id === participant.employeeId)
-                      const training = trainingPrograms.find(t => t.id === participant.trainingProgramId)
-                      return (
-                        <tr key={participant.id}>
-                          <td>{idx + 1}</td>
-                          <td>{participant.employeeId || '-'}</td>
-                          <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
-                          <td>{employee ? (employee.bo_phan || '-') : '-'}</td>
-                          <td>{employee ? (employee.vi_tri || '-') : '-'}</td>
-                          <td>{training ? (training.name || '-') : '-'}</td>
-                          <td>
-                            <span className={`badge ${participant.status === 'Đã tham gia' ? 'badge-success' :
-                              participant.status === 'Vắng' ? 'badge-danger' :
-                                'badge-warning'
-                              }`}>
-                              {escapeHtml(participant.status || '-')}
-                            </span>
-                          </td>
-                          <td>{participant.attendanceRate || participant.tyLeThamDu || 0}%</td>
-                          <td>{escapeHtml(participant.note || participant.ghiChu || '-')}</td>
-                          <td>
-                            <div className="actions">
-                              <button
-                                className="view"
-                                onClick={() => {
-                                  setSelectedTraining(training)
-                                  setIsParticipantReadOnly(true)
-                                  setIsParticipantModalOpen(true)
-                                }}
-                                title="Xem chi tiết"
-                              >
-                                <i className="fas fa-eye"></i>
-                              </button>
-                              <button
-                                className="edit"
-                                onClick={() => {
-                                  setSelectedTraining(training)
-                                  setIsParticipantReadOnly(false)
-                                  setIsParticipantModalOpen(true)
-                                }}
-                                title="Cập nhật trạng thái"
-                              >
-                                <i className="fas fa-edit"></i>
-                              </button>
-                              <button
-                                className="delete"
-                                onClick={() => handleDeleteParticipant(participant.id)}
-                                title="Xóa học viên"
-                              >
-                                <i className="fas fa-trash"></i>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })
-                  ) : (
+              <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
+                <table style={{ minWidth: '101%', marginBottom: 0 }}>
+                  <thead>
                     <tr>
-                      <td colSpan="10" className="empty-state">Chưa có học viên tham gia</td>
+                      <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                      <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã NV</th>
+                      <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Họ và tên</th>
+                      <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Bộ phận</th>
+                      <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Vị trí</th>
+                      <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Chương trình đào tạo</th>
+                      <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tình trạng tham gia</th>
+                      <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tỷ lệ tham dự (%)</th>
+                      <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ghi chú</th>
+                      <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredParticipants.length > 0 ? (
+                      filteredParticipants.map((participant, idx) => {
+                        const employee = employees.find(e => e.id === participant.employeeId)
+                        const training = trainingPrograms.find(t => t.id === participant.trainingProgramId)
+                        return (
+                          <tr key={participant.id}>
+                            <td>{idx + 1}</td>
+                            <td>{participant.employeeId || '-'}</td>
+                            <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
+                            <td>{employee ? (employee.bo_phan || '-') : '-'}</td>
+                            <td>{employee ? (employee.vi_tri || '-') : '-'}</td>
+                            <td>{training ? (training.name || '-') : '-'}</td>
+                            <td>
+                              <span className={`badge ${participant.status === 'Đã tham gia' ? 'badge-success' :
+                                participant.status === 'Vắng' ? 'badge-danger' :
+                                  'badge-warning'
+                                }`}>
+                                {escapeHtml(participant.status || '-')}
+                              </span>
+                            </td>
+                            <td>{participant.attendanceRate || participant.tyLeThamDu || 0}%</td>
+                            <td>{escapeHtml(participant.note || participant.ghiChu || '-')}</td>
+                            <td>
+                              <div className="actions">
+                                <button
+                                  className="view"
+                                  onClick={() => {
+                                    setSelectedTraining(training)
+                                    setIsParticipantReadOnly(true)
+                                    setIsParticipantModalOpen(true)
+                                  }}
+                                  title="Xem chi tiết"
+                                >
+                                  <i className="fas fa-eye"></i>
+                                </button>
+                                <button
+                                  className="edit"
+                                  onClick={() => {
+                                    setSelectedTraining(training)
+                                    setIsParticipantReadOnly(false)
+                                    setIsParticipantModalOpen(true)
+                                  }}
+                                  title="Cập nhật trạng thái"
+                                >
+                                  <i className="fas fa-edit"></i>
+                                </button>
+                                <button
+                                  className="delete"
+                                  onClick={() => handleDeleteParticipant(participant.id)}
+                                  title="Xóa học viên"
+                                >
+                                  <i className="fas fa-trash"></i>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan="10" className="empty-state">Chưa có học viên tham gia</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>
         )

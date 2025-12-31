@@ -610,8 +610,8 @@ function Employees() {
                         </select>
                     </div>
 
-                    <div className="card" style={{ overflow: 'auto', maxHeight: 'calc(100vh - 300px)', position: 'relative', border: '1px solid #e0e0e0', boxShadow: 'none' }}>
-                        <table style={{ minWidth: 'max-content' }}>
+                    <div className="card" style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', position: 'relative', border: '1px solid #e0e0e0', boxShadow: 'none' }}>
+                        <table style={{ minWidth: '101%' }}>
                             <thead>
                                 <tr>
                                     <th style={{ minWidth: '80px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>

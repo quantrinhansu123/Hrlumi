@@ -1021,24 +1021,24 @@ function Attendance() {
             </div>
           </div>
 
-          <div style={{ padding: '0', overflow: 'auto', maxHeight: '75vh', border: '1px solid #ddd', borderRadius: '4px' }}>
+          <div style={{ padding: '0', overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #ddd', borderRadius: '4px' }}>
             {!filterAttendanceMonth ? (
               <div className="empty-state">Vui lòng chọn tháng để xem bảng công</div>
             ) : (
-              <table className="table table-bordered table-sm" style={{ fontSize: '0.85rem', width: 'max-content' }}>
+              <table className="table table-bordered table-sm" style={{ fontSize: '0.85rem', minWidth: '101%' }}>
                 <thead>
                   <tr style={{ background: '#f8f9fa' }}>
-                    <th style={{ minWidth: '50px', position: 'sticky', left: 0, background: '#fff', zIndex: 10 }}>STT</th>
-                    <th style={{ minWidth: '150px', position: 'sticky', left: '50px', background: '#fff', zIndex: 10 }}>Họ tên</th>
-                    <th style={{ minWidth: '100px', position: 'sticky', left: '200px', background: '#fff', zIndex: 10 }}>Có phép (Ngày)</th>
+                    <th style={{ minWidth: '50px', position: 'sticky', top: 0, left: 0, background: '#fff', zIndex: 20 }}>STT</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, left: '50px', background: '#fff', zIndex: 20 }}>Họ tên</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, left: '200px', background: '#fff', zIndex: 20 }}>Có phép (Ngày)</th>
                     {(() => {
                       const [year, month] = filterAttendanceMonth.split('-').map(Number)
                       const daysInMonth = new Date(year, month, 0).getDate()
                       return Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => (
-                        <th key={day} style={{ width: '40px', textAlign: 'center' }}>{day}</th>
+                        <th key={day} style={{ width: '40px', textAlign: 'center', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>{day}</th>
                       ))
                     })()}
-                    <th style={{ width: '60px', textAlign: 'center', background: '#e8f5e9' }}>Tổng</th>
+                    <th style={{ width: '60px', textAlign: 'center', background: '#e8f5e9', position: 'sticky', top: 0, right: 0, zIndex: 10 }}>Tổng</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1055,11 +1055,11 @@ function Attendance() {
 
                       return (
                         <tr key={emp.id}>
-                          <td style={{ position: 'sticky', left: 0, background: '#fff', zIndex: 5 }}>{empIdx + 1}</td>
-                          <td style={{ position: 'sticky', left: '50px', background: '#fff', zIndex: 5, fontWeight: '500' }}>
+                          <td style={{ position: 'sticky', left: 0, background: '#fff', zIndex: 15 }}>{empIdx + 1}</td>
+                          <td style={{ position: 'sticky', left: '50px', background: '#fff', zIndex: 15, fontWeight: '500' }}>
                             {emp.ho_va_ten || emp.name}
                           </td>
-                          <td style={{ position: 'sticky', left: '200px', background: '#fff', zIndex: 5 }}>
+                          <td style={{ position: 'sticky', left: '200px', background: '#fff', zIndex: 15 }}>
                             <MemoizedInput
                               value={attendanceAdjustments[emp.id] || ''}
                               onSave={(val) => saveAdjustment(emp.id, val)}
@@ -1195,21 +1195,21 @@ function Attendance() {
               </select>
             </div>
           </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table>
+          <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
+            <table style={{ minWidth: '101%', marginBottom: 0 }}>
               <thead>
                 <tr>
-                  <th>STT</th>
-                  <th>Mã NV</th>
-                  <th>Họ và tên</th>
-                  <th>Ngày</th>
-                  <th>Check-in đầu</th>
-                  <th>Đi muộn (phút)</th>
-                  <th>Check-out cuối</th>
-                  <th>Về sớm (phút)</th>
-                  <th>Số giờ làm</th>
-                  <th>Trạng thái</th>
-                  <th>Thao tác</th>
+                  <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã NV</th>
+                  <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Họ và tên</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ngày</th>
+                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Check-in đầu</th>
+                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Đi muộn (phút)</th>
+                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Check-out cuối</th>
+                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Về sớm (phút)</th>
+                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Số giờ làm</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Trạng thái</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -1368,27 +1368,27 @@ function Attendance() {
               </select>
             </div>
           </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table>
+          <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
+            <table style={{ minWidth: '101%', marginBottom: 0 }}>
               <thead>
                 <tr>
-                  <th>STT</th>
-                  <th>Mã NV</th>
-                  <th>Họ tên</th>
-                  <th>Bộ phận</th>
-                  <th>Vị trí</th>
-                  <th>Công thực tế</th>
-                  <th>Lương P1 (VNĐ)</th>
-                  <th>Kết quả P3</th>
-                  <th>Lương 3P (VNĐ)</th>
-                  <th>Lương ngày công</th>
-                  <th>Thưởng nóng (VNĐ)</th>
-                  <th>Tổng thu nhập</th>
-                  <th>BHXH + Thuế TNCN</th>
-                  <th>Khấu trừ khác</th>
-                  <th>Thực lĩnh</th>
-                  <th>Trạng thái</th>
-                  <th>Thao tác</th>
+                  <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã NV</th>
+                  <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Họ tên</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Bộ phận</th>
+                  <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Vị trí</th>
+                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Công thực tế</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Lương P1 (VNĐ)</th>
+                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Kết quả P3</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Lương 3P (VNĐ)</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Lương ngày công</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thưởng nóng (VNĐ)</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tổng thu nhập</th>
+                  <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>BHXH + Thuế TNCN</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Khấu trừ khác</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thực lĩnh</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Trạng thái</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -1493,84 +1493,86 @@ function Attendance() {
             <div className="card-header">
               <h3 className="card-title">Bảng 1: Thông tin BHXH</h3>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>STT</th>
-                  <th>Mã NV</th>
-                  <th>Họ tên</th>
-                  <th>Bộ phận</th>
-                  <th>Số sổ BHXH</th>
-                  <th>Ngày tham gia</th>
-                  <th>Mức lương đóng BHXH</th>
-                  <th>Tỷ lệ NLĐ (%)</th>
-                  <th>Tỷ lệ DN (%)</th>
-                  <th>Trạng thái</th>
-                  <th>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {insuranceInfo.length > 0 ? (
-                  insuranceInfo.map((insurance, idx) => {
-                    const employee = employees.find(e => e.id === insurance.employeeId)
-                    return (
-                      <tr key={insurance.id}>
-                        <td>{idx + 1}</td>
-                        <td>{insurance.employeeId || '-'}</td>
-                        <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
-                        <td>{employee ? (employee.bo_phan || employee.department || '-') : '-'}</td>
-                        <td>{escapeHtml(insurance.soSoBHXH || insurance.soSo || '-')}</td>
-                        <td>{insurance.ngayThamGia ? new Date(insurance.ngayThamGia).toLocaleDateString('vi-VN') : '-'}</td>
-                        <td>{formatMoney(insurance.mucLuongDong || insurance.mucLuong || 0)}</td>
-                        <td>{insurance.tyLeNLD || insurance.tyLeNhanVien || 10.5}%</td>
-                        <td>{insurance.tyLeDN || insurance.tyLeDoanhNghiep || 21.5}%</td>
-                        <td>
-                          <span className={`badge ${insurance.status === 'Đang tham gia' ? 'badge-success' :
-                            'badge-danger'
-                            }`}>
-                            {escapeHtml(insurance.status || 'Đang tham gia')}
-                          </span>
-                        </td>
-                        <td>
-                          <div className="actions">
-                            <button
-                              className="view"
-                              onClick={() => {
-                                setSelectedInsurance(insurance)
-                                setIsInsuranceReadOnly(true)
-                                setIsInsuranceModalOpen(true)
-                              }}
-                            >
-                              <i className="fas fa-eye"></i>
-                            </button>
-                            <button
-                              className="edit"
-                              onClick={() => {
-                                setSelectedInsurance(insurance)
-                                setIsInsuranceReadOnly(false)
-                                setIsInsuranceModalOpen(true)
-                              }}
-                            >
-                              <i className="fas fa-edit"></i>
-                            </button>
-                            <button
-                              className="delete"
-                              onClick={() => handleDeleteInsurance(insurance.id)}
-                            >
-                              <i className="fas fa-trash"></i>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })
-                ) : (
+            <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
+              <table style={{ minWidth: '101%', marginBottom: 0 }}>
+                <thead>
                   <tr>
-                    <td colSpan="11" className="empty-state">Chưa có thông tin BHXH</td>
+                    <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã NV</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Họ tên</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Bộ phận</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Số sổ BHXH</th>
+                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ngày tham gia</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mức lương đóng BHXH</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tỷ lệ NLĐ (%)</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tỷ lệ DN (%)</th>
+                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Trạng thái</th>
+                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {insuranceInfo.length > 0 ? (
+                    insuranceInfo.map((insurance, idx) => {
+                      const employee = employees.find(e => e.id === insurance.employeeId)
+                      return (
+                        <tr key={insurance.id}>
+                          <td>{idx + 1}</td>
+                          <td>{insurance.employeeId || '-'}</td>
+                          <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
+                          <td>{employee ? (employee.bo_phan || employee.department || '-') : '-'}</td>
+                          <td>{escapeHtml(insurance.soSoBHXH || insurance.soSo || '-')}</td>
+                          <td>{insurance.ngayThamGia ? new Date(insurance.ngayThamGia).toLocaleDateString('vi-VN') : '-'}</td>
+                          <td>{formatMoney(insurance.mucLuongDong || insurance.mucLuong || 0)}</td>
+                          <td>{insurance.tyLeNLD || insurance.tyLeNhanVien || 10.5}%</td>
+                          <td>{insurance.tyLeDN || insurance.tyLeDoanhNghiep || 21.5}%</td>
+                          <td>
+                            <span className={`badge ${insurance.status === 'Đang tham gia' ? 'badge-success' :
+                              'badge-danger'
+                              }`}>
+                              {escapeHtml(insurance.status || 'Đang tham gia')}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="actions">
+                              <button
+                                className="view"
+                                onClick={() => {
+                                  setSelectedInsurance(insurance)
+                                  setIsInsuranceReadOnly(true)
+                                  setIsInsuranceModalOpen(true)
+                                }}
+                              >
+                                <i className="fas fa-eye"></i>
+                              </button>
+                              <button
+                                className="edit"
+                                onClick={() => {
+                                  setSelectedInsurance(insurance)
+                                  setIsInsuranceReadOnly(false)
+                                  setIsInsuranceModalOpen(true)
+                                }}
+                              >
+                                <i className="fas fa-edit"></i>
+                              </button>
+                              <button
+                                className="delete"
+                                onClick={() => handleDeleteInsurance(insurance.id)}
+                              >
+                                <i className="fas fa-trash"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="11" className="empty-state">Chưa có thông tin BHXH</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )
       }
@@ -1582,22 +1584,22 @@ function Attendance() {
             <div className="card-header">
               <h3 className="card-title">Bảng 2: Thông tin Thuế TNCN</h3>
             </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table>
+            <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
+              <table style={{ minWidth: '101%', marginBottom: 0 }}>
                 <thead>
                   <tr>
-                    <th>STT</th>
-                    <th>Mã NV</th>
-                    <th>Họ tên</th>
-                    <th>Mã số thuế TNCN</th>
-                    <th>Thu nhập tính thuế</th>
-                    <th>Giảm trừ bản thân</th>
-                    <th>Tổng giảm trừ người phụ thuộc</th>
-                    <th>Thu nhập chịu thuế</th>
-                    <th>Biểu thuế</th>
-                    <th>Thuế TNCN phải nộp</th>
-                    <th>Kỳ áp dụng</th>
-                    <th>Thao tác</th>
+                    <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã NV</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Họ tên</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã số thuế TNCN</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thu nhập tính thuế</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Giảm trừ bản thân</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tổng giảm trừ người phụ thuộc</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thu nhập chịu thuế</th>
+                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Biểu thuế</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thuế TNCN phải nộp</th>
+                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Kỳ áp dụng</th>
+                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1692,21 +1694,21 @@ function Attendance() {
             <div className="card-header">
               <h3 className="card-title">Bảng 3: Quản lý người phụ thuộc của nhân sự</h3>
             </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table>
+            <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
+              <table style={{ minWidth: '101%', marginBottom: 0 }}>
                 <thead>
                   <tr>
-                    <th>STT</th>
-                    <th>Mã NV</th>
-                    <th>Họ tên NV</th>
-                    <th>Họ tên người phụ thuộc</th>
-                    <th>Quan hệ</th>
-                    <th>Ngày sinh</th>
-                    <th>CCCD/CMND</th>
-                    <th>Thời gian giảm trừ từ</th>
-                    <th>Thời gian giảm trừ đến</th>
-                    <th>Trạng thái</th>
-                    <th>Thao tác</th>
+                    <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã NV</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Họ tên NV</th>
+                    <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Họ tên người phụ thuộc</th>
+                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Quan hệ</th>
+                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ngày sinh</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>CCCD/CMND</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thời gian giảm trừ từ</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thời gian giảm trừ đến</th>
+                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Trạng thái</th>
+                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>

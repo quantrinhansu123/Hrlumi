@@ -656,79 +656,81 @@ function Recruitment() {
             </button>
           </div>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>STT</th>
-              <th>Bộ phận</th>
-              <th>Vị trí</th>
-              <th>Nhân sự hiện có</th>
-              <th>Định biên</th>
-              <th>Cần tuyển</th>
-              <th>Ghi chú</th>
-              <th>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {plans.length > 0 ? (
-              plans.map((plan, idx) => {
-                const current = Number(plan.nhan_su_hien_co || 0)
-                const target = Number(plan.dinh_bien || 0)
-                const need = Math.max(target - current, 0)
-                return (
-                  <tr key={plan.id || idx}>
-                    <td>{idx + 1}</td>
-                    <td>{escapeHtml(plan.bo_phan || '')}</td>
-                    <td>{escapeHtml(plan.vi_tri || '')}</td>
-                    <td>{current}</td>
-                    <td>{target}</td>
-                    <td>{need}</td>
-                    <td>{escapeHtml(plan.ghi_chu || '')}</td>
-                    <td>
-                      <div className="actions">
-                        <button
-                          className="view"
-                          title="Xem"
-                          onClick={() => {
-                            setSelectedPlan(plan)
-                            setIsPlanReadOnly(true)
-                            setIsPlanModalOpen(true)
-                          }}
-                        >
-                          <i className="fas fa-eye"></i>
-                        </button>
-                        <button
-                          className="edit"
-                          title="Sửa"
-                          onClick={() => {
-                            setSelectedPlan(plan)
-                            setIsPlanReadOnly(false)
-                            setIsPlanModalOpen(true)
-                          }}
-                        >
-                          <i className="fas fa-edit"></i>
-                        </button>
-                        <button
-                          className="delete"
-                          title="Xóa"
-                          onClick={() => handleDeletePlan(plan.id)}
-                        >
-                          <i className="fas fa-trash"></i>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })
-            ) : (
+        <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0', position: 'relative' }}>
+          <table style={{ minWidth: '101%', marginBottom: 0 }}>
+            <thead>
               <tr>
-                <td colSpan="8" className="empty-state">
-                  Chưa có định biên nhân sự
-                </td>
+                <th style={{ minWidth: '80px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Bộ phận</th>
+                <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Vị trí</th>
+                <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Nhân sự hiện có</th>
+                <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Định biên</th>
+                <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Cần tuyển</th>
+                <th style={{ minWidth: '250px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ghi chú</th>
+                <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {plans.length > 0 ? (
+                plans.map((plan, idx) => {
+                  const current = Number(plan.nhan_su_hien_co || 0)
+                  const target = Number(plan.dinh_bien || 0)
+                  const need = Math.max(target - current, 0)
+                  return (
+                    <tr key={plan.id || idx}>
+                      <td>{idx + 1}</td>
+                      <td>{escapeHtml(plan.bo_phan || '')}</td>
+                      <td>{escapeHtml(plan.vi_tri || '')}</td>
+                      <td>{current}</td>
+                      <td>{target}</td>
+                      <td>{need}</td>
+                      <td>{escapeHtml(plan.ghi_chu || '')}</td>
+                      <td>
+                        <div className="actions">
+                          <button
+                            className="view"
+                            title="Xem"
+                            onClick={() => {
+                              setSelectedPlan(plan)
+                              setIsPlanReadOnly(true)
+                              setIsPlanModalOpen(true)
+                            }}
+                          >
+                            <i className="fas fa-eye"></i>
+                          </button>
+                          <button
+                            className="edit"
+                            title="Sửa"
+                            onClick={() => {
+                              setSelectedPlan(plan)
+                              setIsPlanReadOnly(false)
+                              setIsPlanModalOpen(true)
+                            }}
+                          >
+                            <i className="fas fa-edit"></i>
+                          </button>
+                          <button
+                            className="delete"
+                            title="Xóa"
+                            onClick={() => handleDeletePlan(plan.id)}
+                          >
+                            <i className="fas fa-trash"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              ) : (
+                <tr>
+                  <td colSpan="8" className="empty-state">
+                    Chưa có định biên nhân sự
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Bảng 2: Quản lý CV */}
@@ -783,96 +785,98 @@ function Recruitment() {
             </button>
           </div>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>STT</th>
-              <th>Họ và tên</th>
-              <th>Vị trí ứng tuyển</th>
-              <th>Bộ phận</th>
-              <th>Nguồn CV</th>
-              <th>HR phụ trách</th>
-              <th>SĐT</th>
-              <th>Email</th>
-              <th>Trạng thái hiện tại</th>
-              <th>Ngày tiếp nhận</th>
-              <th>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredCandidates.length > 0 ? (
-              filteredCandidates.map((c, idx) => {
-                const status = c.trang_thai || ''
-                const showConvert =
-                  status === 'CV trúng tuyển' && !c.da_chuyen_sang_nv
-
-                return (
-                  <tr key={c.id || idx}>
-                    <td>{idx + 1}</td>
-                    <td>{escapeHtml(c.ho_ten || c.name || '')}</td>
-                    <td>{escapeHtml(c.vi_tri_ung_tuyen || c.vi_tri || '')}</td>
-                    <td>{escapeHtml(c.bo_phan || '')}</td>
-                    <td>{escapeHtml(c.nguon_cv || '')}</td>
-                    <td>{escapeHtml(c.hr_phu_trach || '')}</td>
-                    <td>{escapeHtml(c.sdt || c.sđt || '')}</td>
-                    <td>{escapeHtml(c.email || '')}</td>
-                    <td>{escapeHtml(status)}</td>
-                    <td>{c.ngay_tiep_nhan ? new Date(c.ngay_tiep_nhan).toLocaleDateString('vi-VN') : ''}</td>
-                    <td>
-                      <div className="actions">
-                        <button
-                          className="view"
-                          title="Xem"
-                          onClick={() => {
-                            setSelectedCandidate(c)
-                            setIsCandidateReadOnly(true)
-                            setIsCandidateModalOpen(true)
-                          }}
-                        >
-                          <i className="fas fa-eye"></i>
-                        </button>
-                        <button
-                          className="edit"
-                          title="Sửa"
-                          onClick={() => {
-                            setSelectedCandidate(c)
-                            setIsCandidateReadOnly(false)
-                            setIsCandidateModalOpen(true)
-                          }}
-                        >
-                          <i className="fas fa-edit"></i>
-                        </button>
-                        {showConvert && (
-                          <button
-                            className="btn btn-sm"
-                            style={{ background: '#28a745', color: '#fff', marginLeft: '4px' }}
-                            onClick={() => handleConvertToEmployee(c)}
-                            title="Chuyển sang Nhân viên thử việc"
-                          >
-                            + Chuyển sang Nhân viên thử việc
-                          </button>
-                        )}
-                        <button
-                          className="delete"
-                          title="Xóa"
-                          onClick={() => handleDeleteCandidate(c.id)}
-                        >
-                          <i className="fas fa-trash"></i>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })
-            ) : (
+        <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0', position: 'relative' }}>
+          <table style={{ minWidth: '101%', marginBottom: 0 }}>
+            <thead>
               <tr>
-                <td colSpan="10" className="empty-state">
-                  Chưa có CV ứng viên
-                </td>
+                <th style={{ minWidth: '80px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                <th style={{ minWidth: '250px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Họ và tên</th>
+                <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Vị trí ứng tuyển</th>
+                <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Bộ phận</th>
+                <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Nguồn CV</th>
+                <th style={{ minWidth: '180px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>HR phụ trách</th>
+                <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>SĐT</th>
+                <th style={{ minWidth: '250px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Email</th>
+                <th style={{ minWidth: '180px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Trạng thái hiện tại</th>
+                <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ngày tiếp nhận</th>
+                <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredCandidates.length > 0 ? (
+                filteredCandidates.map((c, idx) => {
+                  const status = c.trang_thai || ''
+                  const showConvert =
+                    status === 'CV trúng tuyển' && !c.da_chuyen_sang_nv
+
+                  return (
+                    <tr key={c.id || idx}>
+                      <td>{idx + 1}</td>
+                      <td>{escapeHtml(c.ho_ten || c.name || '')}</td>
+                      <td>{escapeHtml(c.vi_tri_ung_tuyen || c.vi_tri || '')}</td>
+                      <td>{escapeHtml(c.bo_phan || '')}</td>
+                      <td>{escapeHtml(c.nguon_cv || '')}</td>
+                      <td>{escapeHtml(c.hr_phu_trach || '')}</td>
+                      <td>{escapeHtml(c.sdt || c.sđt || '')}</td>
+                      <td>{escapeHtml(c.email || '')}</td>
+                      <td>{escapeHtml(status)}</td>
+                      <td>{c.ngay_tiep_nhan ? new Date(c.ngay_tiep_nhan).toLocaleDateString('vi-VN') : ''}</td>
+                      <td>
+                        <div className="actions">
+                          <button
+                            className="view"
+                            title="Xem"
+                            onClick={() => {
+                              setSelectedCandidate(c)
+                              setIsCandidateReadOnly(true)
+                              setIsCandidateModalOpen(true)
+                            }}
+                          >
+                            <i className="fas fa-eye"></i>
+                          </button>
+                          <button
+                            className="edit"
+                            title="Sửa"
+                            onClick={() => {
+                              setSelectedCandidate(c)
+                              setIsCandidateReadOnly(false)
+                              setIsCandidateModalOpen(true)
+                            }}
+                          >
+                            <i className="fas fa-edit"></i>
+                          </button>
+                          {showConvert && (
+                            <button
+                              className="btn btn-sm"
+                              style={{ background: '#28a745', color: '#fff', marginLeft: '4px' }}
+                              onClick={() => handleConvertToEmployee(c)}
+                              title="Chuyển sang Nhân viên thử việc"
+                            >
+                              + Chuyển sang Nhân viên thử việc
+                            </button>
+                          )}
+                          <button
+                            className="delete"
+                            title="Xóa"
+                            onClick={() => handleDeleteCandidate(c.id)}
+                          >
+                            <i className="fas fa-trash"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              ) : (
+                <tr>
+                  <td colSpan="10" className="empty-state">
+                    Chưa có CV ứng viên
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Modals */}

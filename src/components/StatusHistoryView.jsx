@@ -198,17 +198,17 @@ function StatusHistoryView({ employees, onDataChange }) {
                                 </span>
                             </div>
                         </div>
-                        <div style={{ overflowX: 'auto' }}>
-                            <table className="table" style={{ marginBottom: 0 }}>
+                        <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
+                            <table className="table" style={{ marginBottom: 0, minWidth: '101%' }}>
                                 <thead>
                                     <tr>
-                                        <th>STT</th>
-                                        <th>Mã nhân viên</th>
-                                        <th>Tên nhân viên</th>
-                                        <th>Trạng thái mới</th>
-                                        <th>Ngày hiệu lực</th>
-                                        <th>Người thực hiện</th>
-                                        <th>Ghi chú</th>
+                                        <th style={{ minWidth: '80px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                                        <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã nhân viên</th>
+                                        <th style={{ minWidth: '250px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tên nhân viên</th>
+                                        <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Trạng thái mới</th>
+                                        <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ngày hiệu lực</th>
+                                        <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Người thực hiện</th>
+                                        <th style={{ minWidth: '300px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ghi chú</th>
                                     </tr>
                                 </thead>
                                 <tbody>

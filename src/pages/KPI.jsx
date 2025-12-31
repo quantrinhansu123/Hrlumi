@@ -745,76 +745,78 @@ function KPI() {
                 </button>
               </div>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>STT</th>
-                  <th>Mã KPI</th>
-                  <th>Tên KPI</th>
-                  <th>Đơn vị đo</th>
-                  <th>Đối tượng áp dụng</th>
-                  <th>Trọng số (%)</th>
-                  <th>Tháng áp dụng</th>
-                  <th>Trạng thái</th>
-                  <th>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {kpiTemplates.length > 0 ? (
-                  kpiTemplates.map((template, idx) => (
-                    <tr key={template.id}>
-                      <td>{idx + 1}</td>
-                      <td>{escapeHtml(template.code || template.id || '-')}</td>
-                      <td>{escapeHtml(template.name || '-')}</td>
-                      <td>{escapeHtml(template.unit || template.donVi || '-')}</td>
-                      <td>{escapeHtml(template.target || template.doiTuong || '-')}</td>
-                      <td>{template.weight || template.trongSo || 0}%</td>
-                      <td>{template.month ? new Date(template.month).toLocaleDateString('vi-VN') : '-'}</td>
-                      <td>
-                        <span className={`badge ${template.status === 'Đang áp dụng' ? 'badge-success' : 'badge-danger'}`}>
-                          {escapeHtml(template.status || 'Đang áp dụng')}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="actions">
-                          <button
-                            className="view"
-                            onClick={() => {
-                              setSelectedTemplate(template)
-                              setIsTemplateReadOnly(true)
-                              setIsTemplateModalOpen(true)
-                            }}
-                            title="Xem chi tiết"
-                          >
-                            <i className="fas fa-eye"></i>
-                          </button>
-                          <button
-                            className="edit"
-                            onClick={() => {
-                              setSelectedTemplate(template)
-                              setIsTemplateReadOnly(false)
-                              setIsTemplateModalOpen(true)
-                            }}
-                          >
-                            <i className="fas fa-edit"></i>
-                          </button>
-                          <button
-                            className="delete"
-                            onClick={() => handleDeleteTemplate(template.id)}
-                          >
-                            <i className="fas fa-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
+            <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
+              <table style={{ minWidth: '101%', marginBottom: 0 }}>
+                <thead>
                   <tr>
-                    <td colSpan="9" className="empty-state">Chưa có danh mục KPI</td>
+                    <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã KPI</th>
+                    <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tên KPI</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Đơn vị đo</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Đối tượng áp dụng</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Trọng số (%)</th>
+                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tháng áp dụng</th>
+                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Trạng thái</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {kpiTemplates.length > 0 ? (
+                    kpiTemplates.map((template, idx) => (
+                      <tr key={template.id}>
+                        <td>{idx + 1}</td>
+                        <td>{escapeHtml(template.code || template.id || '-')}</td>
+                        <td>{escapeHtml(template.name || '-')}</td>
+                        <td>{escapeHtml(template.unit || template.donVi || '-')}</td>
+                        <td>{escapeHtml(template.target || template.doiTuong || '-')}</td>
+                        <td>{template.weight || template.trongSo || 0}%</td>
+                        <td>{template.month ? new Date(template.month).toLocaleDateString('vi-VN') : '-'}</td>
+                        <td>
+                          <span className={`badge ${template.status === 'Đang áp dụng' ? 'badge-success' : 'badge-danger'}`}>
+                            {escapeHtml(template.status || 'Đang áp dụng')}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="actions">
+                            <button
+                              className="view"
+                              onClick={() => {
+                                setSelectedTemplate(template)
+                                setIsTemplateReadOnly(true)
+                                setIsTemplateModalOpen(true)
+                              }}
+                              title="Xem chi tiết"
+                            >
+                              <i className="fas fa-eye"></i>
+                            </button>
+                            <button
+                              className="edit"
+                              onClick={() => {
+                                setSelectedTemplate(template)
+                                setIsTemplateReadOnly(false)
+                                setIsTemplateModalOpen(true)
+                              }}
+                            >
+                              <i className="fas fa-edit"></i>
+                            </button>
+                            <button
+                              className="delete"
+                              onClick={() => handleDeleteTemplate(template.id)}
+                            >
+                              <i className="fas fa-trash"></i>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="9" className="empty-state">Chưa có danh mục KPI</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Bảng 2: Nhập KPI cho từng cá nhân */}
@@ -896,28 +898,28 @@ function KPI() {
                 </div>
               </div>
             </div>
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
               {(() => {
                 // Calculate max KPI count to expand columns dynamically
                 const maxKpiCount = 3
 
                 return (
-                  <table>
+                  <table style={{ minWidth: '101%', marginBottom: 0 }}>
                     <thead>
                       <tr>
-                        <th>STT</th>
-                        <th>Họ và tên</th>
-                        <th>Ca</th>
-                        <th>Vị trí</th>
+                        <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                        <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Họ và tên</th>
+                        <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ca</th>
+                        <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Vị trí</th>
                         {Array.from({ length: maxKpiCount }).map((_, i) => (
                           <React.Fragment key={i}>
-                            <th>Mã KPI {i + 1}</th>
-                            <th>KPI {i + 1}</th>
+                            <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã KPI {i + 1}</th>
+                            <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>KPI {i + 1}</th>
                           </React.Fragment>
                         ))}
-                        <th>Tổng trọng số</th>
-                        <th>Trạng thái</th>
-                        <th>Thao tác</th>
+                        <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tổng trọng số</th>
+                        <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Trạng thái</th>
+                        <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1072,16 +1074,16 @@ function KPI() {
                 ))}
               </select>
             </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table>
+            <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
+              <table style={{ minWidth: '101%', marginBottom: 0 }}>
                 <thead>
                   <tr>
-                    <th>Mã KPI</th>
-                    <th>STT</th>
-                    <th>Tỷ lệ hoàn thành KPI từ</th>
-                    <th>Tỷ lệ hoàn thành KPI đến</th>
-                    <th>% Quy đổi KPI</th>
-                    <th>Thao tác</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã KPI</th>
+                    <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tỷ lệ hoàn thành KPI từ</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tỷ lệ hoàn thành KPI đến</th>
+                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>% Quy đổi KPI</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1132,42 +1134,44 @@ function KPI() {
             <div className="card-header">
               <h3 className="card-title">Bảng 3: Báo cáo tổng hợp theo bộ phận</h3>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>STT</th>
-                  <th>Bộ phận</th>
-                  <th>Số nhân sự</th>
-                  <th>% Đạt KPI</th>
-                  <th>% Vượt KPI</th>
-                  <th>% Không đạt</th>
-                  <th>Điểm KPI TB</th>
-                  <th>Ghi chú</th>
-                </tr>
-              </thead>
-              <tbody>
-                {getDepartmentSummary().length > 0 ? (
-                  getDepartmentSummary().map((dept, idx) => (
-                    <tr key={idx}>
-                      <td>{idx + 1}</td>
-                      <td>{dept.department}</td>
-                      <td>{dept.totalEmployees}</td>
-                      <td>{dept.achievedPercent}%</td>
-                      <td>{dept.exceededPercent}%</td>
-                      <td>{dept.notAchievedPercent}%</td>
-                      <td style={{ fontWeight: 'bold' }}>{dept.avgScore}%</td>
-                      <td>
-                        <span className={`badge ${dept.avgScore >= 100 ? 'badge-success' : dept.avgScore >= 80 ? 'badge-info' : 'badge-warning'}`}>
-                          {dept.note}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr><td colSpan="8" className="empty-state">Chưa có dữ liệu đánh giá</td></tr>
-                )}
-              </tbody>
-            </table>
+            <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
+              <table style={{ minWidth: '101%', marginBottom: 0 }}>
+                <thead>
+                  <tr>
+                    <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Bộ phận</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Số nhân sự</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>% Đạt KPI</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>% Vượt KPI</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>% Không đạt</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Điểm KPI TB</th>
+                    <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ghi chú</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {getDepartmentSummary().length > 0 ? (
+                    getDepartmentSummary().map((dept, idx) => (
+                      <tr key={idx}>
+                        <td>{idx + 1}</td>
+                        <td>{dept.department}</td>
+                        <td>{dept.totalEmployees}</td>
+                        <td>{dept.achievedPercent}%</td>
+                        <td>{dept.exceededPercent}%</td>
+                        <td>{dept.notAchievedPercent}%</td>
+                        <td style={{ fontWeight: 'bold' }}>{dept.avgScore}%</td>
+                        <td>
+                          <span className={`badge ${dept.avgScore >= 100 ? 'badge-success' : dept.avgScore >= 80 ? 'badge-info' : 'badge-warning'}`}>
+                            {dept.note}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan="8" className="empty-state">Chưa có dữ liệu đánh giá</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </>
       )}
@@ -1202,26 +1206,26 @@ function KPI() {
                 </select>
               </div>
             </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="table" style={{ fontSize: '13px', minWidth: '100%' }}>
+            <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
+              <table className="table" style={{ fontSize: '13px', minWidth: '101%', marginBottom: 0 }}>
                 <thead>
                   <tr>
-                    <th>STT</th>
-                    <th style={{ whiteSpace: 'nowrap' }}>Mã NV</th>
-                    <th style={{ whiteSpace: 'nowrap' }}>Họ và tên</th>
-                    <th style={{ whiteSpace: 'nowrap' }}>Bộ phận</th>
-                    <th style={{ whiteSpace: 'nowrap' }}>Vị trí</th>
-                    <th style={{ whiteSpace: 'nowrap' }}>Ca</th>
-                    <th style={{ whiteSpace: 'nowrap' }}>Tháng</th>
+                    <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, whiteSpace: 'nowrap' }}>Mã NV</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, whiteSpace: 'nowrap' }}>Họ và tên</th>
+                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, whiteSpace: 'nowrap' }}>Bộ phận</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, whiteSpace: 'nowrap' }}>Vị trí</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, whiteSpace: 'nowrap' }}>Ca</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, whiteSpace: 'nowrap' }}>Tháng</th>
                     {/* Generic Headers matching Table 2 structure */}
                     {Array.from({ length: 3 }).map((_, idx) => (
-                      <th key={`h-kpi-${idx}`} style={{ whiteSpace: 'nowrap' }}>KPI {idx + 1}</th>
+                      <th key={`h-kpi-${idx}`} style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, whiteSpace: 'nowrap' }}>KPI {idx + 1}</th>
                     ))}
                     {Array.from({ length: 3 }).map((_, idx) => (
-                      <th key={`h-conv-${idx}`} style={{ whiteSpace: 'nowrap' }}>% Quy đổi KPI {idx + 1}</th>
+                      <th key={`h-conv-${idx}`} style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, whiteSpace: 'nowrap' }}>% Quy đổi KPI {idx + 1}</th>
                     ))}
-                    <th style={{ whiteSpace: 'nowrap' }}>KPI tổng (%)</th>
-                    <th style={{ whiteSpace: 'nowrap' }}>Thao tác</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, whiteSpace: 'nowrap' }}>KPI tổng (%)</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, whiteSpace: 'nowrap' }}>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1358,43 +1362,46 @@ function KPI() {
             <div className="card-header">
               <h3 className="card-title">Bảng 3: Báo cáo tổng hợp theo bộ phận</h3>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>STT</th>
-                  <th>Bộ phận</th>
-                  <th>Số nhân sự</th>
-                  <th>% Đạt KPI</th>
-                  <th>% Vượt KPI</th>
-                  <th>% Không đạt</th>
-                  <th>Điểm KPI TB</th>
-                  <th>Ghi chú</th>
-                </tr>
-              </thead>
-              <tbody>
-                {getDepartmentSummary().length > 0 ? (
-                  getDepartmentSummary().map((dept, idx) => (
-                    <tr key={dept.department}>
-                      <td>{idx + 1}</td>
-                      <td>{escapeHtml(dept.department)}</td>
-                      <td>{dept.totalEmployees}</td>
-                      <td>{dept.achievedPercent}%</td>
-                      <td>{dept.exceededPercent}%</td>
-                      <td>{dept.notAchievedPercent}%</td>
-                      <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{dept.avgScore}%</td>
-                      <td>{escapeHtml(dept.note)}</td>
-                    </tr>
-                  ))
-                ) : (
+            <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
+              <table style={{ minWidth: '101%', marginBottom: 0 }}>
+                <thead>
                   <tr>
-                    <td colSpan="8" className="empty-state">Chưa có dữ liệu báo cáo</td>
+                    <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Bộ phận</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Số nhân sự</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>% Đạt KPI</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>% Vượt KPI</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>% Không đạt</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Điểm KPI TB</th>
+                    <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ghi chú</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div >
+                </thead>
+                <tbody>
+                  {getDepartmentSummary().length > 0 ? (
+                    getDepartmentSummary().map((dept, idx) => (
+                      <tr key={dept.department}>
+                        <td>{idx + 1}</td>
+                        <td>{escapeHtml(dept.department)}</td>
+                        <td>{dept.totalEmployees}</td>
+                        <td>{dept.achievedPercent}%</td>
+                        <td>{dept.exceededPercent}%</td>
+                        <td>{dept.notAchievedPercent}%</td>
+                        <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{dept.avgScore}%</td>
+                        <td>{escapeHtml(dept.note)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="8" className="empty-state">Chưa có dữ liệu báo cáo</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </>
-      )}
+      )
+      }
 
       {/* Modals */}
       <KPITemplateModal

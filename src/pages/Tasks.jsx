@@ -424,117 +424,120 @@ function Tasks() {
 
       {/* Tasks Table */}
       <div className="card">
-        <table>
-          <thead>
-            <tr>
-              <th>STT</th>
-              <th>Mã công việc</th>
-              <th>Tên công việc</th>
-              <th>Bộ phận</th>
-              <th>Người giao</th>
-              <th>Người nhận</th>
-              <th>Mức ưu tiên</th>
-              <th>Ngày bắt đầu</th>
-              <th>Deadline</th>
-              <th>Trạng thái</th>
-              <th>Link file kết quả</th>
-              <th>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredTasks.length > 0 ? (
-              filteredTasks.map((task, idx) => {
-                const overdue = isOverdue(task)
-                const status = overdue && task.status !== 'Đã xong' && task.status !== 'Đã hoàn thành'
-                  ? 'Quá hạn'
-                  : task.status
-
-                return (
-                  <tr key={task.id} style={overdue ? { backgroundColor: '#fff3cd' } : {}}>
-                    <td>{idx + 1}</td>
-                    <td>{escapeHtml(task.code || task.id || '-')}</td>
-                    <td>{escapeHtml(task.name || task.title || '-')}</td>
-                    <td>{escapeHtml(task.department || '-')}</td>
-                    <td>{escapeHtml(task.assignerName || getEmployeeName(task.assignerId) || '-')}</td>
-                    <td>{escapeHtml(getEmployeeName(task.assigneeId) || '-')}</td>
-                    <td>
-                      <span className={`badge ${task.priority === 'Cao' ? 'badge-danger' :
-                        task.priority === 'Trung bình' ? 'badge-warning' :
-                          'badge-info'
-                        }`}>
-                        {escapeHtml(task.priority || '-')}
-                      </span>
-                    </td>
-                    <td>{task.startDate ? new Date(task.startDate).toLocaleDateString('vi-VN') : '-'}</td>
-                    <td style={overdue ? { color: 'var(--danger)', fontWeight: 'bold' } : {}}>
-                      {task.deadline ? new Date(task.deadline).toLocaleDateString('vi-VN') : '-'}
-                    </td>
-                    <td>
-                      <span className={`badge ${status === 'Đã xong' || status === 'Đã hoàn thành' ? 'badge-success' :
-                        status === 'Đang làm' ? 'badge-info' :
-                          status === 'Quá hạn' ? 'badge-danger' :
-                            status === 'Tạm dừng' ? 'badge-warning' :
-                              'badge-secondary'
-                        }`}>
-                        {escapeHtml(status || '-')}
-                      </span>
-                    </td>
-                    <td>
-                      {task.resultFileLink ? (
-                        <a
-                          href={task.resultFileLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: 'var(--primary)' }}
-                        >
-                          <i className="fas fa-link"></i> Link
-                        </a>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
-                    <td>
-                      <div className="actions">
-                        <button
-                          className="edit"
-                          onClick={() => {
-                            setSelectedTask(task)
-                            setIsTaskModalOpen(true)
-                          }}
-                          title="Sửa"
-                        >
-                          <i className="fas fa-edit"></i>
-                        </button>
-                        <button
-                          className="view"
-                          onClick={() => {
-                            setSelectedTaskForDetail(task)
-                            setIsTaskDetailModalOpen(true)
-                          }}
-                          title="Xem chi tiết"
-                        >
-                          <i className="fas fa-eye"></i>
-                        </button>
-                        <button
-                          className="delete"
-                          onClick={() => handleDeleteTask(task.id)}
-                          title="Xóa"
-                        >
-                          <i className="fas fa-trash"></i>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })
-            ) : (
+        <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
+          <table style={{ minWidth: '101%', marginBottom: 0 }}>
+            <thead>
               <tr>
-                <td colSpan="12" className="empty-state">Chưa có công việc nào</td>
+                <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã công việc</th>
+                <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tên công việc</th>
+                <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Bộ phận</th>
+                <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Người giao</th>
+                <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Người nhận</th>
+                <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mức ưu tiên</th>
+                <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ngày bắt đầu</th>
+                <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Deadline</th>
+                <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Trạng thái</th>
+                <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Link file kết quả</th>
+                <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredTasks.length > 0 ? (
+                filteredTasks.map((task, idx) => {
+                  const overdue = isOverdue(task)
+                  const status = overdue && task.status !== 'Đã xong' && task.status !== 'Đã hoàn thành'
+                    ? 'Quá hạn'
+                    : task.status
+
+                  return (
+                    <tr key={task.id} style={overdue ? { backgroundColor: '#fff3cd' } : {}}>
+                      <td>{idx + 1}</td>
+                      <td>{escapeHtml(task.code || task.id || '-')}</td>
+                      <td>{escapeHtml(task.name || task.title || '-')}</td>
+                      <td>{escapeHtml(task.department || '-')}</td>
+                      <td>{escapeHtml(task.assignerName || getEmployeeName(task.assignerId) || '-')}</td>
+                      <td>{escapeHtml(getEmployeeName(task.assigneeId) || '-')}</td>
+                      <td>
+                        <span className={`badge ${task.priority === 'Cao' ? 'badge-danger' :
+                          task.priority === 'Trung bình' ? 'badge-warning' :
+                            'badge-info'
+                          }`}>
+                          {escapeHtml(task.priority || '-')}
+                        </span>
+                      </td>
+                      <td>{task.startDate ? new Date(task.startDate).toLocaleDateString('vi-VN') : '-'}</td>
+                      <td style={overdue ? { color: 'var(--danger)', fontWeight: 'bold' } : {}}>
+                        {task.deadline ? new Date(task.deadline).toLocaleDateString('vi-VN') : '-'}
+                      </td>
+                      <td>
+                        <span className={`badge ${status === 'Đã xong' || status === 'Đã hoàn thành' ? 'badge-success' :
+                          status === 'Đang làm' ? 'badge-info' :
+                            status === 'Quá hạn' ? 'badge-danger' :
+                              status === 'Tạm dừng' ? 'badge-warning' :
+                                'badge-secondary'
+                          }`}>
+                          {escapeHtml(status || '-')}
+                        </span>
+                      </td>
+                      <td>
+                        {task.resultFileLink ? (
+                          <a
+                            href={task.resultFileLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: 'var(--primary)' }}
+                          >
+                            <i className="fas fa-link"></i> Link
+                          </a>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td>
+                        <div className="actions">
+                          <button
+                            className="edit"
+                            onClick={() => {
+                              setSelectedTask(task)
+                              setIsTaskModalOpen(true)
+                            }}
+                            title="Sửa"
+                          >
+                            <i className="fas fa-edit"></i>
+                          </button>
+                          <button
+                            className="view"
+                            onClick={() => {
+                              setSelectedTaskForDetail(task)
+                              setIsTaskDetailModalOpen(true)
+                            }}
+                            title="Xem chi tiết"
+                          >
+                            <i className="fas fa-eye"></i>
+                          </button>
+                          <button
+                            className="delete"
+                            onClick={() => handleDeleteTask(task.id)}
+                            title="Xóa"
+                          >
+                            <i className="fas fa-trash"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              ) : (
+                <tr>
+                  <td colSpan="12" className="empty-state">Chưa có công việc nào</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
+
 
       {/* Modals */}
       <TaskModal
@@ -561,68 +564,70 @@ function Tasks() {
       />
 
       {/* Import Modal */}
-      {isImportModalOpen && (
-        <div className="modal show" onClick={() => { setIsImportModalOpen(false); setImportPreviewData([]) }}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '1000px' }}>
-            <div className="modal-header">
-              <h3><i className="fas fa-file-import"></i> Import Danh sách Công việc</h3>
-              <button className="modal-close" onClick={() => { setIsImportModalOpen(false); setImportPreviewData([]) }}>&times;</button>
-            </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label>Chọn file Excel</label>
-                <input type="file" accept=".xlsx,.xls" onChange={handleFileSelect} />
+      {
+        isImportModalOpen && (
+          <div className="modal show" onClick={() => { setIsImportModalOpen(false); setImportPreviewData([]) }}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '1000px' }}>
+              <div className="modal-header">
+                <h3><i className="fas fa-file-import"></i> Import Danh sách Công việc</h3>
+                <button className="modal-close" onClick={() => { setIsImportModalOpen(false); setImportPreviewData([]) }}>&times;</button>
               </div>
-              <div style={{ marginTop: '10px', padding: '10px', background: '#e7f3ff', borderRadius: '4px', fontSize: '0.9rem' }}>
-                <strong>Lưu ý:</strong> Cần các cột: Tên công việc, Bộ phận, Người giao (Họ tên), Người nhận (Họ tên), Deadline.
-              </div>
-
-              {importPreviewData.length > 0 && (
-                <div style={{ marginTop: '20px', maxHeight: '400px', overflowY: 'auto' }}>
-                  <table style={{ fontSize: '0.85rem' }}>
-                    <thead style={{ position: 'sticky', top: 0, background: '#f5f5f5' }}>
-                      <tr>
-                        <th>Tên công việc</th>
-                        <th>Người giao</th>
-                        <th>Người nhận</th>
-                        <th>Deadline</th>
-                        <th>Trạng thái dữ liệu</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {importPreviewData.map((d, i) => (
-                        <tr key={i}>
-                          <td>{d.name}</td>
-                          <td style={{ color: d.assignerId ? 'inherit' : 'red' }}>{d.assignerName}</td>
-                          <td style={{ color: d.assigneeId ? 'inherit' : 'red' }}>{getEmployeeName(d.assigneeId) || 'Không tìm thấy'}</td>
-                          <td>{d.deadline}</td>
-                          <td>
-                            <span className={`badge ${d.isValid ? 'badge-success' : 'badge-danger'}`}>
-                              {d.isValid ? 'Hợp lệ' : 'Thiếu dữ liệu/NV không tồn tại'}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Chọn file Excel</label>
+                  <input type="file" accept=".xlsx,.xls" onChange={handleFileSelect} />
                 </div>
-              )}
+                <div style={{ marginTop: '10px', padding: '10px', background: '#e7f3ff', borderRadius: '4px', fontSize: '0.9rem' }}>
+                  <strong>Lưu ý:</strong> Cần các cột: Tên công việc, Bộ phận, Người giao (Họ tên), Người nhận (Họ tên), Deadline.
+                </div>
 
-              <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button className="btn" onClick={() => { setIsImportModalOpen(false); setImportPreviewData([]) }}>Hủy</button>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleConfirmImport}
-                  disabled={isImporting || importPreviewData.filter(d => d.isValid).length === 0}
-                >
-                  {isImporting ? 'Đang xử lý...' : `Xác nhận Import (${importPreviewData.filter(d => d.isValid).length})`}
-                </button>
+                {importPreviewData.length > 0 && (
+                  <div style={{ marginTop: '20px', maxHeight: '400px', overflowY: 'auto' }}>
+                    <table style={{ fontSize: '0.85rem' }}>
+                      <thead style={{ position: 'sticky', top: 0, background: '#f5f5f5' }}>
+                        <tr>
+                          <th>Tên công việc</th>
+                          <th>Người giao</th>
+                          <th>Người nhận</th>
+                          <th>Deadline</th>
+                          <th>Trạng thái dữ liệu</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importPreviewData.map((d, i) => (
+                          <tr key={i}>
+                            <td>{d.name}</td>
+                            <td style={{ color: d.assignerId ? 'inherit' : 'red' }}>{d.assignerName}</td>
+                            <td style={{ color: d.assigneeId ? 'inherit' : 'red' }}>{getEmployeeName(d.assigneeId) || 'Không tìm thấy'}</td>
+                            <td>{d.deadline}</td>
+                            <td>
+                              <span className={`badge ${d.isValid ? 'badge-success' : 'badge-danger'}`}>
+                                {d.isValid ? 'Hợp lệ' : 'Thiếu dữ liệu/NV không tồn tại'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  <button className="btn" onClick={() => { setIsImportModalOpen(false); setImportPreviewData([]) }}>Hủy</button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleConfirmImport}
+                    disabled={isImporting || importPreviewData.filter(d => d.isValid).length === 0}
+                  >
+                    {isImporting ? 'Đang xử lý...' : `Xác nhận Import (${importPreviewData.filter(d => d.isValid).length})`}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   )
 }
 

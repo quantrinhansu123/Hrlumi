@@ -821,214 +821,49 @@ function Salary() {
       {/* Tab 1: Danh mục bậc lương */}
       {activeTab === 'grades' && (
         <div className="card">
-          <table>
-            <thead>
-              <tr>
-                <th>STT</th>
-                <th>Vị trí</th>
-                <th>Ca làm việc</th>
-                <th>Doanh thu từ (triệu/tháng)</th>
-                <th>Doanh thu đến (triệu/tháng)</th>
-                <th>Bậc lương</th>
-                <th>Lương P1 (VNĐ)</th>
-                <th>Trạng thái</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {salaryGrades.length > 0 ? (
-                salaryGrades
-                  .sort((a, b) => (a.level || 0) - (b.level || 0))
-                  .map((grade, idx) => (
-                    <tr key={grade.id}>
-                      <td>{idx + 1}</td>
-                      <td>{escapeHtml(grade.position || grade.name || '-')}</td>
-                      <td>{escapeHtml(grade.shift || 'Ca ngày')}</td>
-                      <td>{grade.revenueFrom || 0}</td>
-                      <td>{grade.revenueTo === null || grade.revenueTo === undefined || grade.revenueTo === '' ? 'Không giới hạn' : grade.revenueTo}</td>
-                      <td>Bậc {grade.level || 1}</td>
-                      <td style={{ fontWeight: 700, color: 'var(--primary)' }}>
-                        {formatMoney(grade.salary || 0)}
-                      </td>
-                      <td>
-                        <span className={`badge ${grade.status === 'Đang áp dụng' ? 'badge-success' : 'badge-danger'}`}>
-                          {escapeHtml(grade.status || 'Đang áp dụng')}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="actions">
-                          <button
-                            className="view"
-                            onClick={() => {
-                              setSelectedGrade(grade)
-                              setIsGradeReadOnly(true)
-                              setIsGradeModalOpen(true)
-                            }}
-                          >
-                            <i className="fas fa-eye"></i>
-                          </button>
-                          <button
-                            className="edit"
-                            onClick={() => {
-                              setSelectedGrade(grade)
-                              setIsGradeReadOnly(false)
-                              setIsGradeModalOpen(true)
-                            }}
-                          >
-                            <i className="fas fa-pencil-alt"></i>
-                          </button>
-                          <button
-                            className="delete"
-                            onClick={() => handleDeleteGrade(grade.id)}
-                          >
-                            <i className="fas fa-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-              ) : (
+          <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
+            <table style={{ minWidth: '101%', marginBottom: 0 }}>
+              <thead>
                 <tr>
-                  <td colSpan="9" className="empty-state">Chưa có bậc lương</td>
+                  <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                  <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Vị trí</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ca làm việc</th>
+                  <th style={{ minWidth: '180px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Doanh thu từ (triệu/tháng)</th>
+                  <th style={{ minWidth: '180px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Doanh thu đến (triệu/tháng)</th>
+                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Bậc lương</th>
+                  <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Lương P1 (VNĐ)</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Trạng thái</th>
+                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Tab 2: Bậc lương nhân viên */}
-      {activeTab === 'employee-salary' && (
-        <div className="card">
-          <table>
-            <thead>
-              <tr>
-                <th>STT</th>
-                <th>Mã NV</th>
-                <th>Họ và tên</th>
-                <th>Bộ phận</th>
-                <th>Vị trí</th>
-                <th>Ca làm việc</th>
-                <th>Bậc lương P1</th>
-                <th>Lương P1 (VNĐ)</th>
-                <th>Ngày hiệu lực</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {employeeSalaries.length > 0 ? (
-                employeeSalaries.map((empSal, idx) => {
-                  const employee = employees.find(e => e.id === empSal.employeeId)
-                  const grade = salaryGrades.find(g => g.id === empSal.salaryGradeId)
-                  return (
-                    <tr key={empSal.id}>
-                      <td>{idx + 1}</td>
-                      <td>{empSal.employeeId || '-'}</td>
-                      <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
-                      <td>{employee ? (employee.bo_phan || '-') : '-'}</td>
-                      <td>{employee ? (employee.vi_tri || '-') : '-'}</td>
-                      <td>{grade ? (grade.shift || 'Ca ngày') : '-'}</td>
-                      <td>{grade ? `Bậc ${grade.level || 1}` : '-'}</td>
-                      <td style={{ fontWeight: 700, color: 'var(--primary)' }}>
-                        {grade ? formatMoney(grade.salary || 0) : '-'}
-                      </td>
-                      <td>{empSal.effectiveDate || '-'}</td>
-                      <td>
-                        <div className="actions">
-                          <button
-                            className="view"
-                            onClick={() => {
-                              setSelectedEmployeeSalary(empSal)
-                              setIsEmployeeSalaryReadOnly(true)
-                              setIsEmployeeSalaryModalOpen(true)
-                            }}
-                          >
-                            <i className="fas fa-eye"></i>
-                          </button>
-                          <button
-                            className="edit"
-                            onClick={() => {
-                              setSelectedEmployeeSalary(empSal)
-                              setIsEmployeeSalaryReadOnly(false)
-                              setIsEmployeeSalaryModalOpen(true)
-                            }}
-                          >
-                            <i className="fas fa-edit"></i>
-                          </button>
-                          <button
-                            className="delete"
-                            onClick={() => handleDeleteEmployeeSalary(empSal.id)}
-                          >
-                            <i className="fas fa-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              ) : (
-                <tr>
-                  <td colSpan="10" className="empty-state">Chưa có bậc lương nhân viên</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Tab 3: Lịch sử thăng tiến */}
-      {activeTab === 'promotions' && (
-        <div className="card">
-          <table>
-            <thead>
-              <tr>
-                <th>STT</th>
-                <th>Mã NV</th>
-                <th>Họ và tên</th>
-                <th>Bộ phận</th>
-                <th>Vị trí</th>
-                <th>Ca làm việc</th>
-                <th>Bậc lương</th>
-                <th>Lương P1 (VNĐ)</th>
-                <th>Ngày thay đổi</th>
-                <th>Hình thức</th>
-                <th>Lý do điều chỉnh</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {promotionHistory.length > 0 ? (
-                promotionHistory
-                  .sort((a, b) => new Date(b.effectiveDate || 0) - new Date(a.effectiveDate || 0))
-                  .map((history, idx) => {
-                    const employee = employees.find(e => e.id === history.employeeId)
-                    const grade = salaryGrades.find(g => g.id === history.salaryGradeId)
-                    return (
-                      <tr key={history.id}>
+              </thead>
+              <tbody>
+                {salaryGrades.length > 0 ? (
+                  salaryGrades
+                    .sort((a, b) => (a.level || 0) - (b.level || 0))
+                    .map((grade, idx) => (
+                      <tr key={grade.id}>
                         <td>{idx + 1}</td>
-                        <td>{history.employeeId || '-'}</td>
-                        <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
-                        <td>{employee ? (employee.bo_phan || '-') : '-'}</td>
-                        <td>{employee ? (employee.vi_tri || '-') : '-'}</td>
-                        <td>{grade ? (grade.shift || 'Ca ngày') : '-'}</td>
-                        <td>{grade ? `Bậc ${grade.level || 1}` : '-'}</td>
+                        <td>{escapeHtml(grade.position || grade.name || '-')}</td>
+                        <td>{escapeHtml(grade.shift || 'Ca ngày')}</td>
+                        <td>{grade.revenueFrom || 0}</td>
+                        <td>{grade.revenueTo === null || grade.revenueTo === undefined || grade.revenueTo === '' ? 'Không giới hạn' : grade.revenueTo}</td>
+                        <td>Bậc {grade.level || 1}</td>
                         <td style={{ fontWeight: 700, color: 'var(--primary)' }}>
-                          {grade ? formatMoney(grade.salary || 0) : '-'}
+                          {formatMoney(grade.salary || 0)}
                         </td>
                         <td>
-                          {history.effectiveDate
-                            ? new Date(history.effectiveDate).toLocaleDateString('vi-VN')
-                            : '-'}
+                          <span className={`badge ${grade.status === 'Đang áp dụng' ? 'badge-success' : 'badge-danger'}`}>
+                            {escapeHtml(grade.status || 'Đang áp dụng')}
+                          </span>
                         </td>
-                        <td>{escapeHtml(history.type || history.hinhThuc || '-')}</td>
-                        <td>{escapeHtml(history.reason || history.lyDo || '-')}</td>
                         <td>
                           <div className="actions">
                             <button
                               className="view"
                               onClick={() => {
-                                setSelectedEmployeeForHistory(history)
-                                setIsHistoryModalOpen(true)
+                                setSelectedGrade(grade)
+                                setIsGradeReadOnly(true)
+                                setIsGradeModalOpen(true)
                               }}
                             >
                               <i className="fas fa-eye"></i>
@@ -1036,32 +871,208 @@ function Salary() {
                             <button
                               className="edit"
                               onClick={() => {
-                                setSelectedPromotion(history)
-                                setIsPromotionModalOpen(true)
+                                setSelectedGrade(grade)
+                                setIsGradeReadOnly(false)
+                                setIsGradeModalOpen(true)
                               }}
                             >
                               <i className="fas fa-pencil-alt"></i>
                             </button>
                             <button
                               className="delete"
-                              onClick={() => handleDeletePromotionHistory(history.id)}
+                              onClick={() => handleDeleteGrade(grade.id)}
                             >
                               <i className="fas fa-trash"></i>
                             </button>
                           </div>
                         </td>
                       </tr>
-                    )
-                  })
-              ) : (
-                <tr>
-                  <td colSpan="12" className="empty-state">Chưa có lịch sử thăng tiến</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                    ))
+                ) : (
+                  <tr>
+                    <td colSpan="9" className="empty-state">Chưa có bậc lương</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      )}
+      )
+      }
+
+      {/* Tab 2: Bậc lương nhân viên */}
+      {
+        activeTab === 'employee-salary' && (
+          <div className="card">
+            <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
+              <table style={{ minWidth: '101%', marginBottom: 0 }}>
+                <thead>
+                  <tr>
+                    <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã NV</th>
+                    <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Họ và tên</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Bộ phận</th>
+                    <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Vị trí</th>
+                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ca làm việc</th>
+                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Bậc lương P1</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Lương P1 (VNĐ)</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ngày hiệu lực</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {employeeSalaries.length > 0 ? (
+                    employeeSalaries.map((empSal, idx) => {
+                      const employee = employees.find(e => e.id === empSal.employeeId)
+                      const grade = salaryGrades.find(g => g.id === empSal.salaryGradeId)
+                      return (
+                        <tr key={empSal.id}>
+                          <td>{idx + 1}</td>
+                          <td>{empSal.employeeId || '-'}</td>
+                          <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
+                          <td>{employee ? (employee.bo_phan || '-') : '-'}</td>
+                          <td>{employee ? (employee.vi_tri || '-') : '-'}</td>
+                          <td>{grade ? (grade.shift || 'Ca ngày') : '-'}</td>
+                          <td>{grade ? `Bậc ${grade.level || 1}` : '-'}</td>
+                          <td style={{ fontWeight: 700, color: 'var(--primary)' }}>
+                            {grade ? formatMoney(grade.salary || 0) : '-'}
+                          </td>
+                          <td>{empSal.effectiveDate || '-'}</td>
+                          <td>
+                            <div className="actions">
+                              <button
+                                className="view"
+                                onClick={() => {
+                                  setSelectedEmployeeSalary(empSal)
+                                  setIsEmployeeSalaryReadOnly(true)
+                                  setIsEmployeeSalaryModalOpen(true)
+                                }}
+                              >
+                                <i className="fas fa-eye"></i>
+                              </button>
+                              <button
+                                className="edit"
+                                onClick={() => {
+                                  setSelectedEmployeeSalary(empSal)
+                                  setIsEmployeeSalaryReadOnly(false)
+                                  setIsEmployeeSalaryModalOpen(true)
+                                }}
+                              >
+                                <i className="fas fa-edit"></i>
+                              </button>
+                              <button
+                                className="delete"
+                                onClick={() => handleDeleteEmployeeSalary(empSal.id)}
+                              >
+                                <i className="fas fa-trash"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="10" className="empty-state">Chưa có bậc lương nhân viên</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div >
+        )
+      }
+
+      {/* Tab 3: Lịch sử thăng tiến */}
+      {
+        activeTab === 'promotions' && (
+          <div className="card">
+            <div style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #e0e0e0' }}>
+              <table style={{ minWidth: '101%', marginBottom: 0 }}>
+                <thead>
+                  <tr>
+                    <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã NV</th>
+                    <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Họ và tên</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Bộ phận</th>
+                    <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Vị trí</th>
+                    <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ca làm việc</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Bậc lương</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Lương P1 (VNĐ)</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ngày thay đổi</th>
+                    <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Hình thức</th>
+                    <th style={{ minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Lý do điều chỉnh</th>
+                    <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {promotionHistory.length > 0 ? (
+                    promotionHistory
+                      .sort((a, b) => new Date(b.effectiveDate || 0) - new Date(a.effectiveDate || 0))
+                      .map((history, idx) => {
+                        const employee = employees.find(e => e.id === history.employeeId)
+                        const grade = salaryGrades.find(g => g.id === history.salaryGradeId)
+                        return (
+                          <tr key={history.id}>
+                            <td>{idx + 1}</td>
+                            <td>{history.employeeId || '-'}</td>
+                            <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
+                            <td>{employee ? (employee.bo_phan || '-') : '-'}</td>
+                            <td>{employee ? (employee.vi_tri || '-') : '-'}</td>
+                            <td>{grade ? (grade.shift || 'Ca ngày') : '-'}</td>
+                            <td>{grade ? `Bậc ${grade.level || 1}` : '-'}</td>
+                            <td style={{ fontWeight: 700, color: 'var(--primary)' }}>
+                              {grade ? formatMoney(grade.salary || 0) : '-'}
+                            </td>
+                            <td>
+                              {history.effectiveDate
+                                ? new Date(history.effectiveDate).toLocaleDateString('vi-VN')
+                                : '-'}
+                            </td>
+                            <td>{escapeHtml(history.type || history.hinhThuc || '-')}</td>
+                            <td>{escapeHtml(history.reason || history.lyDo || '-')}</td>
+                            <td>
+                              <div className="actions">
+                                <button
+                                  className="view"
+                                  onClick={() => {
+                                    setSelectedEmployeeForHistory(history)
+                                    setIsHistoryModalOpen(true)
+                                  }}
+                                >
+                                  <i className="fas fa-eye"></i>
+                                </button>
+                                <button
+                                  className="edit"
+                                  onClick={() => {
+                                    setSelectedPromotion(history)
+                                    setIsPromotionModalOpen(true)
+                                  }}
+                                >
+                                  <i className="fas fa-pencil-alt"></i>
+                                </button>
+                                <button
+                                  className="delete"
+                                  onClick={() => handleDeletePromotionHistory(history.id)}
+                                >
+                                  <i className="fas fa-trash"></i>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })
+                  ) : (
+                    <tr>
+                      <td colSpan="12" className="empty-state">Chưa có lịch sử thăng tiến</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div >
+        )
+      }
 
 
 
@@ -1123,184 +1134,190 @@ function Salary() {
 
 
 
-      {isGradeImportModalOpen && (
-        <div className="modal show" onClick={() => setIsGradeImportModalOpen(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '800px' }}>
-            <div className="modal-header">
-              <h3>Import Bậc Lương</h3>
-              <button className="modal-close" onClick={() => setIsGradeImportModalOpen(false)}>&times;</button>
-            </div>
-            <div className="modal-body">
-              <input type="file" onChange={handleGradeFileSelect} accept=".xlsx,.xls" />
+      {
+        isGradeImportModalOpen && (
+          <div className="modal show" onClick={() => setIsGradeImportModalOpen(false)}>
+            <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '800px' }}>
+              <div className="modal-header">
+                <h3>Import Bậc Lương</h3>
+                <button className="modal-close" onClick={() => setIsGradeImportModalOpen(false)}>&times;</button>
+              </div>
+              <div className="modal-body">
+                <input type="file" onChange={handleGradeFileSelect} accept=".xlsx,.xls" />
 
-              {gradeImportPreviewData.length > 0 && (
-                <div style={{ marginTop: '15px', maxHeight: '300px', overflow: 'auto' }}>
-                  <table className="table table-bordered">
-                    <thead>
-                      <tr>
-                        <th>Vị trí</th>
-                        <th>Ca</th>
-                        <th>Bậc</th>
-                        <th>Lương P1</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {gradeImportPreviewData.map((d, i) => (
-                        <tr key={i}>
-                          <td>{d.position}</td>
-                          <td>{d.shift}</td>
-                          <td>{d.level}</td>
-                          <td>{formatMoney(d.salary)}</td>
+                {gradeImportPreviewData.length > 0 && (
+                  <div style={{ marginTop: '15px', maxHeight: '300px', overflow: 'auto' }}>
+                    <table className="table table-bordered">
+                      <thead>
+                        <tr>
+                          <th>Vị trí</th>
+                          <th>Ca</th>
+                          <th>Bậc</th>
+                          <th>Lương P1</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody>
+                        {gradeImportPreviewData.map((d, i) => (
+                          <tr key={i}>
+                            <td>{d.position}</td>
+                            <td>{d.shift}</td>
+                            <td>{d.level}</td>
+                            <td>{formatMoney(d.salary)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
-              <div className="modal-actions" style={{ marginTop: '15px', textAlign: 'right' }}>
-                <button className="btn" onClick={() => setIsGradeImportModalOpen(false)}>Hủy</button>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleConfirmGradeImport}
-                  disabled={isGradeImporting || gradeImportPreviewData.length === 0}
-                  style={{ marginLeft: '10px' }}
-                >
-                  {isGradeImporting ? 'Đang import...' : 'Xác nhận'}
-                </button>
+                <div className="modal-actions" style={{ marginTop: '15px', textAlign: 'right' }}>
+                  <button className="btn" onClick={() => setIsGradeImportModalOpen(false)}>Hủy</button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleConfirmGradeImport}
+                    disabled={isGradeImporting || gradeImportPreviewData.length === 0}
+                    style={{ marginLeft: '10px' }}
+                  >
+                    {isGradeImporting ? 'Đang import...' : 'Xác nhận'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
-      {isEmpSalaryImportModalOpen && (
-        <div className="modal show" onClick={() => setIsEmpSalaryImportModalOpen(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '900px' }}>
-            <div className="modal-header">
-              <h3>Import Bậc Lương Nhân Viên</h3>
-              <button className="modal-close" onClick={() => setIsEmpSalaryImportModalOpen(false)}>&times;</button>
-            </div>
-            <div className="modal-body">
-              <div className="alert alert-info">
-                Vui lòng sử dụng file mẫu để đảm bảo định dạng dữ liệu chính xác.
+      {
+        isEmpSalaryImportModalOpen && (
+          <div className="modal show" onClick={() => setIsEmpSalaryImportModalOpen(false)}>
+            <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+              <div className="modal-header">
+                <h3>Import Bậc Lương Nhân Viên</h3>
+                <button className="modal-close" onClick={() => setIsEmpSalaryImportModalOpen(false)}>&times;</button>
               </div>
-              <input type="file" onChange={handleEmpSalaryFileSelect} accept=".xlsx,.xls" />
-
-              {empSalaryImportPreviewData.length > 0 && (
-                <div style={{ marginTop: '15px', maxHeight: '400px', overflow: 'auto' }}>
-                  <table className="table table-bordered">
-                    <thead>
-                      <tr>
-                        <th>Mã NV</th>
-                        <th>Nhân viên</th>
-                        <th>Bậc lương</th>
-                        <th>Ngày hiệu lực</th>
-                        <th>Trạng thái</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {empSalaryImportPreviewData.map((d, i) => (
-                        <tr key={i} style={{ backgroundColor: d.isValid ? 'transparent' : '#fff3f3' }}>
-                          <td>{d.employeeId}</td>
-                          <td>{d.employeeName}</td>
-                          <td>{d.gradeName}</td>
-                          <td>{d.effectiveDate}</td>
-                          <td>
-                            {d.isValid ? (
-                              <span style={{ color: 'green' }}>✓ Hợp lệ</span>
-                            ) : (
-                              <span style={{ color: 'red' }}>✕ {d.note}</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              <div className="modal-body">
+                <div className="alert alert-info">
+                  Vui lòng sử dụng file mẫu để đảm bảo định dạng dữ liệu chính xác.
                 </div>
-              )}
+                <input type="file" onChange={handleEmpSalaryFileSelect} accept=".xlsx,.xls" />
 
-              <div className="modal-actions" style={{ marginTop: '15px', textAlign: 'right' }}>
-                <button className="btn" onClick={() => setIsEmpSalaryImportModalOpen(false)}>Hủy</button>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleConfirmEmpSalaryImport}
-                  disabled={isEmpSalaryImporting || empSalaryImportPreviewData.filter(d => d.isValid).length === 0}
-                  style={{ marginLeft: '10px' }}
-                >
-                  {isEmpSalaryImporting ? 'Đang import...' : 'Xác nhận Import'}
-                </button>
+                {empSalaryImportPreviewData.length > 0 && (
+                  <div style={{ marginTop: '15px', maxHeight: '400px', overflow: 'auto' }}>
+                    <table className="table table-bordered">
+                      <thead>
+                        <tr>
+                          <th>Mã NV</th>
+                          <th>Nhân viên</th>
+                          <th>Bậc lương</th>
+                          <th>Ngày hiệu lực</th>
+                          <th>Trạng thái</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {empSalaryImportPreviewData.map((d, i) => (
+                          <tr key={i} style={{ backgroundColor: d.isValid ? 'transparent' : '#fff3f3' }}>
+                            <td>{d.employeeId}</td>
+                            <td>{d.employeeName}</td>
+                            <td>{d.gradeName}</td>
+                            <td>{d.effectiveDate}</td>
+                            <td>
+                              {d.isValid ? (
+                                <span style={{ color: 'green' }}>✓ Hợp lệ</span>
+                              ) : (
+                                <span style={{ color: 'red' }}>✕ {d.note}</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <div className="modal-actions" style={{ marginTop: '15px', textAlign: 'right' }}>
+                  <button className="btn" onClick={() => setIsEmpSalaryImportModalOpen(false)}>Hủy</button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleConfirmEmpSalaryImport}
+                    disabled={isEmpSalaryImporting || empSalaryImportPreviewData.filter(d => d.isValid).length === 0}
+                    style={{ marginLeft: '10px' }}
+                  >
+                    {isEmpSalaryImporting ? 'Đang import...' : 'Xác nhận Import'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
-      {isHistoryImportModalOpen && (
-        <div className="modal show" onClick={() => setIsHistoryImportModalOpen(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '900px' }}>
-            <div className="modal-header">
-              <h3>Import Lịch Sử Thăng Tiến</h3>
-              <button className="modal-close" onClick={() => setIsHistoryImportModalOpen(false)}>&times;</button>
-            </div>
-            <div className="modal-body">
-              <div className="alert alert-info">
-                Vui lòng sử dụng file mẫu. Hệ thống sẽ tự tìm Bậc lương dựa trên Vị trí, Ca và Bậc.
+      {
+        isHistoryImportModalOpen && (
+          <div className="modal show" onClick={() => setIsHistoryImportModalOpen(false)}>
+            <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+              <div className="modal-header">
+                <h3>Import Lịch Sử Thăng Tiến</h3>
+                <button className="modal-close" onClick={() => setIsHistoryImportModalOpen(false)}>&times;</button>
               </div>
-              <input type="file" onChange={handleHistoryFileSelect} accept=".xlsx,.xls" />
-
-              {historyImportPreviewData.length > 0 && (
-                <div style={{ marginTop: '15px', maxHeight: '400', overflow: 'auto' }}>
-                  <table className="table table-bordered">
-                    <thead>
-                      <tr>
-                        <th>Mã NV</th>
-                        <th>Nhân viên</th>
-                        <th>Bậc lương</th>
-                        <th>Ngày</th>
-                        <th>Hình thức</th>
-                        <th>Trạng thái</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {historyImportPreviewData.map((d, i) => (
-                        <tr key={i} style={{ backgroundColor: d.isValid ? 'transparent' : '#fff3f3' }}>
-                          <td>{d.employeeId}</td>
-                          <td>{d.employeeName}</td>
-                          <td>{d.gradeName}</td>
-                          <td>{d.effectiveDate}</td>
-                          <td>{d.type}</td>
-                          <td>
-                            {d.isValid ? (
-                              <span style={{ color: 'green' }}>✓ Hợp lệ</span>
-                            ) : (
-                              <span style={{ color: 'red' }}>✕ {d.note}</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              <div className="modal-body">
+                <div className="alert alert-info">
+                  Vui lòng sử dụng file mẫu. Hệ thống sẽ tự tìm Bậc lương dựa trên Vị trí, Ca và Bậc.
                 </div>
-              )}
+                <input type="file" onChange={handleHistoryFileSelect} accept=".xlsx,.xls" />
 
-              <div className="modal-actions" style={{ marginTop: '15px', textAlign: 'right' }}>
-                <button className="btn" onClick={() => setIsHistoryImportModalOpen(false)}>Hủy</button>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleConfirmHistoryImport}
-                  disabled={isHistoryImporting || historyImportPreviewData.filter(d => d.isValid).length === 0}
-                  style={{ marginLeft: '10px' }}
-                >
-                  {isHistoryImporting ? 'Đang import...' : 'Xác nhận Import'}
-                </button>
+                {historyImportPreviewData.length > 0 && (
+                  <div style={{ marginTop: '15px', maxHeight: '400', overflow: 'auto' }}>
+                    <table className="table table-bordered">
+                      <thead>
+                        <tr>
+                          <th>Mã NV</th>
+                          <th>Nhân viên</th>
+                          <th>Bậc lương</th>
+                          <th>Ngày</th>
+                          <th>Hình thức</th>
+                          <th>Trạng thái</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {historyImportPreviewData.map((d, i) => (
+                          <tr key={i} style={{ backgroundColor: d.isValid ? 'transparent' : '#fff3f3' }}>
+                            <td>{d.employeeId}</td>
+                            <td>{d.employeeName}</td>
+                            <td>{d.gradeName}</td>
+                            <td>{d.effectiveDate}</td>
+                            <td>{d.type}</td>
+                            <td>
+                              {d.isValid ? (
+                                <span style={{ color: 'green' }}>✓ Hợp lệ</span>
+                              ) : (
+                                <span style={{ color: 'red' }}>✕ {d.note}</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <div className="modal-actions" style={{ marginTop: '15px', textAlign: 'right' }}>
+                  <button className="btn" onClick={() => setIsHistoryImportModalOpen(false)}>Hủy</button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleConfirmHistoryImport}
+                    disabled={isHistoryImporting || historyImportPreviewData.filter(d => d.isValid).length === 0}
+                    style={{ marginLeft: '10px' }}
+                  >
+                    {isHistoryImporting ? 'Đang import...' : 'Xác nhận Import'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
-    </div>
+    </div >
   )
 }
 
