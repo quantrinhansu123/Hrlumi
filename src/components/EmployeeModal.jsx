@@ -11,6 +11,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
     bo_phan: '',
     vi_tri: '',
     trang_thai: 'Thử việc',
+    ca_lam_viec: 'Ca full',
     ngay_vao_lam: '',
     ngay_lam_chinh_thuc: '',
     cccd: '',
@@ -44,6 +45,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
         bo_phan: employee.bo_phan || '',
         vi_tri: employee.vi_tri || '',
         trang_thai: employee.trang_thai || employee.status || 'Thử việc',
+        ca_lam_viec: employee.ca_lam_viec || 'Ca full',
         ngay_vao_lam: employee.ngay_vao_lam || '',
         ngay_lam_chinh_thuc: employee.ngay_lam_chinh_thuc || '',
         cccd: employee.cccd || '',
@@ -85,6 +87,7 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
       bo_phan: '',
       vi_tri: '',
       trang_thai: 'Thử việc',
+      ca_lam_viec: 'Ca full',
       ngay_vao_lam: '',
       ngay_lam_chinh_thuc: '',
       cccd: '',
@@ -392,6 +395,22 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
                 </select>
               </div>
               <div className="form-group">
+                <label>Ca làm việc</label>
+                <select
+                  name="ca_lam_viec"
+                  value={formData.ca_lam_viec}
+                  onChange={handleChange}
+                  disabled={readOnly}
+                >
+                  <option value="Ca full">Ca full</option>
+                  <option value="Ca sáng">Ca sáng (8h - 11h30)</option>
+                  <option value="Ca chiều">Ca chiều (13h30 - 17h30)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
                 <label>Ngày vào làm</label>
                 <input
                   type="date"
@@ -401,9 +420,6 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
                   disabled={readOnly}
                 />
               </div>
-            </div>
-
-            <div className="form-row">
               <div className="form-group">
                 <label>Ngày làm chính thức</label>
                 <input

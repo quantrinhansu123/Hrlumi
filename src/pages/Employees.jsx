@@ -13,6 +13,7 @@ function Employees() {
     const [filterBranch, setFilterBranch] = useState('')
     const [filterDept, setFilterDept] = useState('')
     const [filterStatus, setFilterStatus] = useState('')
+    const [filterBirthMonth, setFilterBirthMonth] = useState('')
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [selectedEmployee, setSelectedEmployee] = useState(null)
     const [isReadOnly, setIsReadOnly] = useState(false)
@@ -28,7 +29,7 @@ function Employees() {
 
     useEffect(() => {
         filterEmployees()
-    }, [employees, searchTerm, filterBranch, filterDept, filterStatus])
+    }, [employees, searchTerm, filterBranch, filterDept, filterStatus, filterBirthMonth])
 
     const loadEmployees = async () => {
         try {
@@ -70,7 +71,36 @@ function Employees() {
             const matchDept = !filterDept || item.bo_phan === filterDept
             const matchStatus = !filterStatus || item.trang_thai === filterStatus || item.status === filterStatus
 
-            return matchSearch && matchBranch && matchDept && matchStatus
+            // Filter Birth Month
+            let matchMonth = true
+            if (filterBirthMonth) {
+                const dob = item.ngay_sinh || item.dob || ''
+                if (!dob) {
+                    matchMonth = false
+                } else {
+                    let month = -1
+                    // Handle YYYY-MM-DD
+                    if (dob.includes('-')) {
+                        const parts = dob.split('-')
+                        if (parts.length === 3) {
+                            // usually YYYY-MM-DD, month is parts[1]
+                            month = parseInt(parts[1], 10)
+                        }
+                    }
+                    // Handle DD/MM/YYYY
+                    else if (dob.includes('/')) {
+                        const parts = dob.split('/')
+                        if (parts.length === 3) {
+                            // usually DD/MM/YYYY, month is parts[1]
+                            month = parseInt(parts[1], 10)
+                        }
+                    }
+
+                    matchMonth = month === parseInt(filterBirthMonth, 10)
+                }
+            }
+
+            return matchSearch && matchBranch && matchDept && matchStatus && matchMonth
         })
 
         setFilteredEmployees(filtered)
@@ -100,7 +130,10 @@ function Employees() {
             'Bộ phận',
             'Vị trí',
             'Trạng thái',
+            'Ngày sinh',
             'Ngày vào làm',
+            'Ngày lên chính thức',
+            'Ca làm việc',
             'CCCD',
             'Ngày cấp',
             'Nơi cấp',
@@ -121,7 +154,10 @@ function Employees() {
                 'Kinh doanh',
                 'Nhân viên',
                 'Chính thức',
+                '1995-01-01',
                 '2024-01-15',
+                '2024-03-15',
+                'Ca full',
                 '001234567890',
                 '2020-01-01',
                 'CA TP.HCM',
@@ -140,7 +176,10 @@ function Employees() {
                 'Marketing',
                 'Trưởng phòng',
                 'Chính thức',
+                '1990-05-15',
                 '2023-06-01',
+                '2023-08-01',
+                'Ca sáng',
                 '001234567891',
                 '2019-05-15',
                 'CA Hà Nội',
@@ -363,8 +402,10 @@ function Employees() {
                     bo_phan: rowObj['bo_phan'] || rowObj['phong_ban'] || rowObj['department'] || '',
                     vi_tri: rowObj['vi_tri'] || rowObj['chuc_vu'] || rowObj['position'] || '',
                     trang_thai: rowObj['trang_thai'] || rowObj['status'] || '',
+                    ngay_sinh: rowObj['ngay_sinh'] || rowObj['dob'] || rowObj['birth_date'] || '',
                     ngay_vao_lam: rowObj['ngay_vao_lam'] || rowObj['ngay_bat_dau'] || '',
-                    ngay_lam_chinh_thuc: rowObj['ngay_chinh_thuc'] || rowObj['ngay_lam_chinh_thuc'] || '',
+                    ngay_lam_chinh_thuc: rowObj['ngay_len_chinh_thuc'] || rowObj['ngay_chinh_thuc'] || rowObj['ngay_lam_chinh_thuc'] || '',
+                    ca_lam_viec: rowObj['ca_lam_viec'] || rowObj['ca'] || rowObj['shift'] || '',
                     cccd: rowObj['cccd'] || rowObj['cmnd'] || '',
                     ngay_cap: rowObj['ngay_cap'] || '',
                     noi_cap: rowObj['noi_cap'] || '',
@@ -560,6 +601,12 @@ function Employees() {
                             <option value="Chính thức">Chính thức</option>
                             <option value="Tạm nghỉ">Tạm nghỉ</option>
                             <option value="Nghỉ việc">Nghỉ việc</option>
+                        </select>
+                        <select value={filterBirthMonth} onChange={(e) => setFilterBirthMonth(e.target.value)}>
+                            <option value="">Tất cả tháng sinh</option>
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                                <option key={month} value={month}>Tháng {month}</option>
+                            ))}
                         </select>
                     </div>
 
