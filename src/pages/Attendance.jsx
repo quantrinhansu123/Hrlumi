@@ -591,12 +591,12 @@ function Attendance() {
         }
 
         // Logic updated:
-        // >= 8h => 1 công
-        // >= 4h & < 8h => 0.5 công
-        // < 4h => 0 công
-        if (hours >= 8) {
+        // >= 7.5h => 1 công
+        // >= 3h & < 7.5h => 0.5 công
+        // < 3h => 0 công
+        if (hours >= 7.5) {
           empWorkdays[log.employeeId] = (empWorkdays[log.employeeId] || 0) + 1
-        } else if (hours >= 4) {
+        } else if (hours >= 3) {
           empWorkdays[log.employeeId] = (empWorkdays[log.employeeId] || 0) + 0.5
         }
       })
