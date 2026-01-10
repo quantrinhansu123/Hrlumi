@@ -4,6 +4,7 @@ import Attendance from './pages/Attendance'
 import Competency from './pages/Competency'
 import Dashboard from './pages/Dashboard'
 import Employees from './pages/Employees'
+import Honor from './pages/Honor'
 import KPI from './pages/KPI'
 import Recruitment from './pages/Recruitment'
 import Salary from './pages/Salary'
@@ -23,6 +24,7 @@ function App() {
           <Route path="/kpi" element={<KPI />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/attendance" element={<Attendance />} />
+          <Route path="/honor" element={<Honor />} />
         </Routes>
       </Layout>
     </BrowserRouter>
