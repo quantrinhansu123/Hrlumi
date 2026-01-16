@@ -11,7 +11,7 @@ import SeedPayrollDataButton from '../components/SeedPayrollDataButton'
 import TaxModal from '../components/TaxModal'
 import { fbDelete, fbGet, fbPush, fbUpdate } from '../services/firebase'
 import { TAX_CONFIG } from '../utils/constants'
-import { calculateProgressiveTax, escapeHtml, formatMoney, normalizeString } from '../utils/helpers'
+import { calculateProgressiveTax, formatMoney, normalizeString } from '../utils/helpers'
 
 
 // Memoized Input Component to prevent re-renders on every keystroke
@@ -1283,7 +1283,7 @@ function Attendance() {
                               log.status === 'Thiếu' ? 'badge-warning' :
                                 'badge-danger'
                               }`}>
-                              {escapeHtml(log.status || '-')}
+                              {log.status || '-'}
                             </span>
                           </td>
                           <td>
@@ -1406,7 +1406,7 @@ function Attendance() {
                         <td>{idx + 1}</td>
                         <td>{payroll.employeeId || '-'}</td>
                         <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
-                        <td>{escapeHtml(payroll.department || '-')}</td>
+                        <td>{payroll.department || '-'}</td>
                         <td>{employee ? (employee.vi_tri || '-') : '-'}</td>
                         <td>{payroll.congThucTe || payroll.cong || 0}</td>
                         <td>{formatMoney(payroll.luongP1 || 0)}</td>
@@ -1427,7 +1427,7 @@ function Attendance() {
                             payroll.status === 'Đang tính' ? 'badge-warning' :
                               'badge-secondary'
                             }`}>
-                            {escapeHtml(payroll.status || 'Đang tính')}
+                            {payroll.status || 'Đang tính'}
                           </span>
                         </td>
                         <td>
@@ -1520,7 +1520,7 @@ function Attendance() {
                           <td>{insurance.employeeId || '-'}</td>
                           <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
                           <td>{employee ? (employee.bo_phan || employee.department || '-') : '-'}</td>
-                          <td>{escapeHtml(insurance.soSoBHXH || insurance.soSo || '-')}</td>
+                          <td>{insurance.soSoBHXH || insurance.soSo || '-'}</td>
                           <td>{insurance.ngayThamGia ? new Date(insurance.ngayThamGia).toLocaleDateString('vi-VN') : '-'}</td>
                           <td>{formatMoney(insurance.mucLuongDong || insurance.mucLuong || 0)}</td>
                           <td>{insurance.tyLeNLD || insurance.tyLeNhanVien || 10.5}%</td>
@@ -1529,7 +1529,7 @@ function Attendance() {
                             <span className={`badge ${insurance.status === 'Đang tham gia' ? 'badge-success' :
                               'badge-danger'
                               }`}>
-                              {escapeHtml(insurance.status || 'Đang tham gia')}
+                              {insurance.status || 'Đang tham gia'}
                             </span>
                           </td>
                           <td>
@@ -1632,16 +1632,16 @@ function Attendance() {
                           <td>{idx + 1}</td>
                           <td>{tax.employeeId || '-'}</td>
                           <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
-                          <td>{escapeHtml(tax.maSoThue || tax.mst || '-')}</td>
+                          <td>{tax.maSoThue || tax.mst || '-'}</td>
                           <td>{formatMoney(inputIncome)}</td>
                           <td>{formatMoney(personalDeduction)}</td>
                           <td>{formatMoney(dependentDeduction)}</td>
                           <td>{formatMoney(assessableIncome)}</td>
-                          <td>{escapeHtml(tax.bieuThue || 'Lũy tiến')}</td>
+                          <td>{tax.bieuThue || 'Lũy tiến'}</td>
                           <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>
                             {formatMoney(taxAmount)}
                           </td>
-                          <td>{escapeHtml(tax.kyApDung || tax.period || '-')}</td>
+                          <td>{tax.kyApDung || tax.period || '-'}</td>
                           <td>
                             <div className="actions">
                               <button
@@ -1720,17 +1720,17 @@ function Attendance() {
                           <td>{idx + 1}</td>
                           <td>{dependent.employeeId || '-'}</td>
                           <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
-                          <td>{escapeHtml(dependent.hoTen || dependent.name || '-')}</td>
-                          <td>{escapeHtml(dependent.quanHe || dependent.relationship || '-')}</td>
+                          <td>{dependent.hoTen || dependent.name || '-'}</td>
+                          <td>{dependent.quanHe || dependent.relationship || '-'}</td>
                           <td>{dependent.ngaySinh ? new Date(dependent.ngaySinh).toLocaleDateString('vi-VN') : '-'}</td>
-                          <td>{escapeHtml(dependent.cccd || dependent.cmnd || '-')}</td>
+                          <td>{dependent.cccd || dependent.cmnd || '-'}</td>
                           <td>{dependent.tuNgay ? new Date(dependent.tuNgay).toLocaleDateString('vi-VN') : '-'}</td>
                           <td>{dependent.denNgay ? new Date(dependent.denNgay).toLocaleDateString('vi-VN') : '-'}</td>
                           <td>
                             <span className={`badge ${dependent.status === 'Đang áp dụng' ? 'badge-success' :
                               'badge-danger'
                               }`}>
-                              {escapeHtml(dependent.status || 'Đang áp dụng')}
+                              {dependent.status || 'Đang áp dụng'}
                             </span>
                           </td>
                           <td>

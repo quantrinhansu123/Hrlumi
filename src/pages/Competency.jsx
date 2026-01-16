@@ -7,7 +7,7 @@ import SeedCompetencyDataButton from '../components/SeedCompetencyDataButton'
 import TrainingParticipantModal from '../components/TrainingParticipantModal'
 import TrainingProgramModal from '../components/TrainingProgramModal'
 import { fbDelete, fbGet, fbPush, fbUpdate } from '../services/firebase'
-import { escapeHtml, normalizeString } from '../utils/helpers'
+import { normalizeString } from '../utils/helpers'
 
 function Competency() {
   const [activeTab, setActiveTab] = useState('framework')
@@ -1903,11 +1903,11 @@ function Competency() {
                                 participant.status === 'Vắng' ? 'badge-danger' :
                                   'badge-warning'
                                 }`}>
-                                {escapeHtml(participant.status || '-')}
+                                {participant.status || '-'}
                               </span>
                             </td>
                             <td>{participant.attendanceRate || participant.tyLeThamDu || 0}%</td>
-                            <td>{escapeHtml(participant.note || participant.ghiChu || '-')}</td>
+                            <td>{participant.note || participant.ghiChu || '-'}</td>
                             <td>
                               <div className="actions">
                                 <button

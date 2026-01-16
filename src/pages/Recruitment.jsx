@@ -3,7 +3,6 @@ import * as XLSX from 'xlsx'
 import CandidateModal from '../components/CandidateModal'
 import RecruitmentPlanModal from '../components/RecruitmentPlanModal'
 import { fbDelete, fbGet, fbPush, fbUpdate } from '../services/firebase'
-import { escapeHtml } from '../utils/helpers'
 
 function Recruitment() {
   const [plans, setPlans] = useState([])
@@ -679,12 +678,12 @@ function Recruitment() {
                   return (
                     <tr key={plan.id || idx}>
                       <td>{idx + 1}</td>
-                      <td>{escapeHtml(plan.bo_phan || '')}</td>
-                      <td>{escapeHtml(plan.vi_tri || '')}</td>
+                      <td>{plan.bo_phan || ''}</td>
+                      <td>{plan.vi_tri || ''}</td>
                       <td>{current}</td>
                       <td>{target}</td>
                       <td>{need}</td>
-                      <td>{escapeHtml(plan.ghi_chu || '')}</td>
+                      <td>{plan.ghi_chu || ''}</td>
                       <td>
                         <div className="actions">
                           <button
@@ -812,14 +811,14 @@ function Recruitment() {
                   return (
                     <tr key={c.id || idx}>
                       <td>{idx + 1}</td>
-                      <td>{escapeHtml(c.ho_ten || c.name || '')}</td>
-                      <td>{escapeHtml(c.vi_tri_ung_tuyen || c.vi_tri || '')}</td>
-                      <td>{escapeHtml(c.bo_phan || '')}</td>
-                      <td>{escapeHtml(c.nguon_cv || '')}</td>
-                      <td>{escapeHtml(c.hr_phu_trach || '')}</td>
-                      <td>{escapeHtml(c.sdt || c.sđt || '')}</td>
-                      <td>{escapeHtml(c.email || '')}</td>
-                      <td>{escapeHtml(status)}</td>
+                      <td>{c.ho_ten || c.name || ''}</td>
+                      <td>{c.vi_tri_ung_tuyen || c.vi_tri || ''}</td>
+                      <td>{c.bo_phan || ''}</td>
+                      <td>{c.nguon_cv || ''}</td>
+                      <td>{c.hr_phu_trach || ''}</td>
+                      <td>{c.sdt || c.sđt || ''}</td>
+                      <td>{c.email || ''}</td>
+                      <td>{status}</td>
                       <td>{c.ngay_tiep_nhan ? new Date(c.ngay_tiep_nhan).toLocaleDateString('vi-VN') : ''}</td>
                       <td>
                         <div className="actions">

@@ -7,7 +7,7 @@ import KPIResultImportModal from '../components/KPIResultImportModal'
 import KPITemplateModal from '../components/KPITemplateModal'
 import SeedKPIDataButton from '../components/SeedKPIDataButton'
 import { fbDelete, fbGet, fbPush, fbUpdate } from '../services/firebase'
-import { escapeHtml, formatMoney } from '../utils/helpers'
+import { formatMoney } from '../utils/helpers'
 
 function KPI() {
   const [activeTab, setActiveTab] = useState('assignment')
@@ -765,15 +765,15 @@ function KPI() {
                     kpiTemplates.map((template, idx) => (
                       <tr key={template.id}>
                         <td>{idx + 1}</td>
-                        <td>{escapeHtml(template.code || template.id || '-')}</td>
-                        <td>{escapeHtml(template.name || '-')}</td>
-                        <td>{escapeHtml(template.unit || template.donVi || '-')}</td>
-                        <td>{escapeHtml(template.target || template.doiTuong || '-')}</td>
+                        <td>{template.code || template.id || '-'}</td>
+                        <td>{template.name || '-'}</td>
+                        <td>{template.unit || template.donVi || '-'}</td>
+                        <td>{template.target || template.doiTuong || '-'}</td>
                         <td>{template.weight || template.trongSo || 0}%</td>
                         <td>{template.month ? new Date(template.month).toLocaleDateString('vi-VN') : '-'}</td>
                         <td>
                           <span className={`badge ${template.status === 'Đang áp dụng' ? 'badge-success' : 'badge-danger'}`}>
-                            {escapeHtml(template.status || 'Đang áp dụng')}
+                            {template.status || 'Đang áp dụng'}
                           </span>
                         </td>
                         <td>
@@ -976,7 +976,7 @@ function KPI() {
 
                                 return (
                                   <React.Fragment key={i}>
-                                    <td>{kpi ? escapeHtml(kpi.code) : ''}</td>
+                                    <td>{kpi ? kpi.code : ''}</td>
                                     <td>
                                       {kpi ? (
                                         <span style={{ fontWeight: 'bold' }}>
@@ -996,7 +996,7 @@ function KPI() {
                                   empKPI.status === 'Chưa chốt' ? 'badge-warning' :
                                     'badge-secondary'
                                   }`}>
-                                  {escapeHtml(empKPI.status || 'Chưa chốt')}
+                                  {empKPI.status || 'Chưa chốt'}
                                 </span>
                               </td>
                               <td>
@@ -1093,14 +1093,14 @@ function KPI() {
                       if (conversions.length === 0) {
                         return (
                           <tr key={template.id}>
-                            <td>{escapeHtml(template.code || template.id)}</td>
+                            <td>{template.code || template.id}</td>
                             <td colSpan="5" className="empty-state">Chưa có tỷ lệ quy đổi</td>
                           </tr>
                         )
                       }
                       return conversions.map((conv, idx) => (
                         <tr key={conv.id}>
-                          {idx === 0 && <td rowSpan={conversions.length}>{escapeHtml(template.code || template.id)}</td>}
+                          {idx === 0 && <td rowSpan={conversions.length}>{template.code || template.id}</td>}
                           <td>{idx + 1}</td>
                           <td>{conv.fromPercent || 0}%</td>
                           <td>{conv.toPercent === null || conv.toPercent === undefined ? '100%+' : `${conv.toPercent}%`}</td>
@@ -1261,10 +1261,10 @@ function KPI() {
                           <td>{idx + 1}</td>
                           <td style={{ whiteSpace: 'nowrap' }}>{employee ? (employee.ma_nhan_vien || employee.employeeCode || employee.code || '-') : '-'}</td>
                           <td style={{ whiteSpace: 'nowrap' }}>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
-                          <td style={{ whiteSpace: 'nowrap' }}>{escapeHtml(result.department || '-')}</td>
+                          <td style={{ whiteSpace: 'nowrap' }}>{result.department || '-'}</td>
                           <td style={{ whiteSpace: 'nowrap' }}>{employee ? (employee.vi_tri || '-') : '-'}</td>
                           <td>{employee ? (employee.shift || 'Ngày') : '-'}</td>
-                          <td style={{ whiteSpace: 'nowrap' }}>{escapeHtml(result.month || '-')}</td>
+                          <td style={{ whiteSpace: 'nowrap' }}>{result.month || '-'}</td>
 
                           {/* Render Actuals based on Assignment Slots */}
                           {Array.from({ length: 3 }).map((_, i) => {
@@ -1381,13 +1381,13 @@ function KPI() {
                     getDepartmentSummary().map((dept, idx) => (
                       <tr key={dept.department}>
                         <td>{idx + 1}</td>
-                        <td>{escapeHtml(dept.department)}</td>
+                        <td>{dept.department}</td>
                         <td>{dept.totalEmployees}</td>
                         <td>{dept.achievedPercent}%</td>
                         <td>{dept.exceededPercent}%</td>
                         <td>{dept.notAchievedPercent}%</td>
                         <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{dept.avgScore}%</td>
-                        <td>{escapeHtml(dept.note)}</td>
+                        <td>{dept.note}</td>
                       </tr>
                     ))
                   ) : (
@@ -1458,8 +1458,8 @@ function KPI() {
               </div>
               <div className="modal-body">
                 <div style={{ marginBottom: '16px' }}>
-                  <p><strong>Tháng:</strong> {escapeHtml(selectedEmployeeKPIView.month || '-')}</p>
-                  <p><strong>Trạng thái:</strong> {escapeHtml(selectedEmployeeKPIView.status || '-')}</p>
+                  <p><strong>Tháng:</strong> {selectedEmployeeKPIView.month || '-'}</p>
+                  <p><strong>Trạng thái:</strong> {selectedEmployeeKPIView.status || '-'}</p>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
                   <table>
@@ -1496,9 +1496,9 @@ function KPI() {
                         return rows.map((row, idx) => (
                           <tr key={idx}>
                             <td>{idx + 1}</td>
-                            <td>{escapeHtml(row.template.code || row.template.id || '-')}</td>
-                            <td>{escapeHtml(row.template.name || '-')}</td>
-                            <td>{escapeHtml(row.template.unit || '-')}</td>
+                            <td>{row.template.code || row.template.id || '-'}</td>
+                            <td>{row.template.name || '-'}</td>
+                            <td>{row.template.unit || '-'}</td>
                             <td>
                               {(row.template.unit === 'VNĐ' || row.template.unit === 'VND')
                                 ? formatMoney(row.target || 0)

@@ -1,5 +1,4 @@
-import React from 'react'
-import { formatMoney, escapeHtml } from '../utils/helpers'
+import { formatMoney } from '../utils/helpers'
 
 function PromotionHistoryModal({ history, employee, promotionHistory, salaryGrades, isOpen, onClose }) {
   if (!isOpen || !history) return null
@@ -40,7 +39,7 @@ function PromotionHistoryModal({ history, employee, promotionHistory, salaryGrad
                     const level = grade ? `Bậc ${grade.level}` : ''
                     const salary = grade ? formatMoney(grade.salary || 0) : ''
                     const content = `${type} – ${level} – ${salary}`
-                    
+
                     return (
                       <tr key={h.id || idx}>
                         <td style={{ fontWeight: 500 }}>
@@ -52,12 +51,12 @@ function PromotionHistoryModal({ history, employee, promotionHistory, salaryGrad
                           </div>
                           {h.reason && (
                             <div style={{ fontSize: '0.9rem', color: '#666', marginTop: '5px', fontStyle: 'italic' }}>
-                              Lý do: {escapeHtml(h.reason || h.lyDo || '')}
+                              Lý do: {h.reason || h.lyDo || ''}
                             </div>
                           )}
                           {h.approvedBy && (
                             <div style={{ fontSize: '0.85rem', color: '#999', marginTop: '3px' }}>
-                              Người phê duyệt: {escapeHtml(h.approvedBy)}
+                              Người phê duyệt: {h.approvedBy}
                             </div>
                           )}
                         </td>

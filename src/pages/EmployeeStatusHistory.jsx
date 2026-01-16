@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import SeedEmployeeStatusButton from '../components/SeedEmployeeStatusButton'
 import { fbGet } from '../services/firebase'
-import { escapeHtml } from '../utils/helpers'
 
 function EmployeeStatusHistory() {
   const [logs, setLogs] = useState([])
@@ -191,12 +190,12 @@ function EmployeeStatusHistory() {
                   filteredLogs.map((log, idx) => (
                     <tr key={log.id || idx}>
                       <td>{idx + 1}</td>
-                      <td>{escapeHtml(log.employeeCode || log.employeeId || '')}</td>
-                      <td>{escapeHtml(log.employeeName || '')}</td>
-                      <td>{escapeHtml(log.newStatus || '')}</td>
+                      <td>{log.employeeCode || log.employeeId || ''}</td>
+                      <td>{log.employeeName || ''}</td>
+                      <td>{log.newStatus || ''}</td>
                       <td>{log.effectiveDate ? new Date(log.effectiveDate).toLocaleDateString('vi-VN') : ''}</td>
-                      <td>{escapeHtml(log.actor || 'HR')}</td>
-                      <td>{escapeHtml(log.note || '')}</td>
+                      <td>{log.actor || 'HR'}</td>
+                      <td>{log.note || ''}</td>
                     </tr>
                   ))
                 ) : (

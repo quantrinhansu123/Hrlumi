@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { fbPush, fbUpdate } from '../services/firebase'
-import { escapeHtml } from '../utils/helpers'
 
 function TaskDetailModal({ task, employees, taskLogs, isOpen, onClose, onSave }) {
   const [isEditing, setIsEditing] = useState(false)
@@ -44,9 +43,9 @@ function TaskDetailModal({ task, employees, taskLogs, isOpen, onClose, onSave })
         deadline: formData.deadline,
         resultFileLink: formData.resultFileLink
       }
-      
+
       await fbUpdate(`hr/tasks/${task.id}`, updateData)
-      
+
       // Create log entry
       await fbPush('hr/taskLogs', {
         taskId: task.id,
@@ -55,7 +54,7 @@ function TaskDetailModal({ task, employees, taskLogs, isOpen, onClose, onSave })
         createdBy: 'System', // In real app, use current user
         createdAt: new Date().toISOString()
       })
-      
+
       alert('Đã cập nhật công việc')
       setIsEditing(false)
       onSave()
@@ -79,7 +78,7 @@ function TaskDetailModal({ task, employees, taskLogs, isOpen, onClose, onSave })
         <div className="modal-header">
           <h3>
             <i className="fas fa-eye"></i>
-            Chi tiết công việc - {escapeHtml(task.name || task.title || 'N/A')}
+            Chi tiết công việc - {task.name || task.title || 'N/A'}
           </h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
@@ -87,37 +86,35 @@ function TaskDetailModal({ task, employees, taskLogs, isOpen, onClose, onSave })
           <div style={{ marginBottom: '20px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
               <div>
-                <strong>Mã công việc:</strong> {escapeHtml(task.code || task.id || '-')}
+                <strong>Mã công việc:</strong> {task.code || task.id || '-'}
               </div>
               <div>
-                <strong>Bộ phận:</strong> {escapeHtml(task.department || '-')}
+                <strong>Bộ phận:</strong> {task.department || '-'}
               </div>
               <div>
-                <strong>Người giao:</strong> {escapeHtml(task.assignerName || getEmployeeName(task.assignerId) || '-')}
+                <strong>Người giao:</strong> {task.assignerName || getEmployeeName(task.assignerId) || '-'}
               </div>
               <div>
-                <strong>Người nhận:</strong> {escapeHtml(getEmployeeName(task.assigneeId) || '-')}
+                <strong>Người nhận:</strong> {getEmployeeName(task.assigneeId) || '-'}
               </div>
               <div>
                 <strong>Mức ưu tiên:</strong>
-                <span className={`badge ${
-                  task.priority === 'Cao' ? 'badge-danger' :
-                  task.priority === 'Trung bình' ? 'badge-warning' :
-                  'badge-info'
-                }`} style={{ marginLeft: '10px' }}>
-                  {escapeHtml(task.priority || '-')}
+                <span className={`badge ${task.priority === 'Cao' ? 'badge-danger' :
+                    task.priority === 'Trung bình' ? 'badge-warning' :
+                      'badge-info'
+                  }`} style={{ marginLeft: '10px' }}>
+                  {task.priority || '-'}
                 </span>
               </div>
               <div>
                 <strong>Trạng thái:</strong>
-                <span className={`badge ${
-                  task.status === 'Đã xong' || task.status === 'Đã hoàn thành' ? 'badge-success' :
-                  task.status === 'Đang làm' ? 'badge-info' :
-                  task.status === 'Quá hạn' ? 'badge-danger' :
-                  task.status === 'Tạm dừng' ? 'badge-warning' :
-                  'badge-secondary'
-                }`} style={{ marginLeft: '10px' }}>
-                  {escapeHtml(task.status || '-')}
+                <span className={`badge ${task.status === 'Đã xong' || task.status === 'Đã hoàn thành' ? 'badge-success' :
+                    task.status === 'Đang làm' ? 'badge-info' :
+                      task.status === 'Quá hạn' ? 'badge-danger' :
+                        task.status === 'Tạm dừng' ? 'badge-warning' :
+                          'badge-secondary'
+                  }`} style={{ marginLeft: '10px' }}>
+                  {task.status || '-'}
                 </span>
               </div>
               <div>
@@ -132,16 +129,16 @@ function TaskDetailModal({ task, employees, taskLogs, isOpen, onClose, onSave })
             {task.description && (
               <div style={{ marginTop: '15px', padding: '10px', background: '#f5f5f5', borderRadius: '4px' }}>
                 <strong>Mô tả:</strong>
-                <p style={{ marginTop: '5px', whiteSpace: 'pre-wrap' }}>{escapeHtml(task.description || task.moTa || '-')}</p>
+                <p style={{ marginTop: '5px', whiteSpace: 'pre-wrap' }}>{task.description || task.moTa || '-'}</p>
               </div>
             )}
 
             {task.resultFileLink && (
               <div style={{ marginTop: '15px' }}>
                 <strong>Link file kết quả:</strong>
-                <a 
-                  href={task.resultFileLink} 
-                  target="_blank" 
+                <a
+                  href={task.resultFileLink}
+                  target="_blank"
                   rel="noopener noreferrer"
                   style={{ marginLeft: '10px', color: 'var(--primary)' }}
                 >
@@ -155,7 +152,7 @@ function TaskDetailModal({ task, employees, taskLogs, isOpen, onClose, onSave })
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: '20px', marginTop: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
               <h4>Cập nhật công việc</h4>
-              <button 
+              <button
                 className="btn btn-sm"
                 onClick={() => setIsEditing(!isEditing)}
               >
@@ -230,30 +227,30 @@ function TaskDetailModal({ task, employees, taskLogs, isOpen, onClose, onSave })
               <h4>Lịch sử cập nhật</h4>
               <div style={{ maxHeight: '300px', overflowY: 'auto', marginTop: '10px' }}>
                 {taskLogs.map((log, idx) => (
-                  <div 
-                    key={log.id || idx} 
-                    style={{ 
-                      padding: '10px', 
-                      marginBottom: '10px', 
-                      background: '#f9f9f9', 
+                  <div
+                    key={log.id || idx}
+                    style={{
+                      padding: '10px',
+                      marginBottom: '10px',
+                      background: '#f9f9f9',
                       borderRadius: '4px',
                       borderLeft: '3px solid var(--primary)'
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                      <strong>{escapeHtml(log.action || 'Cập nhật')}</strong>
+                      <strong>{log.action || 'Cập nhật'}</strong>
                       <span style={{ fontSize: '0.9rem', color: '#666' }}>
-                        {log.createdAt || log.timestamp 
+                        {log.createdAt || log.timestamp
                           ? new Date(log.createdAt || log.timestamp).toLocaleString('vi-VN')
                           : '-'}
                       </span>
                     </div>
                     <div style={{ fontSize: '0.9rem', color: '#666' }}>
-                      {escapeHtml(log.description || '-')}
+                      {log.description || '-'}
                     </div>
                     {log.createdBy && (
                       <div style={{ fontSize: '0.85rem', color: '#999', marginTop: '5px' }}>
-                        Bởi: {escapeHtml(getEmployeeName(log.createdBy) || log.createdBy || 'System')}
+                        Bởi: {getEmployeeName(log.createdBy) || log.createdBy || 'System'}
                       </div>
                     )}
                   </div>

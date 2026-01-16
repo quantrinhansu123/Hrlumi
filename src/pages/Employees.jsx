@@ -3,7 +3,6 @@ import * as XLSX from 'xlsx'
 import EmployeeModal from '../components/EmployeeModal'
 import StatusHistoryView from '../components/StatusHistoryView'
 import { fbDelete, fbGet, fbPush } from '../services/firebase'
-import { escapeHtml } from '../utils/helpers'
 
 function Employees() {
     const [employees, setEmployees] = useState([])
@@ -666,22 +665,22 @@ function Employees() {
                                                         }}></span>
                                                     )}
                                                 </td>
-                                                <td style={{ fontWeight: '500', position: 'sticky', left: 0, background: 'white', zIndex: 1, padding: '4px 8px', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)' }}>{escapeHtml(name)}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.email || '-')}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.sđt || emp.sdt || '-')}</td>
-                                                <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.ngay_sinh || emp.dob || '-')}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.ngay_vao_lam || '-')}</td>
-                                                <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.ngay_lam_chinh_thuc || '-')}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.cccd || '-')}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.ngay_cap || '-')}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.noi_cap || '-')}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.que_quan || '-')}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.gioi_tinh || '-')}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{escapeHtml(emp.tinh_trang_hon_nhan || '-')}</td>
-                                                <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.chi_nhanh || '-')}</td>
-                                                <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.bo_phan || '-')}</td>
-                                                <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.vi_tri || '-')}</td>
-                                                <td style={{ padding: '4px 8px' }}>{escapeHtml(emp.ca_lam_viec || '-')}</td>
+                                                <td style={{ fontWeight: '500', position: 'sticky', left: 0, background: 'white', zIndex: 1, padding: '4px 8px', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)' }}>{name}</td>
+                                                <td style={{ padding: '4px 8px', display: 'none' }}>{emp.email || '-'}</td>
+                                                <td style={{ padding: '4px 8px', display: 'none' }}>{emp.sđt || emp.sdt || '-'}</td>
+                                                <td style={{ padding: '4px 8px' }}>{emp.ngay_sinh || emp.dob || '-'}</td>
+                                                <td style={{ padding: '4px 8px', display: 'none' }}>{emp.ngay_vao_lam || '-'}</td>
+                                                <td style={{ padding: '4px 8px' }}>{emp.ngay_lam_chinh_thuc || '-'}</td>
+                                                <td style={{ padding: '4px 8px', display: 'none' }}>{emp.cccd || '-'}</td>
+                                                <td style={{ padding: '4px 8px', display: 'none' }}>{emp.ngay_cap || '-'}</td>
+                                                <td style={{ padding: '4px 8px', display: 'none' }}>{emp.noi_cap || '-'}</td>
+                                                <td style={{ padding: '4px 8px', display: 'none' }}>{emp.que_quan || '-'}</td>
+                                                <td style={{ padding: '4px 8px', display: 'none' }}>{emp.gioi_tinh || '-'}</td>
+                                                <td style={{ padding: '4px 8px', display: 'none' }}>{emp.tinh_trang_hon_nhan || '-'}</td>
+                                                <td style={{ padding: '4px 8px' }}>{emp.chi_nhanh || '-'}</td>
+                                                <td style={{ padding: '4px 8px' }}>{emp.bo_phan || '-'}</td>
+                                                <td style={{ padding: '4px 8px' }}>{emp.vi_tri || '-'}</td>
+                                                <td style={{ padding: '4px 8px' }}>{emp.ca_lam_viec || '-'}</td>
                                                 <td style={{ padding: '4px 8px' }}>
                                                     <div className="actions" style={{ justifyContent: 'center' }}>
                                                         <button

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { fbDelete, fbGet, fbPush, fbUpdate } from '../services/firebase'
-import { escapeHtml } from '../utils/helpers'
 
 function TrainingParticipantModal({ training, employees, trainingPrograms, isOpen, onClose, onSave, initialView = 'participants', readOnly = false }) {
   const [participants, setParticipants] = useState([])
@@ -398,16 +397,16 @@ function TrainingParticipantModal({ training, employees, trainingPrograms, isOpe
                             <td>{result.score || result.diemThuHoach || '-'}</td>
                             <td>
                               <span className={`badge ${result.grade === 'Giỏi' ? 'badge-success' :
-                                  result.grade === 'Khá' ? 'badge-info' :
-                                    result.grade === 'Trung bình' ? 'badge-warning' :
-                                      'badge-danger'
+                                result.grade === 'Khá' ? 'badge-info' :
+                                  result.grade === 'Trung bình' ? 'badge-warning' :
+                                    'badge-danger'
                                 }`}>
-                                {escapeHtml(result.grade || result.xepLoai || '-')}
+                                {result.grade || result.xepLoai || '-'}
                               </span>
                             </td>
-                            <td>{escapeHtml(result.evaluation || result.danhGia || '-')}</td>
-                            <td>{escapeHtml(result.applied || result.apDung || '-')}</td>
-                            <td>{escapeHtml(result.evaluator || result.nguoiDanhGia || '-')}</td>
+                            <td>{result.evaluation || result.danhGia || '-'}</td>
+                            <td>{result.applied || result.apDung || '-'}</td>
+                            <td>{result.evaluator || result.nguoiDanhGia || '-'}</td>
                             {!readOnly && (
                               <td>
                                 <button

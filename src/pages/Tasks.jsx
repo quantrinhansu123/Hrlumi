@@ -3,7 +3,7 @@ import SeedTaskDataButton from '../components/SeedTaskDataButton'
 import TaskDetailModal from '../components/TaskDetailModal'
 import TaskModal from '../components/TaskModal'
 import { fbDelete, fbGet } from '../services/firebase'
-import { escapeHtml, normalizeString } from '../utils/helpers'
+import { normalizeString } from '../utils/helpers'
 
 function Tasks() {
   const [tasks, setTasks] = useState([])
@@ -453,17 +453,17 @@ function Tasks() {
                   return (
                     <tr key={task.id} style={overdue ? { backgroundColor: '#fff3cd' } : {}}>
                       <td>{idx + 1}</td>
-                      <td>{escapeHtml(task.code || task.id || '-')}</td>
-                      <td>{escapeHtml(task.name || task.title || '-')}</td>
-                      <td>{escapeHtml(task.department || '-')}</td>
-                      <td>{escapeHtml(task.assignerName || getEmployeeName(task.assignerId) || '-')}</td>
-                      <td>{escapeHtml(getEmployeeName(task.assigneeId) || '-')}</td>
+                      <td>{task.code || task.id || '-'}</td>
+                      <td>{task.name || task.title || '-'}</td>
+                      <td>{task.department || '-'}</td>
+                      <td>{task.assignerName || getEmployeeName(task.assignerId) || '-'}</td>
+                      <td>{getEmployeeName(task.assigneeId) || '-'}</td>
                       <td>
                         <span className={`badge ${task.priority === 'Cao' ? 'badge-danger' :
                           task.priority === 'Trung bình' ? 'badge-warning' :
                             'badge-info'
                           }`}>
-                          {escapeHtml(task.priority || '-')}
+                          {task.priority || '-'}
                         </span>
                       </td>
                       <td>{task.startDate ? new Date(task.startDate).toLocaleDateString('vi-VN') : '-'}</td>
@@ -477,7 +477,7 @@ function Tasks() {
                               status === 'Tạm dừng' ? 'badge-warning' :
                                 'badge-secondary'
                           }`}>
-                          {escapeHtml(status || '-')}
+                          {status || '-'}
                         </span>
                       </td>
                       <td>

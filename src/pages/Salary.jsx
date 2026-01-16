@@ -7,7 +7,7 @@ import SalaryGradeModal from '../components/SalaryGradeModal'
 import SeedDataButton from '../components/SeedDataButton'
 import SeedPromotionHistoryButton from '../components/SeedPromotionHistoryButton'
 import { fbDelete, fbGet, fbPush } from '../services/firebase'
-import { escapeHtml, formatMoney } from '../utils/helpers'
+import { formatMoney } from '../utils/helpers'
 
 
 function Salary() {
@@ -843,8 +843,8 @@ function Salary() {
                     .map((grade, idx) => (
                       <tr key={grade.id}>
                         <td>{idx + 1}</td>
-                        <td>{escapeHtml(grade.position || grade.name || '-')}</td>
-                        <td>{escapeHtml(grade.shift || 'Ca ngày')}</td>
+                        <td>{grade.position || grade.name || '-'}</td>
+                        <td>{grade.shift || 'Ca ngày'}</td>
                         <td>{grade.revenueFrom || 0}</td>
                         <td>{grade.revenueTo === null || grade.revenueTo === undefined || grade.revenueTo === '' ? 'Không giới hạn' : grade.revenueTo}</td>
                         <td>Bậc {grade.level || 1}</td>
@@ -853,7 +853,7 @@ function Salary() {
                         </td>
                         <td>
                           <span className={`badge ${grade.status === 'Đang áp dụng' ? 'badge-success' : 'badge-danger'}`}>
-                            {escapeHtml(grade.status || 'Đang áp dụng')}
+                            {grade.status || 'Đang áp dụng'}
                           </span>
                         </td>
                         <td>
@@ -1029,8 +1029,8 @@ function Salary() {
                                 ? new Date(history.effectiveDate).toLocaleDateString('vi-VN')
                                 : '-'}
                             </td>
-                            <td>{escapeHtml(history.type || history.hinhThuc || '-')}</td>
-                            <td>{escapeHtml(history.reason || history.lyDo || '-')}</td>
+                            <td>{history.type || history.hinhThuc || '-'}</td>
+                            <td>{history.reason || history.lyDo || '-'}</td>
                             <td>
                               <div className="actions">
                                 <button

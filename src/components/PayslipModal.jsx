@@ -1,4 +1,4 @@
-import { escapeHtml, formatMoney } from '../utils/helpers'
+import { formatMoney } from '../utils/helpers'
 
 function PayslipModal({ payroll, employee, isOpen, onClose }) {
   if (!isOpen || !payroll) return null
@@ -31,13 +31,13 @@ function PayslipModal({ payroll, employee, isOpen, onClose }) {
                 <strong>Mã nhân sự:</strong> {payroll.employeeId || '-'}
               </div>
               <div>
-                <strong>Bộ phận:</strong> {escapeHtml(payroll.department || employee?.bo_phan || '-')}
+                <strong>Bộ phận:</strong> {payroll.department || employee?.bo_phan || '-'}
               </div>
               <div>
                 <strong>Vị trí:</strong> {employee ? (employee.vi_tri || '-') : '-'}
               </div>
               <div>
-                <strong>Kỳ lương:</strong> {escapeHtml(payroll.period || '-')}
+                <strong>Kỳ lương:</strong> {payroll.period || '-'}
               </div>
             </div>
           </div>

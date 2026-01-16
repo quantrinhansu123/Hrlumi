@@ -1,4 +1,4 @@
-import { escapeHtml, formatMoney } from '../utils/helpers'
+import { formatMoney } from '../utils/helpers'
 
 function KPIDetailModal({ result, employee, kpiTemplates, kpiConversions, isOpen, onClose }) {
   if (!isOpen || !result) return null
@@ -85,8 +85,8 @@ function KPIDetailModal({ result, employee, kpiTemplates, kpiConversions, isOpen
         </div>
         <div className="modal-body">
           <div style={{ marginBottom: '20px' }}>
-            <p><strong>Tháng:</strong> {escapeHtml(result.month || '-')}</p>
-            <p><strong>Bộ phận:</strong> {escapeHtml(result.department || '-')}</p>
+            <p><strong>Tháng:</strong> {result.month || '-'}</p>
+            <p><strong>Bộ phận:</strong> {result.department || '-'}</p>
             <p><strong>KPI tổng:</strong> <span style={{ fontWeight: 'bold', color: 'var(--primary)' }}>
               {(result.totalKPI || result.kpiTong || 0).toFixed(1)}%
             </span></p>
@@ -117,7 +117,7 @@ function KPIDetailModal({ result, employee, kpiTemplates, kpiConversions, isOpen
                   <tr key={idx}>
                     <td>{idx + 1}</td>
                     <td>{employee ? (employee.ho_va_ten || employee.name || 'N/A') : 'N/A'}</td>
-                    <td>{escapeHtml(detail.kpiName)}</td>
+                    <td>{detail.kpiName}</td>
                     <td>
                       {detail.unit === 'VNĐ' || detail.unit === 'VND'
                         ? formatMoney(detail.target)
@@ -137,7 +137,7 @@ function KPIDetailModal({ result, employee, kpiTemplates, kpiConversions, isOpen
                       {detail.conversionPercent}%
                     </td>
                     <td>{detail.weight}%</td>
-                    <td>{escapeHtml(detail.dataSource)}</td>
+                    <td>{detail.dataSource}</td>
                   </tr>
                 ))}
               </tbody>

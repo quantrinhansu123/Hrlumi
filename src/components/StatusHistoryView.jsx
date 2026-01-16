@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { fbGet } from '../services/firebase'
-import { escapeHtml } from '../utils/helpers'
 
 function StatusHistoryView({ employees, onDataChange }) {
     const [logs, setLogs] = useState([])
@@ -218,18 +217,18 @@ function StatusHistoryView({ employees, onDataChange }) {
                                                 <td>{idx + 1}</td>
                                                 <td>
                                                     <span style={{ fontFamily: 'monospace', background: '#f5f5f5', padding: '2px 6px', borderRadius: '4px' }}>
-                                                        {escapeHtml(log.employeeCode || log.employeeId || '')}
+                                                        {log.employeeCode || log.employeeId || ''}
                                                     </span>
                                                 </td>
-                                                <td style={{ fontWeight: '500' }}>{escapeHtml(log.employeeName || '')}</td>
+                                                <td style={{ fontWeight: '500' }}>{log.employeeName || ''}</td>
                                                 <td>
                                                     <span className={`status-badge status-${String(log.newStatus).replace(/\s+/g, '-').toLowerCase()}`} style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', fontWeight: '500' }}>
-                                                        {escapeHtml(log.newStatus || '')}
+                                                        {log.newStatus || ''}
                                                     </span>
                                                 </td>
                                                 <td>{log.effectiveDate ? new Date(log.effectiveDate).toLocaleDateString('vi-VN') : ''}</td>
-                                                <td>{escapeHtml(log.actor || 'HR')}</td>
-                                                <td>{escapeHtml(log.note || '')}</td>
+                                                <td>{log.actor || 'HR'}</td>
+                                                <td>{log.note || ''}</td>
                                             </tr>
                                         ))
                                     ) : (
