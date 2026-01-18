@@ -40,8 +40,13 @@ function Tasks() {
     try {
       setLoading(true)
 
-      // Load employees
-      const empData = await fbGet('employees')
+      const [empData, tasksData, logsData] = await Promise.all([
+        fbGet('employees'),
+        fbGet('hr/tasks'),
+        fbGet('hr/taskLogs')
+      ])
+
+      // Process Employees
       let empList = []
       if (empData) {
         if (Array.isArray(empData)) {
@@ -54,13 +59,12 @@ function Tasks() {
       }
       setEmployees(empList)
 
-      // Load tasks
-      const hrData = await fbGet('hr')
-      const tasksList = hrData?.tasks ? Object.entries(hrData.tasks).map(([k, v]) => ({ ...v, id: k })) : []
+      // Process Tasks
+      const tasksList = tasksData ? Object.entries(tasksData).map(([k, v]) => ({ ...v, id: k })) : []
       setTasks(tasksList)
 
-      // Load task logs
-      const logsList = hrData?.taskLogs ? Object.entries(hrData.taskLogs).map(([k, v]) => ({ ...v, id: k })) : []
+      // Process Task Logs
+      const logsList = logsData ? Object.entries(logsData).map(([k, v]) => ({ ...v, id: k })) : []
       setTaskLogs(logsList)
 
       setLoading(false)

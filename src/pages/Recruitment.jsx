@@ -40,8 +40,13 @@ function Recruitment() {
     try {
       setLoading(true)
 
-      // Load employees (để map sang khi chuyển NV thử việc)
-      const empData = await fbGet('employees')
+      const [empData, plansData, candidatesData] = await Promise.all([
+        fbGet('employees'),
+        fbGet('hr/recruitmentPlans'),
+        fbGet('hr/candidates')
+      ])
+
+      // Process Employees
       let empList = []
       if (empData) {
         if (Array.isArray(empData)) {
@@ -54,22 +59,22 @@ function Recruitment() {
       }
       setEmployees(empList)
 
-      // Load recruitment data
-      const hrData = await fbGet('hr')
-      const plansData = hrData?.recruitmentPlans
-        ? Object.entries(hrData.recruitmentPlans)
+      // Process Recruitment Plans
+      const plans = plansData
+        ? Object.entries(plansData)
           .filter(([k, v]) => v !== null && v !== undefined)
           .map(([k, v]) => ({ ...v, id: k }))
         : []
 
-      const candidatesData = hrData?.candidates
-        ? Object.entries(hrData.candidates)
+      // Process Candidates
+      const candidates = candidatesData
+        ? Object.entries(candidatesData)
           .filter(([k, v]) => v !== null && v !== undefined)
           .map(([k, v]) => ({ ...v, id: k }))
         : []
 
-      setPlans(plansData)
-      setCandidates(candidatesData)
+      setPlans(plans)
+      setCandidates(candidates)
       setLoading(false)
     } catch (error) {
       console.error('Error loading recruitment data:', error)

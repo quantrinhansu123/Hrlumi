@@ -65,8 +65,25 @@ function Salary() {
     try {
       setLoading(true)
 
-      // Load employees
-      const empData = await fbGet('employees')
+      const [
+        empData,
+        gradesData,
+        salariesData,
+        historyData,
+        insData,
+        taxData,
+        depData
+      ] = await Promise.all([
+        fbGet('employees'),
+        fbGet('hr/salaryGrades'),
+        fbGet('hr/employeeSalaries'),
+        fbGet('hr/promotionHistory'),
+        fbGet('hr/insuranceInfo'),
+        fbGet('hr/taxInfo'),
+        fbGet('hr/dependents')
+      ])
+
+      // Process Employees
       let empList = []
       if (empData) {
         if (Array.isArray(empData)) {
@@ -79,30 +96,29 @@ function Salary() {
       }
       setEmployees(empList)
 
-      // Load salary grades
-      const hrData = await fbGet('hr')
-      const grades = hrData?.salaryGrades ? Object.entries(hrData.salaryGrades).map(([k, v]) => ({ ...v, id: k })) : []
+      // Process Salary Grades
+      const grades = gradesData ? Object.entries(gradesData).map(([k, v]) => ({ ...v, id: k })) : []
       setSalaryGrades(grades)
 
-      // Load employee salaries
-      const empSalaries = hrData?.employeeSalaries ? Object.entries(hrData.employeeSalaries).map(([k, v]) => ({ ...v, id: k })) : []
+      // Process Employee Salaries
+      const empSalaries = salariesData ? Object.entries(salariesData).map(([k, v]) => ({ ...v, id: k })) : []
       setEmployeeSalaries(empSalaries)
 
-      // Load promotion history
-      const history = hrData?.promotionHistory ? Object.entries(hrData.promotionHistory).map(([k, v]) => ({ ...v, id: k })) : []
+      // Process History
+      const history = historyData ? Object.entries(historyData).map(([k, v]) => ({ ...v, id: k })) : []
       setPromotionHistory(history)
 
-      // Load Insurance Info
-      const insData = hrData?.insuranceInfo ? Object.entries(hrData.insuranceInfo).map(([k, v]) => ({ ...v, id: k })) : []
-      setInsuranceInfo(insData)
+      // Process Insurance
+      const insList = insData ? Object.entries(insData).map(([k, v]) => ({ ...v, id: k })) : []
+      setInsuranceInfo(insList)
 
-      // Load Tax Info
-      const taxData = hrData?.taxInfo ? Object.entries(hrData.taxInfo).map(([k, v]) => ({ ...v, id: k })) : []
-      setTaxInfo(taxData)
+      // Process Tax
+      const taxList = taxData ? Object.entries(taxData).map(([k, v]) => ({ ...v, id: k })) : []
+      setTaxInfo(taxList)
 
-      // Load Dependents (for Tax Calc)
-      const depData = hrData?.dependents ? Object.entries(hrData.dependents).map(([k, v]) => ({ ...v, id: k })) : []
-      setDependents(depData)
+      // Process Dependents
+      const depList = depData ? Object.entries(depData).map(([k, v]) => ({ ...v, id: k })) : []
+      setDependents(depList)
 
       setLoading(false)
     } catch (error) {

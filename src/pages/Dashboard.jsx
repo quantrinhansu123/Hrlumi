@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
-import { fbGet } from '../services/firebase'
+import { useEffect, useState } from 'react'
 import SeedAllDataButton from '../components/SeedAllDataButton'
+import { fbGet } from '../services/firebase'
 
 function Dashboard() {
   const [stats, setStats] = useState({
@@ -20,15 +20,15 @@ function Dashboard() {
     try {
       const empData = await fbGet('employees')
       let employees = []
-      
+
       if (empData === null || empData === undefined) {
         employees = []
       } else if (Array.isArray(empData)) {
         employees = empData.filter(item => item !== null && item !== undefined)
       } else if (typeof empData === "object") {
         employees = Object.entries(empData)
-          .filter(([k,v]) => v !== null && v !== undefined)
-          .map(([k,v]) => ({...v, id: k}))
+          .filter(([k, v]) => v !== null && v !== undefined)
+          .map(([k, v]) => ({ ...v, id: k }))
       }
 
       const hcmCount = employees.filter(e => {
@@ -44,8 +44,8 @@ function Dashboard() {
       // Load tasks
       let tasks = []
       try {
-        const hrData = await fbGet('hr')
-        tasks = hrData?.tasks ? Object.entries(hrData.tasks).map(([k,v]) => ({...v, id: k})) : []
+        const tasksData = await fbGet('hr/tasks')
+        tasks = tasksData ? Object.entries(tasksData).map(([k, v]) => ({ ...v, id: k })) : []
       } catch (e) {
         console.warn('Tasks not found')
       }
@@ -148,8 +148,8 @@ function Dashboard() {
                   <tr key={idx}>
                     <td>
                       {avatar ? (
-                        <img 
-                          src={avatar} 
+                        <img
+                          src={avatar}
                           alt={name}
                           style={{
                             width: '40px',

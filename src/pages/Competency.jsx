@@ -119,8 +119,17 @@ function Competency() {
     try {
       setLoading(true)
 
-      // Load employees
-      const empData = await fbGet('employees')
+      console.time('LoadData')
+
+      const [empData, frameworkData, evalsData, trainingsData, participantsData] = await Promise.all([
+        fbGet('employees'),
+        fbGet('hr/competencyFramework'),
+        fbGet('hr/employee_competency_assessment'),
+        fbGet('hr/trainings'),
+        fbGet('hr/trainingParticipants')
+      ])
+
+      // Process Employees
       let empList = []
       if (empData) {
         if (Array.isArray(empData)) {
@@ -133,25 +142,23 @@ function Competency() {
       }
       setEmployees(empList)
 
-      // Load competency framework
-      const hrData = await fbGet('hr')
-      const framework = hrData?.competencyFramework ? Object.entries(hrData.competencyFramework).map(([k, v]) => ({ ...v, id: k })) : []
+      // Process Framework
+      const framework = frameworkData ? Object.entries(frameworkData).map(([k, v]) => ({ ...v, id: k })) : []
       setCompetencyFramework(framework)
 
-      // Load evaluations (đổi sang employee_competency_assessment)
-      const evals = hrData?.employee_competency_assessment
-        ? Object.entries(hrData.employee_competency_assessment).map(([k, v]) => ({ ...v, id: k }))
-        : []
+      // Process Evaluations
+      const evals = evalsData ? Object.entries(evalsData).map(([k, v]) => ({ ...v, id: k })) : []
       setEvaluations(evals)
 
-      // Load training programs
-      const trainings = hrData?.trainings ? Object.entries(hrData.trainings).map(([k, v]) => ({ ...v, id: k })) : []
+      // Process Trainings
+      const trainings = trainingsData ? Object.entries(trainingsData).map(([k, v]) => ({ ...v, id: k })) : []
       setTrainingPrograms(trainings)
 
-      // Load training participants
-      const participants = hrData?.trainingParticipants ? Object.entries(hrData.trainingParticipants).map(([k, v]) => ({ ...v, id: k })) : []
+      // Process Participants
+      const participants = participantsData ? Object.entries(participantsData).map(([k, v]) => ({ ...v, id: k })) : []
       setTrainingParticipants(participants)
 
+      console.timeEnd('LoadData')
       setLoading(false)
     } catch (error) {
       console.error('Error loading competency data:', error)

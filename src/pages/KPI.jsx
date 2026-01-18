@@ -61,8 +61,15 @@ function KPI() {
     try {
       setLoading(true)
 
-      // Load employees
-      const empData = await fbGet('employees')
+      const [empData, templatesData, empKPIsData, conversionsData, resultsData] = await Promise.all([
+        fbGet('employees'),
+        fbGet('hr/kpiTemplates'),
+        fbGet('hr/employeeKPIs'),
+        fbGet('hr/kpiConversions'),
+        fbGet('hr/kpiResults')
+      ])
+
+      // Process Employees
       let empList = []
       if (empData) {
         if (Array.isArray(empData)) {
@@ -75,18 +82,20 @@ function KPI() {
       }
       setEmployees(empList)
 
-      // Load KPI data
-      const hrData = await fbGet('hr')
-      const templates = hrData?.kpiTemplates ? Object.entries(hrData.kpiTemplates).map(([k, v]) => ({ ...v, id: k })) : []
+      // Process KPI Templates
+      const templates = templatesData ? Object.entries(templatesData).map(([k, v]) => ({ ...v, id: k })) : []
       setKpiTemplates(templates)
 
-      const empKPIs = hrData?.employeeKPIs ? Object.entries(hrData.employeeKPIs).map(([k, v]) => ({ ...v, id: k })) : []
+      // Process Employee KPIs
+      const empKPIs = empKPIsData ? Object.entries(empKPIsData).map(([k, v]) => ({ ...v, id: k })) : []
       setEmployeeKPIs(empKPIs)
 
-      const conversions = hrData?.kpiConversions ? Object.entries(hrData.kpiConversions).map(([k, v]) => ({ ...v, id: k })) : []
+      // Process Conversions
+      const conversions = conversionsData ? Object.entries(conversionsData).map(([k, v]) => ({ ...v, id: k })) : []
       setKpiConversions(conversions)
 
-      const results = hrData?.kpiResults ? Object.entries(hrData.kpiResults).map(([k, v]) => ({ ...v, id: k })) : []
+      // Process Results
+      const results = resultsData ? Object.entries(resultsData).map(([k, v]) => ({ ...v, id: k })) : []
       setKpiResults(results)
 
       setLoading(false)

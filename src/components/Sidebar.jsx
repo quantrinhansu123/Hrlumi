@@ -17,16 +17,30 @@ function Sidebar() {
 
   return (
     <aside className="sidebar">
-      {menuItems.map(item => (
-        <Link
-          key={item.path}
-          to={item.path}
-          className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
-        >
-          <i className={item.icon}></i>
-          <span>{item.label}</span>
-        </Link>
-      ))}
+      {menuItems.map(item => {
+        const isExternal = item.path.startsWith('http')
+        return isExternal ? (
+          <a
+            key={item.path}
+            href={item.path}
+            className="nav-item"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <i className={item.icon}></i>
+            <span>{item.label}</span>
+          </a>
+        ) : (
+          <Link
+            key={item.path}
+            to={item.path}
+            className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
+          >
+            <i className={item.icon}></i>
+            <span>{item.label}</span>
+          </Link>
+        )
+      })}
     </aside>
   )
 }

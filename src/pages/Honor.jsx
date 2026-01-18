@@ -1,12 +1,25 @@
-import React from 'react'
-
 function Honor() {
+  const honorUrl = "https://quantrinhansu123.github.io/VinhdanhLumi.html/"
+
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Tôn vinh</h1>
-      <div className="bg-white rounded-lg shadow p-6">
-        <p>Trang ghi nhận và tôn vinh thành tích nhân viên.</p>
-      </div>
+    <div style={{
+      width: '100%',
+      height: 'calc(100vh - 80px)',
+      padding: '0',
+      margin: '0',
+      overflow: 'hidden'
+    }}>
+      <iframe
+        src={honorUrl}
+        title="Tôn vinh"
+        style={{
+          width: '100%',
+          height: '100%',
+          border: 'none',
+          display: 'block'
+        }}
+        allowFullScreen
+      />
     </div>
   )
 }

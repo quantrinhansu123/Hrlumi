@@ -104,8 +104,28 @@ function Attendance() {
     try {
       setLoading(true)
 
-      // Load employees
-      const empData = await fbGet('employees')
+      // Load all data concurrently
+      const [
+        empData,
+        attendanceLogsData,
+        payrollsData,
+        insuranceData,
+        taxData,
+        dependentsData,
+        adjustments,
+        manuals
+      ] = await Promise.all([
+        fbGet('employees'),
+        fbGet('hr/attendanceLogs'),
+        fbGet('hr/payrolls'),
+        fbGet('hr/insuranceInfo'),
+        fbGet('hr/taxInfo'),
+        fbGet('hr/dependents'),
+        fbGet(`hr/attendanceAdjustments/${filterAttendanceMonth}`),
+        fbGet(`hr/manualWorkdays/${filterAttendanceMonth}`)
+      ])
+
+      // Process Employees
       let empList = []
       if (empData) {
         if (Array.isArray(empData)) {
@@ -118,31 +138,28 @@ function Attendance() {
       }
       setEmployees(empList)
 
-      // Load attendance and payroll data
-      const hrData = await fbGet('hr')
-      const logs = hrData?.attendanceLogs ? Object.entries(hrData.attendanceLogs).map(([k, v]) => ({ ...v, id: k })) : []
+      // Process Logs
+      const logs = attendanceLogsData ? Object.entries(attendanceLogsData).map(([k, v]) => ({ ...v, id: k })) : []
       setAttendanceLogs(logs ? Object.values(logs) : [])
 
-      // Fetch Adjustments for this month
-      // Path: hr/attendanceAdjustments/YYYY-MM/{employeeId: "1,5"}
-      const adjustments = await fbGet(`hr/attendanceAdjustments/${filterAttendanceMonth}`)
+      // Process Adjustments & Manuals
       setAttendanceAdjustments(adjustments || {})
-
-      // Fetch Manual Workdays
-      // Path: hr/manualWorkdays/YYYY-MM/{employeeId}/{day} = value
-      const manuals = await fbGet(`hr/manualWorkdays/${filterAttendanceMonth}`)
       setManualWorkdays(manuals || {})
 
-      const payrollList = hrData?.payrolls ? Object.entries(hrData.payrolls).map(([k, v]) => ({ ...v, id: k })) : []
+      // Process Payrolls
+      const payrollList = payrollsData ? Object.entries(payrollsData).map(([k, v]) => ({ ...v, id: k })) : []
       setPayrolls(payrollList)
 
-      const insuranceList = hrData?.insuranceInfo ? Object.entries(hrData.insuranceInfo).map(([k, v]) => ({ ...v, id: k })) : []
+      // Process Insurance
+      const insuranceList = insuranceData ? Object.entries(insuranceData).map(([k, v]) => ({ ...v, id: k })) : []
       setInsuranceInfo(insuranceList)
 
-      const taxList = hrData?.taxInfo ? Object.entries(hrData.taxInfo).map(([k, v]) => ({ ...v, id: k })) : []
+      // Process Tax
+      const taxList = taxData ? Object.entries(taxData).map(([k, v]) => ({ ...v, id: k })) : []
       setTaxInfo(taxList)
 
-      const dependentsList = hrData?.dependents ? Object.entries(hrData.dependents).map(([k, v]) => ({ ...v, id: k })) : []
+      // Process Dependents
+      const dependentsList = dependentsData ? Object.entries(dependentsData).map(([k, v]) => ({ ...v, id: k })) : []
       setDependents(dependentsList)
 
       setLoading(false)
