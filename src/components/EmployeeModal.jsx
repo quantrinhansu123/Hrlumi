@@ -257,20 +257,25 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
 
         // Log thay đổi trạng thái nếu có đổi
         if (oldStatus !== newStatus) {
-          // TODO: Create 'employee_status_history' table in Supabase if needed
-          /* 
-          await fbPush('hr/employee_status_history', {
-            employeeId: employee.id,
-            employeeName: formData.ho_va_ten || employee.ho_va_ten || '',
-            newStatus: newStatus,
-            oldStatus: oldStatus,
-            effectiveDate: new Date().toISOString().split('T')[0],
-            actor: 'HR',
-            note: 'Cập nhật trạng thái nhân sự',
-            createdAt: new Date().toISOString()
-          })
-          */
-          console.log('Status changed, but history logging disabled during migration')
+          const historyPayload = {
+            employee_id: employee.id, // Supabase user ID
+            employee_code: employee.employeeId || '', // Store employee code
+            employee_name: formData.ho_va_ten || employee.ho_va_ten || '',
+            new_status: newStatus,
+            old_status: oldStatus,
+            effective_date: new Date().toISOString().split('T')[0],
+            actor: 'HR', // Could be dynamic if we track logged-in user
+            note: 'Cập nhật trạng thái nhân sự'
+          }
+
+          const { error: historyError } = await supabase
+            .from('employee_status_history')
+            .insert([historyPayload])
+
+          if (historyError) {
+            console.error('Error logging status history:', historyError)
+            // Non-blocking error, just log it
+          }
         }
       } else {
         // Remove id from formData if it exists and is empty/null to allow auto-increment

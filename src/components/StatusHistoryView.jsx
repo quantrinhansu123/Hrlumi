@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fbGet } from '../services/firebase'
+import { supabase } from '../services/supabase'
 
 function StatusHistoryView({ employees, onDataChange }) {
     const [logs, setLogs] = useState([])
@@ -15,14 +15,29 @@ function StatusHistoryView({ employees, onDataChange }) {
     const loadData = async () => {
         try {
             setLoading(true)
-            const hrData = await fbGet('hr')
-            const rawLogs = hrData?.employee_status_history
-                ? Object.entries(hrData.employee_status_history)
-                    .filter(([k, v]) => v !== null && v !== undefined)
-                    .map(([k, v]) => ({ ...v, id: k }))
-                : []
+            setLoading(true)
+            const { data, error } = await supabase
+                .from('employee_status_history')
+                .select('*')
+                .order('created_at', { ascending: false })
+
+            if (error) throw error
+
+            const rawLogs = (data || []).map(item => ({
+                id: item.id,
+                employeeId: item.employee_id, // Map database column to UI expected field
+                employeeCode: item.employee_code,
+                employeeName: item.employee_name,
+                oldStatus: item.old_status,
+                newStatus: item.new_status,
+                effectiveDate: item.effective_date,
+                actor: item.actor,
+                note: item.note,
+                createdAt: item.created_at
+            }))
             // Sort newest first
-            rawLogs.sort((a, b) => new Date(b.effectiveDate || b.createdAt || 0) - new Date(a.effectiveDate || a.createdAt || 0))
+            // Sort manually if needed, though Supabase order() handles it
+            // rawLogs.sort((a, b) => new Date(b.effectiveDate || b.createdAt || 0) - new Date(a.effectiveDate || a.createdAt || 0))
             setLogs(rawLogs)
             setLoading(false)
         } catch (error) {
