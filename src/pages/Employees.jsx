@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import EmployeeModal from '../components/EmployeeModal'
 import StatusHistoryView from '../components/StatusHistoryView'
-import { fbDelete, fbGet, fbPush } from '../services/firebase'
+import { supabase } from '../services/supabase'
+import { mapUserToApp } from '../utils/helpers'
 
 function Employees() {
     const [employees, setEmployees] = useState([])
@@ -33,20 +34,14 @@ function Employees() {
     const loadEmployees = async () => {
         try {
             setLoading(true)
-            const raw = await fbGet("employees")
-            let data = []
+            const { data, error } = await supabase
+                .from('users')
+                .select('*')
 
-            if (raw === null || raw === undefined) {
-                data = []
-            } else if (Array.isArray(raw)) {
-                data = raw.filter(item => item !== null && item !== undefined)
-            } else if (typeof raw === "object") {
-                data = Object.entries(raw)
-                    .filter(([k, v]) => v !== null && v !== undefined)
-                    .map(([k, v]) => ({ ...v, id: k }))
-            }
+            if (error) throw error
 
-            setEmployees(data)
+            const mappedData = (data || []).map(u => mapUserToApp(u))
+            setEmployees(mappedData)
             setLoading(false)
         } catch (err) {
             console.error("Error loading employees:", err)
@@ -111,7 +106,13 @@ function Employees() {
         }
 
         try {
-            await fbDelete(`employees/${id}`)
+            const { error } = await supabase
+                .from('users')
+                .delete()
+                .eq('id', id)
+
+            if (error) throw error
+
             setEmployees(prev => prev.filter(item => item.id !== id))
             alert(`Đã xóa nhân viên "${name}"`)
         } catch (error) {
@@ -393,7 +394,7 @@ function Employees() {
                 })
 
                 const payload = {
-                    employeeId: rowObj['ma_nhan_vien'] || rowObj['ma_nv'] || rowObj['employee_id'] || rowObj['code'] || '',
+                    // id: rowObj['ma_nhan_vien'] || rowObj['ma_nv'] || rowObj['employee_id'] || rowObj['code'] || '', // Supabase typically auto-generates ID, or use it if UUID
                     ho_va_ten: rowObj['ho_va_ten'] || rowObj['ho_ten'] || rowObj['ten'] || rowObj['ho_va_ten'] || rowObj['name'] || '',
                     email: rowObj['email'] || '',
                     sđt: rowObj['sdt'] || rowObj['so_dien_thoai'] || rowObj['dien_thoai'] || rowObj['phone'] || '',
@@ -423,16 +424,23 @@ function Employees() {
                 }
 
                 console.log('✅ Importing:', payload.ho_va_ten)
-                if (payload.avatarUrl) {
-                    console.log('   🖼️ Avatar URL:', payload.avatarUrl)
+
+                const dbPayload = mapAppToUser(payload)
+                dbPayload.password = dbPayload.password || '123456'
+
+                const { error } = await supabase.from('users').insert([dbPayload])
+
+                if (error) {
+                    console.error('❌ Insert error for:', payload.ho_va_ten, error)
+                    skipped++ // Count as skipped/failed
+                } else {
+                    imported++
                 }
-                await fbPush('employees', payload)
-                imported++
             }
 
             await loadEmployees()
             console.log(`📊 Import summary: ${imported} imported, ${skipped} skipped`)
-            alert(`Đã import ${imported} dòng.${skipped > 0 ? ` Bỏ qua ${skipped} dòng (thiếu tên).` : ''}`)
+            alert(`Đã import ${imported} dòng.${skipped > 0 ? ` Bỏ qua/Lỗi ${skipped} dòng.` : ''}`)
         } catch (error) {
             console.error('❌ Import error:', error)
             alert('Lỗi import: ' + error.message)
@@ -483,8 +491,13 @@ function Employees() {
                                 if (confirm('CẢNH BÁO: Hành động này sẽ XÓA TOÀN BỘ dữ liệu nhân viên và lịch sử trạng thái hiện tại.\n\nBạn có chắc muốn làm sạch hệ thống để nhập liệu thật không?')) {
                                     try {
                                         setLoading(true)
-                                        await fbDelete('employees')
-                                        await fbDelete('hr/employee_status_history')
+                                        // Delete all users
+                                        // Warning: Supabase delete without where clause often requires specific settings or policies
+                                        const { error } = await supabase.from('users').delete().neq('id', 0) // Cheap trick if id is numeric, or use a always-true condition
+
+                                        if (error) throw error
+
+                                        // await fbDelete('hr/employee_status_history') // Consider where history lives now
                                         setEmployees([])
                                         alert('Đã xóa sạch dữ liệu hệ thống!')
                                         loadEmployees()

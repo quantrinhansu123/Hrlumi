@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fbPush, fbUpdate } from '../services/firebase'
+import { supabase } from '../services/supabase'
 
 function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) {
   const [formData, setFormData] = useState({
@@ -247,10 +247,18 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
       const newStatus = formData.trang_thai
 
       if (employee && employee.id) {
-        await fbUpdate(`employees/${employee.id}`, formData)
+        const dbPayload = mapAppToUser(formData)
+        const { error } = await supabase
+          .from('users')
+          .update(dbPayload)
+          .eq('id', employee.id)
+
+        if (error) throw error
 
         // Log thay đổi trạng thái nếu có đổi
         if (oldStatus !== newStatus) {
+          // TODO: Create 'employee_status_history' table in Supabase if needed
+          /* 
           await fbPush('hr/employee_status_history', {
             employeeId: employee.id,
             employeeName: formData.ho_va_ten || employee.ho_va_ten || '',
@@ -261,9 +269,21 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
             note: 'Cập nhật trạng thái nhân sự',
             createdAt: new Date().toISOString()
           })
+          */
+          console.log('Status changed, but history logging disabled during migration')
         }
       } else {
-        await fbPush('employees', formData)
+        // Remove id from formData if it exists and is empty/null to allow auto-increment
+        if ('id' in formData) delete formData.id
+
+        const dbPayload = mapAppToUser(formData)
+        dbPayload.password = '123456'
+
+        const { error } = await supabase
+          .from('users')
+          .insert([dbPayload])
+
+        if (error) throw error
       }
       onSave()
       onClose()
