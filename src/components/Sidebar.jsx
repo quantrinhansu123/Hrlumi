@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom'
 
 function Sidebar() {
   const location = useLocation()
@@ -22,21 +22,16 @@ function Sidebar() {
         <span>HR Manager</span>
       </div>
 
-      {menuItems.map(item => {
-        // Handle external or special links if needed, logic from before
-        const isExternal = item.path.startsWith('http');
-
-        return (
-          <Link
-            key={item.path}
-            to={item.path}
-            className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
-          >
-            <i className={item.icon}></i>
-            <span>{item.label}</span>
-          </Link>
-        )
-      })}
+      {menuItems.map(item => (
+        <Link
+          key={item.path}
+          to={item.path}
+          className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
+        >
+          <i className={item.icon}></i>
+          <span>{item.label}</span>
+        </Link>
+      ))}
     </aside>
   )
 }
