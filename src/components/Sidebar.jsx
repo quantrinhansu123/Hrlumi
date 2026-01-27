@@ -1,15 +1,7 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
+import { Link, useLocation } from 'react-router-dom';
 
 function Sidebar() {
   const location = useLocation()
-  const navigate = useNavigate()
-  const { logout } = useAuth()
-
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
-  }
 
   const menuItems = [
     { path: '/dashboard', icon: 'fas fa-home', label: 'Tổng quan' },
@@ -46,15 +38,6 @@ function Sidebar() {
           </Link>
         )
       })}
-
-      <div
-        className="nav-item"
-        onClick={handleLogout}
-        style={{ marginTop: 'auto', borderTop: '1px solid #eee', cursor: 'pointer', color: '#d32f2f' }}
-      >
-        <i className="fas fa-sign-out-alt"></i>
-        <span>Đăng xuất</span>
-      </div>
     </aside>
   )
 }
