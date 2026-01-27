@@ -1,32 +1,19 @@
 :root {
-  --primary: #003366;
-  /* Deep Navy (Uniforms/Night Sky) */
-  --primary-dark: #002244;
-  /* Darker Navy */
-  --secondary: #00a0e9;
-  /* Sky Blue (Flight) */
-  --accent: #ffcc00;
-  /* Safety Yellow (Runway markings) */
-  --bg: #eceff1;
-  /* Concrete/Cloud Grey */
-  --card: #ffffff;
-  --text: #263238;
-  /* Slate Dark (Signage) */
-  --text-light: #546e7a;
-  /* Slate Grey */
-  --border: #b0bec5;
-  /* Metal/Aluminium Grey */
-  --danger: #d32f2f;
-  /* Alert Red */
-  --success: #2e7d32;
-  /* Safe Green */
-  --warning: #fbc02d;
-  /* Caution Yellow */
-  --info: #0288d1;
-  /* Info Blue */
-  --shadow: 0 4px 12px rgba(55, 71, 79, 0.1);
-  --radius: 4px;
-  /* Sharper corners for industrial/signage look */
+  --primary: #00b14f;
+  --primary-dark: #009643;
+  --secondary: #f37021;
+  --accent: #1a73e8;
+  --bg: #f5f5f5;
+  --card: #fff;
+  --text: #333;
+  --text-light: #666;
+  --border: #e0e0e0;
+  --danger: #dc3545;
+  --success: #28a745;
+  --warning: #ffc107;
+  --info: #17a2b8;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --radius: 8px;
 }
 
 * {
@@ -36,19 +23,15 @@
 }
 
 body {
-  font-family: 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-  /* Signage fonts */
+  font-family: 'Segoe UI', Tahoma, sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
-  letter-spacing: 0.3px;
-  /* Slightly clearer text */
 }
 
 /* Header */
 .header {
-  background: linear-gradient(135deg, #003366 0%, #00509e 100%);
-  /* Navy Gradient */
+  background: linear-gradient(135deg, #4eca7a 0%, #3cb868 100%);
   color: #fff;
   padding: 15px 30px;
   display: flex;
@@ -57,9 +40,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-  border-bottom: 3px solid var(--accent);
-  /* Runway stripe accent */
+  box-shadow: var(--shadow);
 }
 
 .logo {
@@ -84,8 +65,7 @@ body {
 }
 
 .logo span {
-  color: var(--accent);
-  /* Safety Yellow text accent */
+  color: var(--secondary);
 }
 
 .user-info {
@@ -117,6 +97,8 @@ body {
   top: 80px;
   height: calc(100vh - 80px);
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .nav-item {
@@ -132,10 +114,9 @@ body {
 
 .nav-item:hover,
 .nav-item.active {
-  background: rgba(0, 160, 233, 0.1);
-  /* Sky blue tint */
-  color: var(--secondary);
-  border-left-color: var(--secondary);
+  background: rgba(0, 177, 79, 0.1);
+  color: var(--primary);
+  border-left-color: var(--primary);
 }
 
 .nav-item i {
@@ -536,31 +517,25 @@ tr:hover {
 }
 
 /* Print Styles */
-/* Print Styles */
 @media print {
   @page {
     size: A4;
     margin: 0;
-    /* Setting margin to 0 hides default browser headers/footers */
   }
 
-  /* 1. Hide ALL main layout elements effectively removing them from flow */
   .header,
   .sidebar,
   .page-header,
   .tabs,
   .card,
-  /* Hides the table container */
   .search-box,
   .actions,
   .loadingState,
   .emptyState,
   .modal:not(.show) {
-    /* Hide closed modals */
     display: none !important;
   }
 
-  /* 2. Reset Layout Containers to be invisible wrappers */
   .container,
   .main,
   #root,
@@ -573,10 +548,8 @@ tr:hover {
     overflow: visible !important;
     background: white !important;
     position: static !important;
-    /* Let flow naturally */
   }
 
-  /* 3. Style the specific Payslip Modal */
   .modal.show {
     position: absolute !important;
     top: 0 !important;
@@ -585,7 +558,6 @@ tr:hover {
     height: auto !important;
     margin: 0 !important;
     padding: 1.5cm !important;
-    /* Add internal padding since page margin is 0 */
     background: white !important;
     display: block !important;
     visibility: visible !important;
@@ -603,11 +575,9 @@ tr:hover {
     position: static !important;
   }
 
-  /* Compact content specific for Payslip */
   .modal-header {
     padding: 10px 0 !important;
     border-bottom: 2px solid #000 !important;
-    /* Black for better print contrast */
     margin-bottom: 15px !important;
   }
 
@@ -644,7 +614,6 @@ tr:hover {
     color: #000 !important;
   }
 
-  /* Hide print-irrelevant elements in Modal */
   .modal-close,
   .modal-footer,
   button,
@@ -653,7 +622,6 @@ tr:hover {
     display: none !important;
   }
 
-  /* Force single page if possible */
   .modal-content {
     page-break-inside: avoid !important;
   }

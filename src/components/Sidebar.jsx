@@ -10,9 +10,9 @@ function Sidebar() {
     { path: '/salary', icon: 'fas fa-money-bill-wave', label: 'Lương & Phúc lợi' },
     { path: '/competency', icon: 'fas fa-chart-line', label: 'Khung năng lực' },
     { path: '/kpi', icon: 'fas fa-bullseye', label: 'KPI' },
-    { path: '/grading', icon: 'fas fa-star-half-alt', label: 'Chấm điểm' },
     { path: '/tasks', icon: 'fas fa-tasks', label: 'Công việc' },
-    { path: '/attendance', icon: 'fas fa-clock', label: 'Chấm công' }
+    { path: '/attendance', icon: 'fas fa-clock', label: 'Chấm công' },
+    { path: '/honor', icon: 'fas fa-medal', label: 'Vinh danh' }
   ]
 
   return (
