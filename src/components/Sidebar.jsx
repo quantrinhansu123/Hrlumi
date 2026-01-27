@@ -1,36 +1,41 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 
 function Sidebar() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { logout } = useAuth()
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
 
   const menuItems = [
     { path: '/dashboard', icon: 'fas fa-home', label: 'Tổng quan' },
     { path: '/employees', icon: 'fas fa-users', label: 'Hồ sơ nhân sự' },
     { path: '/recruitment', icon: 'fas fa-user-plus', label: 'Tuyển dụng' },
-    { path: '/salary', icon: 'fas fa-dollar-sign', label: 'Bậc lương & Thăng tiến' },
-    { path: '/competency', icon: 'fas fa-graduation-cap', label: 'Năng lực nhân sự' },
+    { path: '/salary', icon: 'fas fa-money-bill-wave', label: 'Lương & Phúc lợi' },
+    { path: '/competency', icon: 'fas fa-chart-line', label: 'Khung năng lực' },
     { path: '/kpi', icon: 'fas fa-bullseye', label: 'KPI' },
-    { path: '/tasks', icon: 'fas fa-clipboard-list', label: 'Giao việc' },
-    { path: '/attendance', icon: 'fas fa-clock', label: 'Chấm công & Lương' },
-    { path: '/honor', icon: 'fas fa-medal', label: 'Tôn vinh' },
+    { path: '/grading', icon: 'fas fa-star-half-alt', label: 'Chấm điểm' },
+    { path: '/tasks', icon: 'fas fa-tasks', label: 'Công việc' },
+    { path: '/attendance', icon: 'fas fa-clock', label: 'Chấm công' },
+    { path: '/honor', icon: 'fas fa-medal', label: 'Vinh danh' }
   ]
 
   return (
     <aside className="sidebar">
+      <div className="brand">
+        <i className="fas fa-layer-group"></i>
+        <span>HR Manager</span>
+      </div>
+
       {menuItems.map(item => {
-        const isExternal = item.path.startsWith('http')
-        return isExternal ? (
-          <a
-            key={item.path}
-            href={item.path}
-            className="nav-item"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <i className={item.icon}></i>
-            <span>{item.label}</span>
-          </a>
-        ) : (
+        // Handle external or special links if needed, logic from before
+        const isExternal = item.path.startsWith('http');
+
+        return (
           <Link
             key={item.path}
             to={item.path}
@@ -41,6 +46,15 @@ function Sidebar() {
           </Link>
         )
       })}
+
+      <div
+        className="nav-item"
+        onClick={handleLogout}
+        style={{ marginTop: 'auto', borderTop: '1px solid #eee', cursor: 'pointer', color: '#d32f2f' }}
+      >
+        <i className="fas fa-sign-out-alt"></i>
+        <span>Đăng xuất</span>
+      </div>
     </aside>
   )
 }

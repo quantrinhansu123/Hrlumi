@@ -15,6 +15,28 @@ export const formatMoney = (n) => {
 }
 
 
+
+// Display date as DD/MM/YYYY
+export const formatDateDisplay = (dateStr) => {
+  if (!dateStr) return '-'
+  try {
+    // If it's already DD/MM/YYYY
+    if (String(dateStr).includes('/') && String(dateStr).split('/').length === 3) return dateStr
+
+    // If YYYY-MM-DD
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return dateStr
+
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const year = date.getFullYear()
+
+    return `${day}/${month}/${year}`
+  } catch (e) {
+    return dateStr
+  }
+}
+
 export const normalizeString = (str) => {
   if (!str) return ''
   return str.normalize('NFD')
@@ -81,6 +103,29 @@ export const mapUserToApp = (user) => {
   }
 }
 
+// Helper to convert DD/MM/YYYY to YYYY-MM-DD
+const formatDateForDB = (dateStr) => {
+  if (!dateStr) return null
+  const str = String(dateStr).trim()
+
+  // Already in YYYY-MM-DD
+  if (str.match(/^\d{4}-\d{2}-\d{2}$/)) return str
+
+  // Handle DD/MM/YYYY
+  if (str.includes('/')) {
+    const parts = str.split('/')
+    if (parts.length === 3) {
+      // Assuming DD/MM/YYYY
+      const day = parts[0].padStart(2, '0')
+      const month = parts[1].padStart(2, '0')
+      const year = parts[2]
+      return `${year}-${month}-${day}`
+    }
+  }
+
+  return null
+}
+
 // Map App State (Vietnamese) -> Supabase DB columns (English)
 export const mapAppToUser = (data) => {
   if (!data) return null
@@ -95,14 +140,14 @@ export const mapAppToUser = (data) => {
     position: data.vi_tri || '',
     employment_status: data.trang_thai || '',
     shift: data.ca_lam_viec || '',
-    join_date: data.ngay_vao_lam || null, // Date fields should be null if empty string
-    official_date: data.ngay_lam_chinh_thuc || null,
+    join_date: formatDateForDB(data.ngay_vao_lam),
+    official_date: formatDateForDB(data.ngay_lam_chinh_thuc),
     cccd: data.cccd || '',
-    identity_issue_date: data.ngay_cap || null,
+    identity_issue_date: formatDateForDB(data.ngay_cap),
     identity_issue_place: data.noi_cap || '',
     address: data.dia_chi_thuong_tru || '',
     hometown: data.que_quan || '',
-    dob: data.ngay_sinh || null,
+    dob: formatDateForDB(data.ngay_sinh),
     gender: data.gioi_tinh || '',
     marital_status: data.tinh_trang_hon_nhan || '',
     avatar_url: data.avatarDataUrl || data.avatarUrl || data.avatar || '',

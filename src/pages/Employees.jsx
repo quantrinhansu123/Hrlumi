@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx'
 import EmployeeModal from '../components/EmployeeModal'
 import StatusHistoryView from '../components/StatusHistoryView'
 import { supabase } from '../services/supabase'
-import { mapUserToApp } from '../utils/helpers'
+import { formatDateDisplay, mapAppToUser, mapUserToApp } from '../utils/helpers'
 
 function Employees() {
     const [employees, setEmployees] = useState([])
@@ -450,6 +450,91 @@ function Employees() {
         }
     }
 
+    const handleSyncFirebase = async () => {
+        if (!confirm('Bạn có chắc muốn đồng bộ dữ liệu từ Firebase?\n\n- Nhân viên có sẵn (trùng Email hoặc Mã NV) sẽ được CẬP NHẬT.\n- Nhân viên mới sẽ được THÊM MỚI.\n')) {
+            return
+        }
+
+        setLoading(true)
+        try {
+            console.log("🔄 Fetching from Firebase...")
+            const response = await fetch('https://lumi-6dff7-default-rtdb.asia-southeast1.firebasedatabase.app/employees.json')
+            const data = await response.json()
+
+            if (!data) throw new Error('Không lấy được dữ liệu từ Firebase')
+
+            const users = Object.values(data)
+            console.log(`✅ Found ${users.length} users in Firebase. identifying duplicates...`)
+
+            let updated = 0
+            let inserted = 0
+            let errors = 0
+
+            for (const fbUser of users) {
+                try {
+                    // Firebase object keys match App State keys, so we can map directly
+                    const dbPayload = mapAppToUser(fbUser)
+
+                    if (!dbPayload.name) continue
+
+                    // Identity Check: Email or Employee Code
+                    let existingId = null
+
+                    if (dbPayload.email) {
+                        const { data: found } = await supabase
+                            .from('users')
+                            .select('id')
+                            .eq('email', dbPayload.email)
+                            .maybeSingle()
+                        if (found) existingId = found.id
+                    }
+
+                    if (!existingId && dbPayload.employee_id) {
+                        const { data: found } = await supabase
+                            .from('users')
+                            .select('id')
+                            .eq('employee_id', dbPayload.employee_id)
+                            .maybeSingle()
+                        if (found) existingId = found.id
+                    }
+
+                    if (existingId) {
+                        // Update
+                        const { error } = await supabase
+                            .from('users')
+                            .update(dbPayload)
+                            .eq('id', existingId)
+
+                        if (error) throw error
+                        updated++
+                    } else {
+                        // Insert
+                        dbPayload.password = '123456' // Default password
+                        const { error } = await supabase
+                            .from('users')
+                            .insert([dbPayload])
+
+                        if (error) throw error
+                        inserted++
+                    }
+
+                } catch (err) {
+                    console.error("❌ Sync error for user:", fbUser.ho_va_ten, err)
+                    errors++
+                }
+            }
+
+            await loadEmployees()
+            alert(`Đồng bộ hoàn tất!\n\n- Thay đổi/Cập nhật: ${updated}\n- Thêm mới: ${inserted}\n- Lỗi: ${errors}`)
+
+        } catch (err) {
+            console.error("Firebase sync error:", err)
+            alert('Lỗi đồng bộ: ' + err.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
     // Get unique departments
     const departments = [...new Set(employees.map(e => e.bo_phan).filter(Boolean))].sort()
 
@@ -484,6 +569,15 @@ function Employees() {
                         >
                             <i className="fas fa-file-upload"></i>
                             Upload Excel
+                        </button>
+                        <button
+                            className="btn btn-warning"
+                            onClick={handleSyncFirebase}
+                            style={{ marginRight: '10px', color: '#fff', background: '#ff9800', borderColor: '#ff9800' }}
+                            title="Đồng bộ từ Firebase (Cập nhật nếu trùng)"
+                        >
+                            <i className="fas fa-sync-alt"></i>
+                            Đồng bộ Firebase
                         </button>
                         <button
                             className="btn btn-secondary"
@@ -681,11 +775,11 @@ function Employees() {
                                                 <td style={{ fontWeight: '500', position: 'sticky', left: 0, background: 'white', zIndex: 1, padding: '4px 8px', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)' }}>{name}</td>
                                                 <td style={{ padding: '4px 8px', display: 'none' }}>{emp.email || '-'}</td>
                                                 <td style={{ padding: '4px 8px', display: 'none' }}>{emp.sđt || emp.sdt || '-'}</td>
-                                                <td style={{ padding: '4px 8px' }}>{emp.ngay_sinh || emp.dob || '-'}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{emp.ngay_vao_lam || '-'}</td>
-                                                <td style={{ padding: '4px 8px' }}>{emp.ngay_lam_chinh_thuc || '-'}</td>
+                                                <td style={{ padding: '4px 8px' }}>{formatDateDisplay(emp.ngay_sinh || emp.dob)}</td>
+                                                <td style={{ padding: '4px 8px', display: 'none' }}>{formatDateDisplay(emp.ngay_vao_lam)}</td>
+                                                <td style={{ padding: '4px 8px' }}>{formatDateDisplay(emp.ngay_lam_chinh_thuc)}</td>
                                                 <td style={{ padding: '4px 8px', display: 'none' }}>{emp.cccd || '-'}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{emp.ngay_cap || '-'}</td>
+                                                <td style={{ padding: '4px 8px', display: 'none' }}>{formatDateDisplay(emp.ngay_cap)}</td>
                                                 <td style={{ padding: '4px 8px', display: 'none' }}>{emp.noi_cap || '-'}</td>
                                                 <td style={{ padding: '4px 8px', display: 'none' }}>{emp.que_quan || '-'}</td>
                                                 <td style={{ padding: '4px 8px', display: 'none' }}>{emp.gioi_tinh || '-'}</td>
@@ -706,6 +800,14 @@ function Employees() {
                                                             }}
                                                         >
                                                             <i className="fas fa-eye"></i>
+                                                        </button>
+                                                        <button
+                                                            className="btn-icon"
+                                                            title="Chấm điểm KPI"
+                                                            style={{ color: '#ff9800', border: '1px solid #ff9800', background: '#fff' }}
+                                                            onClick={() => window.open(`/grading/${emp.id}`, '_blank')} // Open in new tab or navigate
+                                                        >
+                                                            <i className="fas fa-star-half-alt"></i>
                                                         </button>
                                                         <button
                                                             className="edit"
