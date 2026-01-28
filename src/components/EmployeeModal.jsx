@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../services/supabase'
+import { mapAppToUser } from '../utils/helpers'
 
 function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) {
   const [formData, setFormData] = useState({

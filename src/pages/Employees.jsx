@@ -801,14 +801,7 @@ function Employees() {
                                                         >
                                                             <i className="fas fa-eye"></i>
                                                         </button>
-                                                        <button
-                                                            className="btn-icon"
-                                                            title="Chấm điểm KPI"
-                                                            style={{ color: '#ff9800', border: '1px solid #ff9800', background: '#fff' }}
-                                                            onClick={() => window.open(`/grading/${emp.id}`, '_blank')} // Open in new tab or navigate
-                                                        >
-                                                            <i className="fas fa-star-half-alt"></i>
-                                                        </button>
+
                                                         <button
                                                             className="edit"
                                                             title="Sửa"
