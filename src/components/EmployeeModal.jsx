@@ -284,6 +284,8 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
 
         const dbPayload = mapAppToUser(formData)
         dbPayload.password = '123456'
+        // Create manual ID because DB does not auto-generate it
+        dbPayload.id = crypto.randomUUID()
 
         const { error } = await supabase
           .from('users')
