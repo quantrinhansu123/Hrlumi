@@ -450,90 +450,7 @@ function Employees() {
         }
     }
 
-    const handleSyncFirebase = async () => {
-        if (!confirm('Bạn có chắc muốn đồng bộ dữ liệu từ Firebase?\n\n- Nhân viên có sẵn (trùng Email hoặc Mã NV) sẽ được CẬP NHẬT.\n- Nhân viên mới sẽ được THÊM MỚI.\n')) {
-            return
-        }
 
-        setLoading(true)
-        try {
-            console.log("🔄 Fetching from Firebase...")
-            const response = await fetch('https://lumi-6dff7-default-rtdb.asia-southeast1.firebasedatabase.app/employees.json')
-            const data = await response.json()
-
-            if (!data) throw new Error('Không lấy được dữ liệu từ Firebase')
-
-            const users = Object.values(data)
-            console.log(`✅ Found ${users.length} users in Firebase. identifying duplicates...`)
-
-            let updated = 0
-            let inserted = 0
-            let errors = 0
-
-            for (const fbUser of users) {
-                try {
-                    // Firebase object keys match App State keys, so we can map directly
-                    const dbPayload = mapAppToUser(fbUser)
-
-                    if (!dbPayload.name) continue
-
-                    // Identity Check: Email or Employee Code
-                    let existingId = null
-
-                    if (dbPayload.email) {
-                        const { data: found } = await supabase
-                            .from('users')
-                            .select('id')
-                            .eq('email', dbPayload.email)
-                            .maybeSingle()
-                        if (found) existingId = found.id
-                    }
-
-                    if (!existingId && dbPayload.employee_id) {
-                        const { data: found } = await supabase
-                            .from('users')
-                            .select('id')
-                            .eq('employee_id', dbPayload.employee_id)
-                            .maybeSingle()
-                        if (found) existingId = found.id
-                    }
-
-                    if (existingId) {
-                        // Update
-                        const { error } = await supabase
-                            .from('users')
-                            .update(dbPayload)
-                            .eq('id', existingId)
-
-                        if (error) throw error
-                        updated++
-                    } else {
-                        // Insert
-                        dbPayload.password = '123456' // Default password
-                        const { error } = await supabase
-                            .from('users')
-                            .insert([dbPayload])
-
-                        if (error) throw error
-                        inserted++
-                    }
-
-                } catch (err) {
-                    console.error("❌ Sync error for user:", fbUser.ho_va_ten, err)
-                    errors++
-                }
-            }
-
-            await loadEmployees()
-            alert(`Đồng bộ hoàn tất!\n\n- Thay đổi/Cập nhật: ${updated}\n- Thêm mới: ${inserted}\n- Lỗi: ${errors}`)
-
-        } catch (err) {
-            console.error("Firebase sync error:", err)
-            alert('Lỗi đồng bộ: ' + err.message)
-        } finally {
-            setLoading(false)
-        }
-    }
 
     // Get unique departments
     const departments = [...new Set(employees.map(e => e.bo_phan).filter(Boolean))].sort()
@@ -570,43 +487,8 @@ function Employees() {
                             <i className="fas fa-file-upload"></i>
                             Upload Excel
                         </button>
-                        <button
-                            className="btn btn-warning"
-                            onClick={handleSyncFirebase}
-                            style={{ marginRight: '10px', color: '#fff', background: '#ff9800', borderColor: '#ff9800' }}
-                            title="Đồng bộ từ Firebase (Cập nhật nếu trùng)"
-                        >
-                            <i className="fas fa-sync-alt"></i>
-                            Đồng bộ Firebase
-                        </button>
-                        <button
-                            className="btn btn-secondary"
-                            onClick={async () => {
-                                if (confirm('CẢNH BÁO: Hành động này sẽ XÓA TOÀN BỘ dữ liệu nhân viên và lịch sử trạng thái hiện tại.\n\nBạn có chắc muốn làm sạch hệ thống để nhập liệu thật không?')) {
-                                    try {
-                                        setLoading(true)
-                                        // Delete all users
-                                        // Warning: Supabase delete without where clause often requires specific settings or policies
-                                        const { error } = await supabase.from('users').delete().neq('id', 0) // Cheap trick if id is numeric, or use a always-true condition
 
-                                        if (error) throw error
 
-                                        // await fbDelete('hr/employee_status_history') // Consider where history lives now
-                                        setEmployees([])
-                                        alert('Đã xóa sạch dữ liệu hệ thống!')
-                                        loadEmployees()
-                                    } catch (e) {
-                                        alert('Lỗi: ' + e.message)
-                                        setLoading(false)
-                                    }
-                                }
-                            }}
-                            style={{ marginRight: '10px', background: '#d32f2f', borderColor: '#d32f2f', color: '#fff' }}
-                            title="Xóa toàn bộ dữ liệu mẫu"
-                        >
-                            <i className="fas fa-trash-alt"></i>
-                            Làm sạch dữ liệu
-                        </button>
                         <button
                             className="btn btn-info"
                             onClick={downloadTemplate}

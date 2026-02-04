@@ -35,6 +35,41 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
   const [avatarUrlInput, setAvatarUrlInput] = useState('')
   const [galleryUrlInput, setGalleryUrlInput] = useState('')
 
+  // Auto-generate Employee ID
+  const generateEmployeeId = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('employee_id')
+
+      if (error) throw error
+
+      // Collect all existing numeric IDs
+      const existingNums = new Set()
+      if (data && data.length > 0) {
+        data.forEach(user => {
+          const idStr = user.employee_id || ''
+          const match = idStr.match(/^NV(\d+)$/i)
+          if (match) {
+            existingNums.add(parseInt(match[1], 10))
+          }
+        })
+      }
+
+      // Find lowest available number starting from 1
+      let nextNum = 1
+      while (existingNums.has(nextNum)) {
+        nextNum++
+      }
+
+      const nextId = `NV${String(nextNum).padStart(3, '0')}`
+
+      setFormData(prev => ({ ...prev, employeeId: nextId }))
+    } catch (error) {
+      console.error('Error generating employee ID:', error)
+    }
+  }
+
   useEffect(() => {
     if (employee) {
       setFormData({
@@ -75,6 +110,9 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
       setFilesPreview(employee.files || [])
     } else {
       resetForm()
+      if (isOpen) {
+        generateEmployeeId()
+      }
     }
   }, [employee, isOpen])
 
@@ -116,6 +154,8 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
       [e.target.name]: e.target.value
     })
   }
+
+  // ... (keep other handlers)
 
   const handleAvatarChange = async (e) => {
     const file = e.target.files[0]
@@ -328,9 +368,9 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
                   name="employeeId"
                   value={formData.employeeId}
                   onChange={handleChange}
-                  placeholder="Ví dụ: NV001"
+                  placeholder="Hệ thống tự tạo (VD: NV001)"
                   required
-                  disabled={readOnly}
+                  readOnly
                 />
               </div>
             </div>
