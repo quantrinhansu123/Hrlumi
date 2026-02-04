@@ -386,15 +386,30 @@ function Employees() {
 
             let imported = 0
             let skipped = 0
+            const errors = []
 
-            for (const row of dataRows) {
+            const isValidDate = (dateStr) => {
+                if (!dateStr) return true // Empty is ok
+                // Check format DD/MM/YYYY or YYYY-MM-DD
+                const datePattern = /^(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{1,2}-\d{1,2})$/
+                if (!datePattern.test(dateStr)) return false
+
+                // Try to parse
+                const date = new Date(dateStr.includes('/') ? dateStr.split('/').reverse().join('-') : dateStr)
+                return !isNaN(date.getTime())
+            }
+
+            for (let i = 0; i < dataRows.length; i++) {
+                const row = dataRows[i]
+                const rowIndex = i + 2 // Header is row 1
+
                 const rowObj = {}
                 headers.forEach((h, idx) => {
                     rowObj[h] = row[idx] || ''
                 })
 
                 const payload = {
-                    // id: rowObj['ma_nhan_vien'] || rowObj['ma_nv'] || rowObj['employee_id'] || rowObj['code'] || '', // Supabase typically auto-generates ID, or use it if UUID
+                    employeeId: rowObj['ma_nhan_vien'] || rowObj['ma_nv'] || rowObj['employee_id'] || rowObj['code'] || '',
                     ho_va_ten: rowObj['ho_va_ten'] || rowObj['ho_ten'] || rowObj['ten'] || rowObj['ho_va_ten'] || rowObj['name'] || '',
                     email: rowObj['email'] || '',
                     sđt: rowObj['sdt'] || rowObj['so_dien_thoai'] || rowObj['dien_thoai'] || rowObj['phone'] || '',
@@ -416,9 +431,25 @@ function Employees() {
                     avatarUrl: convertDriveLink(rowObj['link_anh'] || rowObj['avatar'] || rowObj['anh'] || rowObj['hinh_anh'] || rowObj['image'] || '')
                 }
 
+                // VALIDATION
+                const rowErrors = []
 
                 if (!payload.ho_va_ten) {
-                    console.log('⚠️ Skipped row (no name):', rowObj)
+                    rowErrors.push('Thiếu họ tên')
+                }
+
+                if (!isValidDate(payload.ngay_sinh)) rowErrors.push(`Ngày sinh không hợp lệ: "${payload.ngay_sinh}" (cần dd/mm/yyyy)`)
+                if (!isValidDate(payload.ngay_vao_lam)) rowErrors.push(`Ngày vào làm không hợp lệ: "${payload.ngay_vao_lam}" (cần dd/mm/yyyy)`)
+                if (!isValidDate(payload.ngay_lam_chinh_thuc)) rowErrors.push(`Ngày chính thức không hợp lệ: "${payload.ngay_lam_chinh_thuc}" (cần dd/mm/yyyy)`)
+                if (!isValidDate(payload.ngay_cap)) rowErrors.push(`Ngày cấp CCCD không hợp lệ: "${payload.ngay_cap}" (cần dd/mm/yyyy)`)
+
+                if (rowErrors.length > 0) {
+                    console.log(`⚠️ Skipped row ${rowIndex}:`, rowErrors.join(', '))
+                    errors.push({
+                        row: rowIndex,
+                        name: payload.ho_va_ten || 'Không tên',
+                        reason: rowErrors.join(', ')
+                    })
                     skipped++
                     continue
                 }
@@ -426,13 +457,19 @@ function Employees() {
                 console.log('✅ Importing:', payload.ho_va_ten)
 
                 const dbPayload = mapAppToUser(payload)
+                dbPayload.id = crypto.randomUUID()
                 dbPayload.password = dbPayload.password || '123456'
 
                 const { error } = await supabase.from('users').insert([dbPayload])
 
                 if (error) {
                     console.error('❌ Insert error for:', payload.ho_va_ten, error)
-                    skipped++ // Count as skipped/failed
+                    errors.push({
+                        row: rowIndex,
+                        name: payload.ho_va_ten,
+                        reason: `Lỗi Database: ${error.message || error.code}`
+                    })
+                    skipped++
                 } else {
                     imported++
                 }
@@ -440,7 +477,21 @@ function Employees() {
 
             await loadEmployees()
             console.log(`📊 Import summary: ${imported} imported, ${skipped} skipped`)
-            alert(`Đã import ${imported} dòng.${skipped > 0 ? ` Bỏ qua/Lỗi ${skipped} dòng.` : ''}`)
+
+            let message = `Đã import thành công: ${imported} nhân viên.\n`
+            if (skipped > 0) {
+                message += `Có ${skipped} dòng bị lỗi/bỏ qua:\n\n`
+                // Limit errors to first 10 to avoid huge alert
+                const showErrors = errors.slice(0, 10)
+                showErrors.forEach(err => {
+                    message += `• Dòng ${err.row} (${err.name}): ${err.reason}\n`
+                })
+                if (errors.length > 10) {
+                    message += `... và ${errors.length - 10} dòng khác.`
+                }
+            }
+
+            alert(message)
         } catch (error) {
             console.error('❌ Import error:', error)
             alert('Lỗi import: ' + error.message)
