@@ -126,6 +126,9 @@ function Employees() {
             'Họ và tên',
             'Email',
             'SĐT',
+            'Tên đăng nhập',
+            'Vai trò',
+            'Mật khẩu',
             'Chi nhánh',
             'Bộ phận',
             'Vị trí',
@@ -144,84 +147,12 @@ function Employees() {
             'Link ảnh'
         ]
 
-        const sampleData = [
-            [
-                'NV001',
-                'Nguyễn Văn A',
-                'nguyenvana@example.com',
-                '0901234567',
-                'HCM',
-                'Kinh doanh',
-                'Nhân viên',
-                'Chính thức',
-                '1995-01-01',
-                '2024-01-15',
-                '2024-03-15',
-                'Ca full',
-                '001234567890',
-                '2020-01-01',
-                'CA TP.HCM',
-                'TP.HCM',
-                '123 Đường ABC, Q.1, TP.HCM',
-                'Nam',
-                'Độc thân',
-                'https://drive.google.com/file/d/YOUR_FILE_ID/view'
-            ],
-            [
-                'NV002',
-                'Trần Thị B',
-                'tranthib@example.com',
-                '0912345678',
-                'Hà Nội',
-                'Marketing',
-                'Trưởng phòng',
-                'Chính thức',
-                '1990-05-15',
-                '2023-06-01',
-                '2023-08-01',
-                'Ca sáng',
-                '001234567891',
-                '2019-05-15',
-                'CA Hà Nội',
-                'Hà Nội',
-                '456 Phố XYZ, Hà Nội',
-                'Nữ',
-                'Đã kết hôn',
-                'https://i.imgur.com/example.jpg'
-            ]
-        ]
-
-        const escapeCell = (val) => {
-            return String(val || '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-        }
-
-        const headerHtml = headers.map(h => `<th>${escapeCell(h)}</th>`).join('')
-        const rowsHtml = sampleData.map(row => {
-            const tds = row.map(cell => `<td>${escapeCell(cell)}</td>`).join('')
-            return `<tr>${tds}</tr>`
-        }).join('')
-
-        const tableHtml = `<table><thead><tr>${headerHtml}</tr></thead><tbody>${rowsHtml}</tbody></table>`
-
-        const htmlContent = `
-      <html xmlns:x="urn:schemas-microsoft-com:office:excel">
-        <head><meta charset="UTF-8"></head>
-        <body>${tableHtml}</body>
-      </html>
-    `
-
-        const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel;charset=utf-8;' })
-        const link = document.createElement('a')
-        const url = URL.createObjectURL(blob)
-        link.href = url
-        link.download = 'Mau_import_nhan_su.xls'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
+        // Tạo file mẫu chuẩn xlsx với 1 dòng dữ liệu để trống
+        const emptyRow = new Array(headers.length).fill('')
+        const ws = XLSX.utils.aoa_to_sheet([headers, emptyRow])
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'Mau_import_nhan_su')
+        XLSX.writeFile(wb, 'Mau_import_nhan_su.xlsx')
     }
 
     const exportToExcel = () => {
@@ -232,9 +163,12 @@ function Employees() {
 
         const headers = [
             'STT',
+            'Mã nhân viên',
             'Họ và tên',
             'Email',
             'SĐT',
+            'Tên đăng nhập',
+            'Vai trò',
             'Chi nhánh',
             'Bộ phận',
             'Vị trí',
@@ -259,9 +193,12 @@ function Employees() {
         const rowsHtml = filteredEmployees.map((emp, idx) => {
             const cells = [
                 idx + 1,
+                emp.employeeId || '',
                 emp.ho_va_ten || emp.name || emp.Tên || '',
                 emp.email || '',
                 emp.sđt || emp.sdt || '',
+                emp.username || '',
+                emp.role || 'user',
                 emp.chi_nhanh || '',
                 emp.bo_phan || '',
                 emp.vi_tri || '',
@@ -413,6 +350,9 @@ function Employees() {
                     ho_va_ten: rowObj['ho_va_ten'] || rowObj['ho_ten'] || rowObj['ten'] || rowObj['ho_va_ten'] || rowObj['name'] || '',
                     email: rowObj['email'] || '',
                     sđt: rowObj['sdt'] || rowObj['so_dien_thoai'] || rowObj['dien_thoai'] || rowObj['phone'] || '',
+                    username: rowObj['ten_dang_nhap'] || rowObj['username'] || rowObj['user_name'] || '',
+                    role: rowObj['vai_tro'] || rowObj['role'] || 'user',
+                    password: rowObj['mat_khau'] || rowObj['password'] || '',
                     chi_nhanh: rowObj['chi_nhanh'] || rowObj['branch'] || '',
                     bo_phan: rowObj['bo_phan'] || rowObj['phong_ban'] || rowObj['department'] || '',
                     vi_tri: rowObj['vi_tri'] || rowObj['chuc_vu'] || rowObj['position'] || '',
@@ -434,10 +374,6 @@ function Employees() {
                 // VALIDATION
                 const rowErrors = []
 
-                if (!payload.ho_va_ten) {
-                    rowErrors.push('Thiếu họ tên')
-                }
-
                 if (!isValidDate(payload.ngay_sinh)) rowErrors.push(`Ngày sinh không hợp lệ: "${payload.ngay_sinh}" (cần dd/mm/yyyy)`)
                 if (!isValidDate(payload.ngay_vao_lam)) rowErrors.push(`Ngày vào làm không hợp lệ: "${payload.ngay_vao_lam}" (cần dd/mm/yyyy)`)
                 if (!isValidDate(payload.ngay_lam_chinh_thuc)) rowErrors.push(`Ngày chính thức không hợp lệ: "${payload.ngay_lam_chinh_thuc}" (cần dd/mm/yyyy)`)
@@ -458,7 +394,7 @@ function Employees() {
 
                 const dbPayload = mapAppToUser(payload)
                 dbPayload.id = crypto.randomUUID()
-                dbPayload.password = dbPayload.password || '123456'
+                dbPayload.password = payload.password || dbPayload.password || '123456'
 
                 const { error } = await supabase.from('users').insert([dbPayload])
 
@@ -814,6 +750,9 @@ function Employees() {
                                     <li>Họ và tên</li>
                                     <li>Email</li>
                                     <li>SĐT</li>
+                                    <li>Tên đăng nhập (tùy chọn)</li>
+                                    <li>Vai trò (tùy chọn, mặc định user)</li>
+                                    <li>Mật khẩu (tùy chọn, mặc định 123456)</li>
                                     <li>Chi nhánh</li>
                                     <li>Bộ phận</li>
                                     <li>Vị trí</li>
@@ -828,7 +767,7 @@ function Employees() {
                                     <li>Tình trạng hôn nhân</li>
                                     <li>Link ảnh (tùy chọn)</li>
                                 </ul>
-                                <small>Hàng đầu tiên nên là header với tên cột như trên. Cột "Link ảnh" có thể để trống nếu không có.</small>
+                                <small>Hàng đầu tiên là header. Các cột dữ liệu có thể để trống, hệ thống sẽ bỏ qua dòng trống hoàn toàn.</small>
                             </div>
                         </div>
                         <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
