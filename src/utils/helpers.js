@@ -77,7 +77,7 @@ export const mapUserToApp = (user) => {
   if (!user) return null
   return {
     id: user.id,
-    employeeId: user.employee_id || '',
+    employeeId: user.employee_id || user.username || user.id || '',
     ho_va_ten: user.name || '',
     email: user.email || '',
     sđt: user.phone || '',
@@ -131,7 +131,6 @@ export const mapAppToUser = (data) => {
   if (!data) return null
   return {
     // id field is usually handled by Supabase or passed separately for updates
-    employee_id: data.employeeId || '',
     name: data.ho_va_ten || '',
     email: data.email || '',
     phone: data.sđt || data.sdt || '',
@@ -145,7 +144,6 @@ export const mapAppToUser = (data) => {
     cccd: data.cccd || '',
     identity_issue_date: formatDateForDB(data.ngay_cap),
     identity_issue_place: data.noi_cap || '',
-    address: data.dia_chi_thuong_tru || '',
     hometown: data.que_quan || '',
     dob: formatDateForDB(data.ngay_sinh),
     gender: data.gioi_tinh || '',
@@ -155,4 +153,51 @@ export const mapAppToUser = (data) => {
     role: data.role || 'user',
     username: data.username || data.email?.split('@')[0] || data.employeeId || ''
   }
+}
+
+// Parse Supabase schema-cache error, e.g.:
+// "Could not find the 'address' column of 'users' in the schema cache"
+export const getMissingUsersColumnFromError = (error) => {
+  const message = error?.message || ''
+  const match = message.match(/Could not find the '([^']+)' column of 'users' in the schema cache/i)
+  return match?.[1] || null
+}
+
+// Remove unsupported column from payload to keep compatibility across different DB schemas
+export const removeMissingUsersColumnFromPayload = (payload, error) => {
+  const missingColumn = getMissingUsersColumnFromError(error)
+  if (!missingColumn || !payload || !(missingColumn in payload)) {
+    return { payload, removedColumn: null }
+  }
+
+  const sanitizedPayload = { ...payload }
+  delete sanitizedPayload[missingColumn]
+
+  return { payload: sanitizedPayload, removedColumn: missingColumn }
+}
+
+// Keep retrying users table mutation by stripping unsupported columns one by one.
+export const runUsersMutationWithSchemaFallback = async (mutateFn, initialPayload, maxRetries = 20) => {
+  let payload = { ...(initialPayload || {}) }
+  let attempts = 0
+  const removedColumns = []
+
+  while (attempts <= maxRetries) {
+    const result = await mutateFn(payload)
+    const error = result?.error
+    if (!error) {
+      return { error: null, payload, removedColumns }
+    }
+
+    const fallback = removeMissingUsersColumnFromPayload(payload, error)
+    if (!fallback.removedColumn) {
+      return { error, payload, removedColumns }
+    }
+
+    removedColumns.push(fallback.removedColumn)
+    payload = fallback.payload
+    attempts += 1
+  }
+
+  return { error: new Error('Unable to adapt payload to users schema.'), payload, removedColumns }
 }

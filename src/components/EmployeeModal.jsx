@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../services/supabase'
-import { mapAppToUser } from '../utils/helpers'
+import { mapAppToUser, runUsersMutationWithSchemaFallback } from '../utils/helpers'
 
 function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) {
   const [formData, setFormData] = useState({
@@ -35,39 +35,10 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
   const [avatarUrlInput, setAvatarUrlInput] = useState('')
   const [galleryUrlInput, setGalleryUrlInput] = useState('')
 
-  // Auto-generate Employee ID
-  const generateEmployeeId = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('employee_id')
-
-      if (error) throw error
-
-      // Collect all existing numeric IDs
-      const existingNums = new Set()
-      if (data && data.length > 0) {
-        data.forEach(user => {
-          const idStr = user.employee_id || ''
-          const match = idStr.match(/^NV(\d+)$/i)
-          if (match) {
-            existingNums.add(parseInt(match[1], 10))
-          }
-        })
-      }
-
-      // Find lowest available number starting from 1
-      let nextNum = 1
-      while (existingNums.has(nextNum)) {
-        nextNum++
-      }
-
-      const nextId = `NV${String(nextNum).padStart(3, '0')}`
-
-      setFormData(prev => ({ ...prev, employeeId: nextId }))
-    } catch (error) {
-      console.error('Error generating employee ID:', error)
-    }
+  // Auto-generate local Employee ID (not persisted if DB has no employee_id column)
+  const generateEmployeeId = () => {
+    const nextId = `NV${Date.now().toString().slice(-6)}`
+    setFormData(prev => ({ ...prev, employeeId: nextId }))
   }
 
   useEffect(() => {
@@ -289,10 +260,14 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
 
       if (employee && employee.id) {
         const dbPayload = mapAppToUser(formData)
-        const { error } = await supabase
-          .from('users')
-          .update(dbPayload)
-          .eq('id', employee.id)
+        const mutationResult = await runUsersMutationWithSchemaFallback(
+          (payload) => supabase
+            .from('users')
+            .update(payload)
+            .eq('id', employee.id),
+          dbPayload
+        )
+        const { error } = mutationResult
 
         if (error) throw error
 
@@ -327,9 +302,13 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
         // Create manual ID because DB does not auto-generate it
         dbPayload.id = crypto.randomUUID()
 
-        const { error } = await supabase
-          .from('users')
-          .insert([dbPayload])
+        const mutationResult = await runUsersMutationWithSchemaFallback(
+          (payload) => supabase
+            .from('users')
+            .insert([payload]),
+          dbPayload
+        )
+        const { error } = mutationResult
 
         if (error) throw error
       }

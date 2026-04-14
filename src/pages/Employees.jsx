@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx'
 import EmployeeModal from '../components/EmployeeModal'
 import StatusHistoryView from '../components/StatusHistoryView'
 import { supabase } from '../services/supabase'
-import { formatDateDisplay, mapAppToUser, mapUserToApp } from '../utils/helpers'
+import { formatDateDisplay, mapAppToUser, mapUserToApp, runUsersMutationWithSchemaFallback } from '../utils/helpers'
 
 function Employees() {
     const [employees, setEmployees] = useState([])
@@ -396,7 +396,11 @@ function Employees() {
                 dbPayload.id = crypto.randomUUID()
                 dbPayload.password = payload.password || dbPayload.password || '123456'
 
-                const { error } = await supabase.from('users').insert([dbPayload])
+                const mutationResult = await runUsersMutationWithSchemaFallback(
+                    (payloadToInsert) => supabase.from('users').insert([payloadToInsert]),
+                    dbPayload
+                )
+                const { error } = mutationResult
 
                 if (error) {
                     console.error('❌ Insert error for:', payload.ho_va_ten, error)
