@@ -766,23 +766,14 @@ function Attendance() {
   }
 
   const downloadAttendanceTemplate = () => {
-    const headers = [
-      'Mã NV',
-      'Họ và tên',
-      'Ngày (YYYY-MM-DD)',
-      'Giờ vào (HH:MM)',
-      'Giờ ra (HH:MM)'
-    ]
+    const headers = ['Mã NV', 'Tên NV', 'Phòng ban', 'Ngày', 'Lần 1', 'Lần 2', 'Lần 3', 'Lần 4', 'Lần 5', 'Lần 6', 'Lần 7']
     const sample = [
-      'NV001', 'Nguyễn Văn A', '2024-11-01', '08:00', '17:30',
-      'NV001', 'Nguyễn Văn A', '2024-11-02', '07:55', '17:35'
+      ['NV001', 'Nguyễn Văn A', 'Kế toán', '5/1/2026', '08:00', '12:00', '13:30', '17:30', '', '', ''],
+      ['NV001', 'Nguyễn Văn A', 'Kế toán', '5/2/2026', '07:55', '17:35', '', '', '', '', '']
     ]
-    // Use AOA to Sheet for simple list
-    // Or better: Create a Matrix template as well?
-    // Let's provide the List Format as default simple template
-    const ws = XLSX.utils.aoa_to_sheet([headers, sample.slice(0, 5)]) // Just sample row
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...sample])
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'MauChamCong')
+    XLSX.utils.book_append_sheet(wb, ws, 'ChamCong')
     XLSX.writeFile(wb, 'Mau_nhap_cham_cong.xlsx')
   }
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import EmployeeModal from '../components/EmployeeModal'
 import StatusHistoryView from '../components/StatusHistoryView'
+import EmployeeDirectory from '../components/EmployeeDirectory'
 import { supabase } from '../services/supabase'
 import { formatDateDisplay, mapAppToUser, mapUserToApp, runUsersMutationWithSchemaFallback } from '../utils/helpers'
 
@@ -14,6 +15,7 @@ function Employees() {
     const [filterDept, setFilterDept] = useState('')
     const [filterStatus, setFilterStatus] = useState('')
     const [filterBirthMonth, setFilterBirthMonth] = useState('')
+    const [filterContract, setFilterContract] = useState('')
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [selectedEmployee, setSelectedEmployee] = useState(null)
     const [isReadOnly, setIsReadOnly] = useState(false)
@@ -29,7 +31,7 @@ function Employees() {
 
     useEffect(() => {
         filterEmployees()
-    }, [employees, searchTerm, filterBranch, filterDept, filterStatus, filterBirthMonth])
+    }, [employees, searchTerm, filterBranch, filterDept, filterStatus, filterBirthMonth, filterContract, activeTab])
 
     const loadEmployees = async () => {
         try {
@@ -54,16 +56,35 @@ function Employees() {
         let filtered = employees.filter(item => {
             if (!item) return false
 
+            const status = item.trang_thai || item.status || ''
+            // Không hiện nhân viên nghỉ việc
+            if (status === 'Nghỉ việc') return false
+
             const nameField = item.ho_va_ten || item.name || item.Tên || ""
             const matchSearch = !searchTerm ||
                 nameField.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (item.email && item.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
                 (item.sđt && String(item.sđt || '').includes(searchTerm)) ||
-                (item.sdt && String(item.sdt || '').includes(searchTerm))
+                (item.sdt && String(item.sdt || '').includes(searchTerm)) ||
+                (item.employeeId && String(item.employeeId).toLowerCase().includes(searchTerm.toLowerCase()))
 
-            const matchBranch = !filterBranch || item.chi_nhanh === filterBranch
-            const matchDept = !filterDept || item.bo_phan === filterDept
-            const matchStatus = !filterStatus || item.trang_thai === filterStatus || item.status === filterStatus
+            const matchBranch = !filterBranch
+                || (filterBranch === '__none__' ? !item.chi_nhanh : item.chi_nhanh === filterBranch)
+            const matchDept = !filterDept
+                || (filterDept === '__none__' ? !item.bo_phan : item.bo_phan === filterDept)
+            const matchStatus = !filterStatus || status === filterStatus
+            const contractType = item.loai_hop_dong || item.contractType || ''
+            const matchContract = !filterContract || contractType === filterContract
+
+            let matchExpiry = true
+            if (activeTab === 'expiring') {
+                const expiryValue = item.ngay_het_han || item.contractEndDate || item.ngay_het_han_hop_dong
+                const expiryDate = expiryValue ? new Date(expiryValue) : null
+                const daysLeft = expiryDate && !Number.isNaN(expiryDate.getTime())
+                    ? Math.ceil((expiryDate.getTime() - Date.now()) / 86400000)
+                    : null
+                matchExpiry = daysLeft !== null && daysLeft >= 0 && daysLeft <= 60
+            }
 
             // Filter Birth Month
             let matchMonth = true
@@ -94,7 +115,7 @@ function Employees() {
                 }
             }
 
-            return matchSearch && matchBranch && matchDept && matchStatus && matchMonth
+            return matchSearch && matchBranch && matchDept && matchStatus && matchMonth && matchContract && matchExpiry
         })
 
         setFilteredEmployees(filtered)
@@ -443,13 +464,217 @@ function Employees() {
 
 
 
-    // Get unique departments
-    const departments = [...new Set(employees.map(e => e.bo_phan).filter(Boolean))].sort()
+    const isActiveEmployee = (e) => (e.trang_thai || e.status || '') !== 'Nghỉ việc'
+    const activeEmployees = employees.filter(isActiveEmployee)
+
+    // Employees scoped by selected branch (for department tabs)
+    const employeesInBranch = activeEmployees.filter(e => {
+        if (!filterBranch) return true
+        if (filterBranch === '__none__') return !e.chi_nhanh
+        return e.chi_nhanh === filterBranch
+    })
+
+    const branches = [...new Set(activeEmployees.map(e => e.chi_nhanh).filter(Boolean))].sort()
+    const noBranchCount = activeEmployees.filter(e => !e.chi_nhanh).length
+
+    const departments = [...new Set(employeesInBranch.map(e => e.bo_phan).filter(Boolean))].sort()
+    const noDeptCount = employeesInBranch.filter(e => !e.bo_phan).length
+
+    const getBranchCount = (branch) => {
+        if (branch === '') return activeEmployees.length
+        if (branch === '__none__') return noBranchCount
+        return activeEmployees.filter(e => e.chi_nhanh === branch).length
+    }
+
+    const getDeptCount = (dept) => {
+        if (dept === '') return employeesInBranch.length
+        if (dept === '__none__') return noDeptCount
+        return employeesInBranch.filter(e => e.bo_phan === dept).length
+    }
+
+    // Group filtered list by department
+    const groupedEmployees = (() => {
+        const groups = new Map()
+        filteredEmployees.forEach(emp => {
+            const key = emp.bo_phan || 'Chưa phân bộ phận'
+            if (!groups.has(key)) groups.set(key, [])
+            groups.get(key).push(emp)
+        })
+
+        const sortedKeys = [...groups.keys()].sort((a, b) => {
+            if (a === 'Chưa phân bộ phận') return 1
+            if (b === 'Chưa phân bộ phận') return -1
+            return a.localeCompare(b, 'vi')
+        })
+
+        return sortedKeys.map(key => ({
+            dept: key,
+            items: groups.get(key)
+        }))
+    })()
+
+    const openView = (emp) => {
+        setSelectedEmployee(emp)
+        setIsReadOnly(true)
+        setIsModalOpen(true)
+    }
+
+    const openEdit = (emp) => {
+        setSelectedEmployee(emp)
+        setIsReadOnly(false)
+        setIsModalOpen(true)
+    }
+
+    const renderCard = (emp, idx) => {
+        const name = emp.ho_va_ten || emp.name || emp.Tên || 'N/A'
+        const avatar = emp.avatarDataUrl || emp.avatarUrl || emp.avatar || ''
+        const status = emp.trang_thai || emp.status || ''
+        return (
+            <article key={emp.id || idx} className="employee-photo-card">
+                <div className="employee-photo-card__media">
+                    {avatar ? (
+                        <img
+                            src={avatar}
+                            alt={name}
+                            onError={(e) => {
+                                e.target.style.display = 'none'
+                                const placeholder = e.target.nextSibling
+                                if (placeholder) placeholder.style.display = 'flex'
+                            }}
+                        />
+                    ) : null}
+                    <div
+                        className="employee-photo-card__placeholder"
+                        style={{ display: avatar ? 'none' : 'flex' }}
+                    >
+                        <i className="fas fa-user"></i>
+                    </div>
+                    {status && (
+                        <span className="employee-photo-card__status">{status}</span>
+                    )}
+                </div>
+                <div className="employee-photo-card__body">
+                    <h3 className="employee-photo-card__name">{name}</h3>
+                    <p className="employee-photo-card__meta">
+                        {emp.employeeId ? emp.employeeId : `#${idx + 1}`}
+                    </p>
+                    <div className="employee-photo-card__actions">
+                        <div className="actions">
+                            <button className="view" title="Xem" onClick={() => openView(emp)}>
+                                <i className="fas fa-eye"></i>
+                            </button>
+                            <button className="edit" title="Sửa" onClick={() => openEdit(emp)}>
+                                <i className="fas fa-edit"></i>
+                            </button>
+                            <button className="delete" title="Xóa" onClick={() => handleDelete(emp.id, name)}>
+                                <i className="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </article>
+        )
+    }
+
+    const renderListRow = (emp, idx) => {
+        const name = emp.ho_va_ten || emp.name || emp.Tên || 'N/A'
+        const avatar = emp.avatarDataUrl || emp.avatarUrl || emp.avatar || ''
+        const status = emp.trang_thai || emp.status || ''
+        return (
+            <div key={emp.id || idx} className="employee-list-row">
+                <div className="employee-list-row__photo">
+                    {avatar ? (
+                        <img
+                            src={avatar}
+                            alt={name}
+                            onError={(e) => {
+                                e.target.style.display = 'none'
+                                const placeholder = e.target.nextSibling
+                                if (placeholder) placeholder.style.display = 'flex'
+                            }}
+                        />
+                    ) : null}
+                    <div
+                        className="employee-photo-card__placeholder"
+                        style={{ display: avatar ? 'none' : 'flex' }}
+                    >
+                        <i className="fas fa-user"></i>
+                    </div>
+                </div>
+                <div className="employee-list-row__info">
+                    <h3 className="employee-list-row__name">{name}</h3>
+                    <div className="employee-list-row__meta">
+                        <span>{emp.employeeId || `#${idx + 1}`}</span>
+                        <span>Sinh: {formatDateDisplay(emp.ngay_sinh || emp.dob) || '—'}</span>
+                        <span>Chính thức: {formatDateDisplay(emp.ngay_lam_chinh_thuc) || '—'}</span>
+                    </div>
+                </div>
+                {status && (
+                    <span className="employee-list-row__status">{status}</span>
+                )}
+                <div className="employee-list-row__actions">
+                    <div className="actions">
+                        <button className="view" title="Xem" onClick={() => openView(emp)}>
+                            <i className="fas fa-eye"></i>
+                        </button>
+                        <button className="edit" title="Sửa" onClick={() => openEdit(emp)}>
+                            <i className="fas fa-edit"></i>
+                        </button>
+                        <button className="delete" title="Xóa" onClick={() => handleDelete(emp.id, name)}>
+                            <i className="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    const handleSelectBranch = (branch) => {
+        setFilterBranch(branch)
+        setFilterDept('')
+    }
+
+    const tabBtnStyle = (active) => ({
+        padding: '8px 14px',
+        border: '1px solid',
+        borderColor: active ? 'var(--primary)' : '#ddd',
+        borderRadius: '6px',
+        background: active ? 'var(--primary)' : '#fff',
+        color: active ? '#fff' : '#444',
+        cursor: 'pointer',
+        fontWeight: active ? 600 : 500,
+        fontSize: '0.9rem'
+    })
 
     if (loading) {
         return <div className="loadingState">Đang tải dữ liệu...</div>
     }
 
+    return <EmployeeDirectory
+        employees={employees}
+        filteredEmployees={filteredEmployees}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        filterDept={filterDept}
+        setFilterDept={setFilterDept}
+        filterStatus={filterStatus}
+        setFilterStatus={setFilterStatus}
+        filterContract={filterContract}
+        setFilterContract={setFilterContract}
+        selectedEmployee={selectedEmployee}
+        setSelectedEmployee={setSelectedEmployee}
+        isModalOpen={isModalOpen}
+        setIsModalOpen={setIsModalOpen}
+        isReadOnly={isReadOnly}
+        setIsReadOnly={setIsReadOnly}
+        onReload={loadEmployees}
+        onExport={exportToExcel}
+        onImport={handleImportExcel}
+    />
+
+    /*
     return (
         <div>
             <div className="page-header" style={{ marginBottom: '10px' }}>
@@ -556,30 +781,114 @@ function Employees() {
 
             {activeTab === 'list' ? (
                 <>
-                    <div className="search-box">
+                    <div style={{ marginBottom: '14px' }}>
+                        <div style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '6px', fontWeight: 600 }}>
+                            Chi nhánh
+                        </div>
+                        <div className="branch-tabs" style={{
+                            display: 'flex',
+                            gap: '8px',
+                            flexWrap: 'wrap',
+                            marginBottom: '12px',
+                            paddingBottom: '12px',
+                            borderBottom: '1px solid #eee'
+                        }}>
+                            <button
+                                type="button"
+                                onClick={() => handleSelectBranch('')}
+                                style={tabBtnStyle(filterBranch === '')}
+                            >
+                                Tất cả
+                                <span style={{ marginLeft: '6px', opacity: 0.85, fontSize: '0.8rem' }}>
+                                    ({getBranchCount('')})
+                                </span>
+                            </button>
+                            {branches.map(branch => (
+                                <button
+                                    key={branch}
+                                    type="button"
+                                    onClick={() => handleSelectBranch(branch)}
+                                    style={tabBtnStyle(filterBranch === branch)}
+                                >
+                                    {branch}
+                                    <span style={{ marginLeft: '6px', opacity: 0.85, fontSize: '0.8rem' }}>
+                                        ({getBranchCount(branch)})
+                                    </span>
+                                </button>
+                            ))}
+                            {noBranchCount > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleSelectBranch('__none__')}
+                                    style={tabBtnStyle(filterBranch === '__none__')}
+                                >
+                                    Chưa có chi nhánh
+                                    <span style={{ marginLeft: '6px', opacity: 0.85, fontSize: '0.8rem' }}>
+                                        ({noBranchCount})
+                                    </span>
+                                </button>
+                            )}
+                        </div>
+
+                        <div style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '6px', fontWeight: 600 }}>
+                            Bộ phận{filterBranch && filterBranch !== '__none__' ? ` · ${filterBranch}` : ''}
+                        </div>
+                        <div className="dept-tabs" style={{
+                            display: 'flex',
+                            gap: '8px',
+                            flexWrap: 'wrap',
+                            paddingBottom: '4px'
+                        }}>
+                            <button
+                                type="button"
+                                onClick={() => setFilterDept('')}
+                                style={tabBtnStyle(filterDept === '')}
+                            >
+                                Tất cả
+                                <span style={{ marginLeft: '6px', opacity: 0.85, fontSize: '0.8rem' }}>
+                                    ({getDeptCount('')})
+                                </span>
+                            </button>
+                            {departments.map(dept => (
+                                <button
+                                    key={dept}
+                                    type="button"
+                                    onClick={() => setFilterDept(dept)}
+                                    style={tabBtnStyle(filterDept === dept)}
+                                >
+                                    {dept}
+                                    <span style={{ marginLeft: '6px', opacity: 0.85, fontSize: '0.8rem' }}>
+                                        ({getDeptCount(dept)})
+                                    </span>
+                                </button>
+                            ))}
+                            {noDeptCount > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setFilterDept('__none__')}
+                                    style={tabBtnStyle(filterDept === '__none__')}
+                                >
+                                    Chưa phân bộ phận
+                                    <span style={{ marginLeft: '6px', opacity: 0.85, fontSize: '0.8rem' }}>
+                                        ({noDeptCount})
+                                    </span>
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="search-box" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
                         <input
                             type="text"
                             placeholder="Tìm theo Mã NV, Họ tên, SĐT, Email..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
-                        <select value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)}>
-                            <option value="">Tất cả chi nhánh</option>
-                            <option value="HCM">HCM</option>
-                            <option value="Hà Nội">Hà Nội</option>
-                        </select>
-                        <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
-                            <option value="">Tất cả phòng ban</option>
-                            {departments.map(dept => (
-                                <option key={dept} value={dept}>{dept}</option>
-                            ))}
-                        </select>
                         <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
                             <option value="">Tất cả trạng thái</option>
                             <option value="Thử việc">Thử việc</option>
                             <option value="Chính thức">Chính thức</option>
                             <option value="Tạm nghỉ">Tạm nghỉ</option>
-                            <option value="Nghỉ việc">Nghỉ việc</option>
                         </select>
                         <select value={filterBirthMonth} onChange={(e) => setFilterBirthMonth(e.target.value)}>
                             <option value="">Tất cả tháng sinh</option>
@@ -587,127 +896,54 @@ function Employees() {
                                 <option key={month} value={month}>Tháng {month}</option>
                             ))}
                         </select>
+                        <div className="employee-view-toggle">
+                            <button
+                                type="button"
+                                className={viewMode === 'cards' ? 'active' : ''}
+                                onClick={() => setViewMode('cards')}
+                                title="Dạng thẻ"
+                            >
+                                <i className="fas fa-th-large"></i>
+                            </button>
+                            <button
+                                type="button"
+                                className={viewMode === 'list' ? 'active' : ''}
+                                onClick={() => setViewMode('list')}
+                                title="Dạng list"
+                            >
+                                <i className="fas fa-list"></i>
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="card" style={{ overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', position: 'relative', border: '1px solid #e0e0e0', boxShadow: 'none' }}>
-                        <table style={{ minWidth: '101%' }}>
-                            <thead>
-                                <tr>
-                                    <th style={{ minWidth: '80px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
-                                    <th style={{ minWidth: '100px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ảnh</th>
-                                    <th style={{ minWidth: '300px', position: 'sticky', left: 0, top: 0, background: '#f8f9fa', zIndex: 12, whiteSpace: 'nowrap', padding: '4px 8px', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)' }}>Họ và tên</th>
-                                    <th style={{ minWidth: '300px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>Email</th>
-                                    <th style={{ minWidth: '200px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>SĐT</th>
-                                    <th style={{ minWidth: '200px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ngày sinh</th>
-                                    <th style={{ minWidth: '200px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>Ngày vào làm</th>
-                                    <th style={{ minWidth: '200px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ngày chính thức</th>
-                                    <th style={{ minWidth: '200px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>CCCD</th>
-                                    <th style={{ minWidth: '200px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>Ngày cấp</th>
-                                    <th style={{ minWidth: '250px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>Nơi cấp</th>
-                                    <th style={{ minWidth: '250px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>Quê quán</th>
-                                    <th style={{ minWidth: '150px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>Giới tính</th>
-                                    <th style={{ minWidth: '200px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10, display: 'none' }}>TT Hôn nhân</th>
-                                    <th style={{ minWidth: '200px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Chi nhánh</th>
-                                    <th style={{ minWidth: '250px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Bộ phận</th>
-                                    <th style={{ minWidth: '250px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Vị trí</th>
-                                    <th style={{ minWidth: '200px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ca làm việc</th>
-                                    <th style={{ width: '150px', whiteSpace: 'nowrap', padding: '4px 8px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredEmployees.length > 0 ? (
-                                    filteredEmployees.map((emp, idx) => {
-                                        const name = emp.ho_va_ten || emp.name || emp.Tên || 'N/A'
-                                        const avatar = emp.avatarDataUrl || emp.avatarUrl || emp.avatar || ''
-                                        return (
-                                            <tr key={emp.id || idx}>
-                                                <td style={{ textAlign: 'center', padding: '4px 8px' }}>{idx + 1}</td>
-                                                <td style={{ textAlign: 'center', padding: '4px 8px' }}>
-                                                    {avatar ? (
-                                                        <img
-                                                            src={avatar}
-                                                            alt={name}
-                                                            style={{
-                                                                width: '32px',
-                                                                height: '32px',
-                                                                borderRadius: '50%',
-                                                                objectFit: 'cover'
-                                                            }}
-                                                            onError={(e) => e.target.style.display = 'none'}
-                                                        />
-                                                    ) : (
-                                                        <span style={{
-                                                            width: '32px',
-                                                            height: '32px',
-                                                            borderRadius: '50%',
-                                                            background: 'var(--primary)',
-                                                            display: 'inline-block'
-                                                        }}></span>
-                                                    )}
-                                                </td>
-                                                <td style={{ fontWeight: '500', position: 'sticky', left: 0, background: 'white', zIndex: 1, padding: '4px 8px', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)' }}>{name}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{emp.email || '-'}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{emp.sđt || emp.sdt || '-'}</td>
-                                                <td style={{ padding: '4px 8px' }}>{formatDateDisplay(emp.ngay_sinh || emp.dob)}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{formatDateDisplay(emp.ngay_vao_lam)}</td>
-                                                <td style={{ padding: '4px 8px' }}>{formatDateDisplay(emp.ngay_lam_chinh_thuc)}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{emp.cccd || '-'}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{formatDateDisplay(emp.ngay_cap)}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{emp.noi_cap || '-'}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{emp.que_quan || '-'}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{emp.gioi_tinh || '-'}</td>
-                                                <td style={{ padding: '4px 8px', display: 'none' }}>{emp.tinh_trang_hon_nhan || '-'}</td>
-                                                <td style={{ padding: '4px 8px' }}>{emp.chi_nhanh || '-'}</td>
-                                                <td style={{ padding: '4px 8px' }}>{emp.bo_phan || '-'}</td>
-                                                <td style={{ padding: '4px 8px' }}>{emp.vi_tri || '-'}</td>
-                                                <td style={{ padding: '4px 8px' }}>{emp.ca_lam_viec || '-'}</td>
-                                                <td style={{ padding: '4px 8px' }}>
-                                                    <div className="actions" style={{ justifyContent: 'center' }}>
-                                                        <button
-                                                            className="view"
-                                                            title="Xem"
-                                                            onClick={() => {
-                                                                setSelectedEmployee(emp)
-                                                                setIsReadOnly(true)
-                                                                setIsModalOpen(true)
-                                                            }}
-                                                        >
-                                                            <i className="fas fa-eye"></i>
-                                                        </button>
-
-                                                        <button
-                                                            className="edit"
-                                                            title="Sửa"
-                                                            onClick={() => {
-                                                                setSelectedEmployee(emp)
-                                                                setIsReadOnly(false)
-                                                                setIsModalOpen(true)
-                                                            }}
-                                                        >
-                                                            <i className="fas fa-edit"></i>
-                                                        </button>
-                                                        <button
-                                                            className="delete"
-                                                            title="Xóa"
-                                                            onClick={() => handleDelete(emp.id, name)}
-                                                        >
-                                                            <i className="fas fa-trash"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )
-                                    })
-                                ) : (
-                                    <tr>
-                                        <td colSpan="19" className="empty-state">
-                                            {employees.length === 0 ? 'Chưa có dữ liệu nhân sự' : 'Không tìm thấy kết quả'}
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                    {filteredEmployees.length === 0 ? (
+                        <div className="employee-card-empty">
+                            {activeEmployees.length === 0 ? 'Chưa có dữ liệu nhân sự' : 'Không tìm thấy kết quả'}
+                        </div>
+                    ) : (
+                        <div className="employee-dept-groups">
+                            {groupedEmployees.map(group => (
+                                <section key={group.dept} className="employee-dept-group">
+                                    <div className="employee-dept-group__header">
+                                        <h3>
+                                            <i className="fas fa-building"></i>
+                                            {group.dept}
+                                        </h3>
+                                        <span>{group.items.length} nhân viên</span>
+                                    </div>
+                                    {viewMode === 'cards' ? (
+                                        <div className="employee-card-grid">
+                                            {group.items.map((emp, idx) => renderCard(emp, idx))}
+                                        </div>
+                                    ) : (
+                                        <div className="employee-list">
+                                            {group.items.map((emp, idx) => renderListRow(emp, idx))}
+                                        </div>
+                                    )}
+                                </section>
+                            ))}
+                        </div>
+                    )}
                 </>
             ) : (
                 <StatusHistoryView employees={employees} onDataChange={() => { }} />
@@ -723,6 +959,8 @@ function Employees() {
                 }}
                 onSave={loadEmployees}
                 readOnly={isReadOnly}
+                departmentOptions={[...new Set(employees.map(e => e.bo_phan).filter(Boolean))]}
+                positionOptions={[...new Set(employees.map(e => e.vi_tri).filter(Boolean))]}
             />
 
             {isImportModalOpen && (
@@ -782,6 +1020,7 @@ function Employees() {
             )}
         </div>
     )
+    */
 }
 
 export default Employees

@@ -2,7 +2,125 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../services/supabase'
 import { mapAppToUser, runUsersMutationWithSchemaFallback } from '../utils/helpers'
 
-function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) {
+function normalizeFiles(files = []) {
+  return (files || []).map((file, idx) => {
+    if (typeof file === 'string') {
+      return { name: `Giấy tờ ${idx + 1}`, url: file, data: '', type: '' }
+    }
+    return {
+      name: file.name || `Giấy tờ ${idx + 1}`,
+      url: file.url || file.link || '',
+      data: file.data || '',
+      type: file.type || ''
+    }
+  })
+}
+
+/** Dropdown chọn sẵn hoặc nhập giá trị mới */
+function SelectOrCreateField({
+  label,
+  name,
+  value,
+  options = [],
+  onChange,
+  disabled = false,
+  placeholder = 'Nhập giá trị mới...'
+}) {
+  const knownOptions = [...new Set(options.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi'))
+  const isKnownValue = !value || knownOptions.includes(value)
+  const [customMode, setCustomMode] = useState(!isKnownValue && !!value)
+
+  useEffect(() => {
+    const known = !value || knownOptions.includes(value)
+    setCustomMode(!known && !!value)
+  }, [value, knownOptions.join('|')])
+
+  const handleSelectChange = (e) => {
+    const next = e.target.value
+    if (next === '__new__') {
+      setCustomMode(true)
+      onChange({ target: { name, value: '' } })
+      return
+    }
+    setCustomMode(false)
+    onChange({ target: { name, value: next } })
+  }
+
+  if (disabled) {
+    return (
+      <div className="form-group">
+        <label>{label}</label>
+        <input type="text" name={name} value={value || ''} disabled />
+      </div>
+    )
+  }
+
+  return (
+    <div className="form-group">
+      <label>{label}</label>
+      {!customMode ? (
+        <select
+          name={name}
+          value={value || ''}
+          onChange={handleSelectChange}
+        >
+          <option value="">-- Chọn {label.toLowerCase()} --</option>
+          {knownOptions.map(opt => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+          <option value="__new__">+ Nhập mới...</option>
+        </select>
+      ) : (
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <input
+            type="text"
+            name={name}
+            value={value || ''}
+            onChange={onChange}
+            placeholder={placeholder}
+            autoFocus
+            style={{ flex: 1 }}
+          />
+          <button
+            type="button"
+            className="btn"
+            title="Chọn từ danh sách"
+            onClick={() => {
+              setCustomMode(false)
+              onChange({ target: { name, value: '' } })
+            }}
+            style={{ whiteSpace: 'nowrap', padding: '8px 10px' }}
+          >
+            <i className="fas fa-list"></i>
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function getFileIcon(file) {
+  const type = (file.type || '').toLowerCase()
+  const name = (file.name || '').toLowerCase()
+  if (type.includes('pdf') || name.endsWith('.pdf')) return 'fa-file-pdf'
+  if (type.includes('word') || type.includes('document') || name.endsWith('.doc') || name.endsWith('.docx')) {
+    return 'fa-file-word'
+  }
+  if (type.includes('image') || /\.(png|jpe?g|gif|webp)$/i.test(name)) return 'fa-file-image'
+  return 'fa-file-alt'
+}
+
+function EmployeeModal({
+  employee,
+  isOpen,
+  onClose,
+  onSave,
+  readOnly = false,
+  departmentOptions = [],
+  positionOptions = []
+}) {
+  const [activeTab, setActiveTab] = useState('info')
+  const [editingDocs, setEditingDocs] = useState(false)
   const [formData, setFormData] = useState({
     ho_va_ten: '',
     employeeId: '',
@@ -31,18 +149,24 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
   const [imagesPreview, setImagesPreview] = useState([])
   const [filesPreview, setFilesPreview] = useState([])
 
-  // State for URL inputs
   const [avatarUrlInput, setAvatarUrlInput] = useState('')
   const [galleryUrlInput, setGalleryUrlInput] = useState('')
 
-  // Auto-generate local Employee ID (not persisted if DB has no employee_id column)
   const generateEmployeeId = () => {
     const nextId = `NV${Date.now().toString().slice(-6)}`
     setFormData(prev => ({ ...prev, employeeId: nextId }))
   }
 
   useEffect(() => {
+    if (!isOpen) return
+    setActiveTab('info')
+    setEditingDocs(false)
+
     if (employee) {
+      const normalizedFiles = normalizeFiles(employee.files || employee.documents || [])
+      const initialDocs = normalizedFiles.length > 0
+        ? normalizedFiles
+        : (readOnly ? [] : [{ name: '', url: '', data: '', type: '' }])
       setFormData({
         ho_va_ten: employee.ho_va_ten || '',
         employeeId: employee.employeeId || '',
@@ -65,12 +189,11 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
         tinh_trang_hon_nhan: employee.tinh_trang_hon_nhan || '',
         avatarDataUrl: employee.avatarDataUrl || employee.avatarUrl || employee.avatar || '',
         images: employee.images || [],
-        files: employee.files || []
+        files: initialDocs
       })
 
       const initialAvatar = employee.avatarDataUrl || employee.avatarUrl || employee.avatar || ''
       setAvatarPreview(initialAvatar)
-      // If the initial avatar is a URL (starts with http), set it to the input too
       if (initialAvatar.startsWith('http')) {
         setAvatarUrlInput(initialAvatar)
       } else {
@@ -78,16 +201,15 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
       }
 
       setImagesPreview(employee.images || [])
-      setFilesPreview(employee.files || [])
+      setFilesPreview(initialDocs)
     } else {
       resetForm()
-      if (isOpen) {
-        generateEmployeeId()
-      }
+      generateEmployeeId()
     }
-  }, [employee, isOpen])
+  }, [employee, isOpen, readOnly])
 
   const resetForm = () => {
+    const emptyDoc = [{ name: '', url: '', data: '', type: '' }]
     setFormData({
       ho_va_ten: '',
       employeeId: '',
@@ -110,13 +232,33 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
       tinh_trang_hon_nhan: '',
       avatarDataUrl: '',
       images: [],
-      files: []
+      files: emptyDoc
     })
     setAvatarPreview('')
     setImagesPreview([])
-    setFilesPreview([])
+    setFilesPreview(emptyDoc)
     setAvatarUrlInput('')
     setGalleryUrlInput('')
+    setActiveTab('info')
+    setEditingDocs(false)
+  }
+
+  const docsEditable = !readOnly || editingDocs
+
+  const startAddDocuments = () => {
+    setEditingDocs(true)
+    setActiveTab('documents')
+    if (filesPreview.length === 0) {
+      syncDocuments([{ name: '', url: '', data: '', type: '' }])
+    } else if (getFilledDocuments().length === filesPreview.length) {
+      // đã có giấy tờ đầy đủ → thêm 1 dòng trống để nhập tiếp
+      syncDocuments([...filesPreview, { name: '', url: '', data: '', type: '' }])
+    }
+  }
+
+  const syncDocuments = (docs) => {
+    setFilesPreview(docs)
+    setFormData(prev => ({ ...prev, files: docs }))
   }
 
   const handleChange = (e) => {
@@ -126,16 +268,14 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
     })
   }
 
-  // ... (keep other handlers)
-
   const handleAvatarChange = async (e) => {
     const file = e.target.files[0]
     if (!file) return
 
     if (file.type.startsWith('image/')) {
       const reader = new FileReader()
-      reader.onload = (e) => {
-        const dataUrl = e.target.result
+      reader.onload = (ev) => {
+        const dataUrl = ev.target.result
         setAvatarPreview(dataUrl)
         setFormData({ ...formData, avatarDataUrl: dataUrl })
       }
@@ -150,8 +290,8 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
     for (const file of files) {
       if (file.type.startsWith('image/')) {
         const reader = new FileReader()
-        reader.onload = (e) => {
-          newImages.push(e.target.result)
+        reader.onload = (ev) => {
+          newImages.push(ev.target.result)
           if (newImages.length === files.length) {
             setImagesPreview([...imagesPreview, ...newImages])
             setFormData({
@@ -165,27 +305,51 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
     }
   }
 
-  const handleFilesChange = async (e) => {
-    const files = Array.from(e.target.files)
-    const newFiles = []
+  const addDocumentRow = () => {
+    syncDocuments([...filesPreview, { name: '', url: '', data: '', type: '' }])
+  }
 
-    for (const file of files) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        newFiles.push({
-          name: file.name,
-          data: e.target.result,
-          type: file.type
-        })
-        if (newFiles.length === files.length) {
-          setFilesPreview([...filesPreview, ...newFiles])
-          setFormData({
-            ...formData,
-            files: [...formData.files, ...newFiles]
-          })
-        }
-      }
-      reader.readAsDataURL(file)
+  const updateDocumentRow = (index, field, value) => {
+    const next = filesPreview.map((doc, i) => (
+      i === index ? { ...doc, [field]: value } : doc
+    ))
+    syncDocuments(next)
+  }
+
+  const handleRowFileUpload = (index, e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const next = filesPreview.map((doc, i) => (
+        i === index
+          ? {
+              ...doc,
+              name: doc.name || file.name,
+              data: ev.target.result,
+              url: '',
+              type: file.type
+            }
+          : doc
+      ))
+      syncDocuments(next)
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  const openDocument = (file) => {
+    if (file.url) {
+      window.open(file.url, '_blank', 'noopener,noreferrer')
+      return
+    }
+    if (file.data) {
+      const link = document.createElement('a')
+      link.href = file.data
+      link.download = file.name || 'document'
+      link.target = '_blank'
+      link.click()
     }
   }
 
@@ -195,30 +359,24 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
     setFormData({ ...formData, images: newImages })
   }
 
-  const removeFile = (index) => {
-    const newFiles = filesPreview.filter((_, i) => i !== index)
-    setFilesPreview(newFiles)
-    setFormData({ ...formData, files: newFiles })
+  const removeDocumentRow = (index) => {
+    const next = filesPreview.filter((_, i) => i !== index)
+    syncDocuments(next.length > 0 ? next : [{ name: '', url: '', data: '', type: '' }])
   }
 
+  const getFilledDocuments = () => filesPreview.filter(doc =>
+    (doc.name && doc.name.trim()) || doc.url || doc.data
+  )
 
-
-  // Helper to process image URLs (supports Google Drive)
   const processImageUrl = (url) => {
     if (!url) return ''
 
-    // Check for Google Drive share links
-    // Formats: 
-    // https://drive.google.com/file/d/FILE_ID/view
-    // https://drive.google.com/open?id=FILE_ID
-    // https://drive.google.com/uc?id=FILE_ID
     const driveRegex = /\/d\/([^/?]+)|id=([^&]+)/
     const match = url.match(driveRegex)
 
     if (match) {
       const id = match[1] || match[2]
       if (id) {
-        // Use lh3.googleusercontent.com which is more reliable for embedding images
         return `https://lh3.googleusercontent.com/d/${id}`
       }
     }
@@ -226,7 +384,6 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
     return url
   }
 
-  // Handle Avatar URL Input
   const handleAvatarUrlChange = (e) => {
     const rawUrl = e.target.value
     setAvatarUrlInput(rawUrl)
@@ -236,7 +393,6 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
     setFormData({ ...formData, avatarDataUrl: displayUrl })
   }
 
-  // Handle Gallery URL Add
   const handleAddGalleryUrl = () => {
     if (!galleryUrlInput) return
 
@@ -252,14 +408,16 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (readOnly) return
+    if (readOnly && !editingDocs) return
 
     try {
       const oldStatus = employee ? (employee.trang_thai || employee.status || '') : ''
       const newStatus = formData.trang_thai
+      const filledDocs = getFilledDocuments()
+      const payloadForm = { ...formData, files: filledDocs }
 
       if (employee && employee.id) {
-        const dbPayload = mapAppToUser(formData)
+        const dbPayload = mapAppToUser(payloadForm)
         const mutationResult = await runUsersMutationWithSchemaFallback(
           (payload) => supabase
             .from('users')
@@ -271,16 +429,15 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
 
         if (error) throw error
 
-        // Log thay đổi trạng thái nếu có đổi
-        if (oldStatus !== newStatus) {
+        if (!readOnly && oldStatus !== newStatus) {
           const historyPayload = {
-            employee_id: employee.id, // Supabase user ID
-            employee_code: employee.employeeId || '', // Store employee code
+            employee_id: employee.id,
+            employee_code: employee.employeeId || '',
             employee_name: formData.ho_va_ten || employee.ho_va_ten || '',
             new_status: newStatus,
             old_status: oldStatus,
             effective_date: new Date().toISOString().split('T')[0],
-            actor: 'HR', // Could be dynamic if we track logged-in user
+            actor: 'HR',
             note: 'Cập nhật trạng thái nhân sự'
           }
 
@@ -290,16 +447,14 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
 
           if (historyError) {
             console.error('Error logging status history:', historyError)
-            // Non-blocking error, just log it
           }
         }
       } else {
-        // Remove id from formData if it exists and is empty/null to allow auto-increment
+        if (readOnly) return
         if ('id' in formData) delete formData.id
 
-        const dbPayload = mapAppToUser(formData)
+        const dbPayload = mapAppToUser(payloadForm)
         dbPayload.password = '123456'
-        // Create manual ID because DB does not auto-generate it
         dbPayload.id = crypto.randomUUID()
 
         const mutationResult = await runUsersMutationWithSchemaFallback(
@@ -329,418 +484,559 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
 
   return (
     <div className="modal show" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-content modal-lg" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>
-            <i className={readOnly ? "fas fa-eye" : "fas fa-user"}></i>
+            <i className={readOnly ? 'fas fa-eye' : 'fas fa-user'}></i>
+            {' '}
             {getTitle()}
           </h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
         <div className="modal-body">
-          <form onSubmit={handleSubmit}>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Mã nhân viên *</label>
-                <input
-                  type="text"
-                  name="employeeId"
-                  value={formData.employeeId}
-                  onChange={handleChange}
-                  placeholder="Hệ thống tự tạo (VD: NV001)"
-                  required
-                  readOnly
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Họ và tên *</label>
-                <input
-                  type="text"
-                  name="ho_va_ten"
-                  value={formData.ho_va_ten}
-                  onChange={handleChange}
-                  required
-                  disabled={readOnly}
-                />
-              </div>
-              <div className="form-group">
-                <label>Email</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  disabled={readOnly}
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>SĐT</label>
-                <input
-                  type="text"
-                  name="sđt"
-                  value={formData.sđt}
-                  onChange={handleChange}
-                  disabled={readOnly}
-                />
-              </div>
-              <div className="form-group">
-                <label>Chi nhánh</label>
-                <select
-                  name="chi_nhanh"
-                  value={formData.chi_nhanh}
-                  onChange={handleChange}
-                  disabled={readOnly}
-                >
-                  <option value="HCM">HCM</option>
-                  <option value="Hà Nội">Hà Nội</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Bộ phận</label>
-                <input
-                  type="text"
-                  name="bo_phan"
-                  value={formData.bo_phan}
-                  onChange={handleChange}
-                  disabled={readOnly}
-                />
-              </div>
-              <div className="form-group">
-                <label>Vị trí</label>
-                <input
-                  type="text"
-                  name="vi_tri"
-                  value={formData.vi_tri}
-                  onChange={handleChange}
-                  disabled={readOnly}
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Trạng thái</label>
-                <select
-                  name="trang_thai"
-                  value={formData.trang_thai}
-                  onChange={handleChange}
-                  disabled={readOnly}
-                >
-                  <option value="Thử việc">Thử việc</option>
-                  <option value="Chính thức">Chính thức</option>
-                  <option value="Tạm nghỉ">Tạm nghỉ</option>
-                  <option value="Nghỉ việc">Nghỉ việc</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Ca làm việc</label>
-                <select
-                  name="ca_lam_viec"
-                  value={formData.ca_lam_viec}
-                  onChange={handleChange}
-                  disabled={readOnly}
-                >
-                  <option value="Ca full">Ca full</option>
-                  <option value="Ca sáng">Ca sáng (8h - 11h30)</option>
-                  <option value="Ca chiều">Ca chiều (13h30 - 17h30)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Ngày vào làm</label>
-                <input
-                  type="date"
-                  name="ngay_vao_lam"
-                  value={formData.ngay_vao_lam}
-                  onChange={handleChange}
-                  disabled={readOnly}
-                />
-              </div>
-              <div className="form-group">
-                <label>Ngày làm chính thức</label>
-                <input
-                  type="date"
-                  name="ngay_lam_chinh_thuc"
-                  value={formData.ngay_lam_chinh_thuc}
-                  onChange={handleChange}
-                  disabled={readOnly}
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>CCCD/CMND</label>
-                <input
-                  type="text"
-                  name="cccd"
-                  value={formData.cccd}
-                  onChange={handleChange}
-                  placeholder="Số CCCD/CMND"
-                  disabled={readOnly}
-                />
-              </div>
-              <div className="form-group">
-                <label>Ngày cấp</label>
-                <input
-                  type="date"
-                  name="ngay_cap"
-                  value={formData.ngay_cap}
-                  onChange={handleChange}
-                  disabled={readOnly}
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Nơi cấp</label>
-                <input
-                  type="text"
-                  name="noi_cap"
-                  value={formData.noi_cap}
-                  onChange={handleChange}
-                  placeholder="Nơi cấp CCCD/CMND"
-                  disabled={readOnly}
-                />
-              </div>
-              <div className="form-group">
-                <label>Quê quán</label>
-                <input
-                  type="text"
-                  name="que_quan"
-                  value={formData.que_quan}
-                  onChange={handleChange}
-                  placeholder="Quê quán"
-                  disabled={readOnly}
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Địa chỉ thường trú</label>
-                <input
-                  type="text"
-                  name="dia_chi_thuong_tru"
-                  value={formData.dia_chi_thuong_tru}
-                  onChange={handleChange}
-                  placeholder="Địa chỉ thường trú"
-                  disabled={readOnly}
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Ngày sinh</label>
-                <input
-                  type="date"
-                  name="ngay_sinh"
-                  value={formData.ngay_sinh}
-                  onChange={handleChange}
-                  disabled={readOnly}
-                />
-              </div>
-              <div className="form-group">
-                <label>Giới tính</label>
-                <select
-                  name="gioi_tinh"
-                  value={formData.gioi_tinh}
-                  onChange={handleChange}
-                  disabled={readOnly}
-                >
-                  <option value="">-- Chọn giới tính --</option>
-                  <option value="Nam">Nam</option>
-                  <option value="Nữ">Nữ</option>
-                  <option value="Khác">Khác</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Tình trạng hôn nhân</label>
-                <select
-                  name="tinh_trang_hon_nhan"
-                  value={formData.tinh_trang_hon_nhan}
-                  onChange={handleChange}
-                  disabled={readOnly}
-                >
-                  <option value="">-- Chọn tình trạng --</option>
-                  <option value="Độc thân">Độc thân</option>
-                  <option value="Đã kết hôn">Đã kết hôn</option>
-                  <option value="Ly hôn">Ly hôn</option>
-                  <option value="Khác">Khác</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Avatar */}
-            <div className="form-group">
-              <label>Ảnh đại diện</label>
-              {avatarPreview && (
-                <div style={{ marginBottom: '10px' }}>
-                  <img
-                    src={avatarPreview}
-                    alt="Avatar"
-                    style={{
-                      width: '100px',
-                      height: '100px',
-                      objectFit: 'cover',
-                      borderRadius: '8px'
-                    }}
-                  />
-                </div>
+          <div className="modal-tabs">
+            <button
+              type="button"
+              className={`tab-btn ${activeTab === 'info' ? 'active' : ''}`}
+              onClick={() => setActiveTab('info')}
+            >
+              <i className="fas fa-id-card"></i>
+              Thông tin
+            </button>
+            <button
+              type="button"
+              className={`tab-btn ${activeTab === 'documents' ? 'active' : ''}`}
+              onClick={() => setActiveTab('documents')}
+            >
+              <i className="fas fa-folder-open"></i>
+              Giấy tờ liên quan
+              {getFilledDocuments().length > 0 && (
+                <span style={{
+                  background: 'var(--primary)',
+                  color: '#fff',
+                  borderRadius: '999px',
+                  padding: '1px 8px',
+                  fontSize: '0.75rem'
+                }}>
+                  {getFilledDocuments().length}
+                </span>
               )}
-              {!readOnly && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarChange}
-                  />
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.9em', color: '#666' }}>Hoặc nhập link ảnh:</span>
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            {activeTab === 'info' && (
+              <>
+                {readOnly ? (
+                  <div className="employee-profile-header">
+                    {avatarPreview ? (
+                      <img
+                        src={avatarPreview}
+                        alt={formData.ho_va_ten || 'Avatar'}
+                        className="employee-profile-avatar"
+                      />
+                    ) : (
+                      <div className="employee-profile-avatar placeholder">
+                        <i className="fas fa-user"></i>
+                      </div>
+                    )}
+                    <div className="employee-profile-meta">
+                      <h4>{formData.ho_va_ten || '—'}</h4>
+                      <p><strong>Mã NV:</strong> {formData.employeeId || '—'}</p>
+                      <p><strong>Vị trí:</strong> {formData.vi_tri || '—'} {formData.bo_phan ? `· ${formData.bo_phan}` : ''}</p>
+                      <p><strong>Trạng thái:</strong> {formData.trang_thai || '—'}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="form-group">
+                    <label>Ảnh đại diện</label>
+                    {avatarPreview && (
+                      <div style={{ marginBottom: '10px' }}>
+                        <img
+                          src={avatarPreview}
+                          alt="Avatar"
+                          style={{
+                            width: '100px',
+                            height: '100px',
+                            objectFit: 'cover',
+                            borderRadius: '8px'
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarChange}
+                      />
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.9em', color: '#666' }}>Hoặc nhập link ảnh:</span>
+                        <input
+                          type="text"
+                          placeholder="https://example.com/avatar.jpg"
+                          value={avatarUrlInput}
+                          onChange={handleAvatarUrlChange}
+                          style={{ flex: 1 }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Mã nhân viên *</label>
                     <input
                       type="text"
-                      placeholder="https://example.com/avatar.jpg"
-                      value={avatarUrlInput}
-                      onChange={handleAvatarUrlChange}
-                      style={{ flex: 1 }}
+                      name="employeeId"
+                      value={formData.employeeId}
+                      onChange={handleChange}
+                      placeholder="Hệ thống tự tạo (VD: NV001)"
+                      required
+                      readOnly
                     />
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Multiple Images */}
-            <div className="form-group">
-              <label>Nhiều ảnh</label>
-              {imagesPreview.length > 0 && (
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
-                  {imagesPreview.map((img, idx) => (
-                    <div key={idx} style={{ position: 'relative' }}>
-                      <img
-                        src={img}
-                        alt={`Preview ${idx}`}
-                        style={{
-                          width: '80px',
-                          height: '80px',
-                          objectFit: 'cover',
-                          borderRadius: '4px'
-                        }}
-                      />
-                      {!readOnly && (
-                        <button
-                          type="button"
-                          onClick={() => removeImage(idx)}
-                          style={{
-                            position: 'absolute',
-                            top: '4px',
-                            right: '4px',
-                            background: 'var(--danger)',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            padding: '2px 6px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          ×
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {!readOnly && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleImagesChange}
-                  />
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Họ và tên *</label>
                     <input
                       type="text"
-                      placeholder="Nhập link ảnh..."
-                      value={galleryUrlInput}
-                      onChange={(e) => setGalleryUrlInput(e.target.value)}
-                      style={{ flex: 1 }}
+                      name="ho_va_ten"
+                      value={formData.ho_va_ten}
+                      onChange={handleChange}
+                      required
+                      disabled={readOnly}
                     />
+                  </div>
+                  <div className="form-group">
+                    <label>Email</label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      disabled={readOnly}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>SĐT</label>
+                    <input
+                      type="text"
+                      name="sđt"
+                      value={formData.sđt}
+                      onChange={handleChange}
+                      disabled={readOnly}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Chi nhánh</label>
+                    <select
+                      name="chi_nhanh"
+                      value={formData.chi_nhanh}
+                      onChange={handleChange}
+                      disabled={readOnly}
+                    >
+                      <option value="HCM">HCM</option>
+                      <option value="Hà Nội">Hà Nội</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <SelectOrCreateField
+                    label="Bộ phận"
+                    name="bo_phan"
+                    value={formData.bo_phan}
+                    options={departmentOptions}
+                    onChange={handleChange}
+                    disabled={readOnly}
+                    placeholder="Nhập bộ phận mới..."
+                  />
+                  <SelectOrCreateField
+                    label="Vị trí"
+                    name="vi_tri"
+                    value={formData.vi_tri}
+                    options={positionOptions}
+                    onChange={handleChange}
+                    disabled={readOnly}
+                    placeholder="Nhập vị trí mới..."
+                  />
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Trạng thái</label>
+                    <select
+                      name="trang_thai"
+                      value={formData.trang_thai}
+                      onChange={handleChange}
+                      disabled={readOnly}
+                    >
+                      <option value="Thử việc">Thử việc</option>
+                      <option value="Chính thức">Chính thức</option>
+                      <option value="Tạm nghỉ">Tạm nghỉ</option>
+                      <option value="Nghỉ việc">Nghỉ việc</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Ca làm việc</label>
+                    <select
+                      name="ca_lam_viec"
+                      value={formData.ca_lam_viec}
+                      onChange={handleChange}
+                      disabled={readOnly}
+                    >
+                      <option value="Ca full">Ca full</option>
+                      <option value="Ca sáng">Ca sáng (8h - 11h30)</option>
+                      <option value="Ca chiều">Ca chiều (13h30 - 17h30)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Ngày vào làm</label>
+                    <input
+                      type="date"
+                      name="ngay_vao_lam"
+                      value={formData.ngay_vao_lam}
+                      onChange={handleChange}
+                      disabled={readOnly}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Ngày làm chính thức</label>
+                    <input
+                      type="date"
+                      name="ngay_lam_chinh_thuc"
+                      value={formData.ngay_lam_chinh_thuc}
+                      onChange={handleChange}
+                      disabled={readOnly}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>CCCD/CMND</label>
+                    <input
+                      type="text"
+                      name="cccd"
+                      value={formData.cccd}
+                      onChange={handleChange}
+                      placeholder="Số CCCD/CMND"
+                      disabled={readOnly}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Ngày cấp</label>
+                    <input
+                      type="date"
+                      name="ngay_cap"
+                      value={formData.ngay_cap}
+                      onChange={handleChange}
+                      disabled={readOnly}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Nơi cấp</label>
+                    <input
+                      type="text"
+                      name="noi_cap"
+                      value={formData.noi_cap}
+                      onChange={handleChange}
+                      placeholder="Nơi cấp CCCD/CMND"
+                      disabled={readOnly}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Quê quán</label>
+                    <input
+                      type="text"
+                      name="que_quan"
+                      value={formData.que_quan}
+                      onChange={handleChange}
+                      placeholder="Quê quán"
+                      disabled={readOnly}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Địa chỉ thường trú</label>
+                    <input
+                      type="text"
+                      name="dia_chi_thuong_tru"
+                      value={formData.dia_chi_thuong_tru}
+                      onChange={handleChange}
+                      placeholder="Địa chỉ thường trú"
+                      disabled={readOnly}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Ngày sinh</label>
+                    <input
+                      type="date"
+                      name="ngay_sinh"
+                      value={formData.ngay_sinh}
+                      onChange={handleChange}
+                      disabled={readOnly}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Giới tính</label>
+                    <select
+                      name="gioi_tinh"
+                      value={formData.gioi_tinh}
+                      onChange={handleChange}
+                      disabled={readOnly}
+                    >
+                      <option value="">-- Chọn giới tính --</option>
+                      <option value="Nam">Nam</option>
+                      <option value="Nữ">Nữ</option>
+                      <option value="Khác">Khác</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Tình trạng hôn nhân</label>
+                    <select
+                      name="tinh_trang_hon_nhan"
+                      value={formData.tinh_trang_hon_nhan}
+                      onChange={handleChange}
+                      disabled={readOnly}
+                    >
+                      <option value="">-- Chọn tình trạng --</option>
+                      <option value="Độc thân">Độc thân</option>
+                      <option value="Đã kết hôn">Đã kết hôn</option>
+                      <option value="Ly hôn">Ly hôn</option>
+                      <option value="Khác">Khác</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Ảnh đính kèm</label>
+                  {imagesPreview.length > 0 ? (
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                      {imagesPreview.map((img, idx) => (
+                        <div key={idx} style={{ position: 'relative' }}>
+                          <img
+                            src={img}
+                            alt={`Preview ${idx}`}
+                            style={{
+                              width: '80px',
+                              height: '80px',
+                              objectFit: 'cover',
+                              borderRadius: '4px'
+                            }}
+                          />
+                          {!readOnly && (
+                            <button
+                              type="button"
+                              onClick={() => removeImage(idx)}
+                              style={{
+                                position: 'absolute',
+                                top: '4px',
+                                right: '4px',
+                                background: 'var(--danger)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                padding: '2px 6px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    readOnly && <p style={{ color: '#64748b', margin: '0 0 8px' }}>Chưa có ảnh đính kèm</p>
+                  )}
+                  {!readOnly && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleImagesChange}
+                      />
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          placeholder="Nhập link ảnh..."
+                          value={galleryUrlInput}
+                          onChange={(e) => setGalleryUrlInput(e.target.value)}
+                          style={{ flex: 1 }}
+                        />
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={handleAddGalleryUrl}
+                          style={{ padding: '8px 15px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                          Thêm
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {activeTab === 'documents' && (
+              <>
+                {!docsEditable ? (
+                  <>
+                    {getFilledDocuments().length > 0 ? (
+                      <div className="document-list">
+                        {getFilledDocuments().map((file, idx) => (
+                          <div key={idx} className="document-item">
+                            <div className="document-item-info">
+                              <i className={`fas ${getFileIcon(file)}`} style={{ color: '#2563eb' }}></i>
+                              <div style={{ minWidth: 0 }}>
+                                <span style={{ display: 'block', fontWeight: 600 }}>{file.name || `Giấy tờ ${idx + 1}`}</span>
+                                {(file.url || file.data) && (
+                                  <span style={{ display: 'block', fontSize: '0.82rem', color: '#64748b' }}>
+                                    {file.url || 'File đã tải lên'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {(file.url || file.data) && (
+                              <div className="document-item-actions">
+                                <button
+                                  type="button"
+                                  className="btn"
+                                  onClick={() => openDocument(file)}
+                                  title={file.url ? 'Mở link' : 'Tải xuống'}
+                                  style={{
+                                    background: '#16a34a',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    padding: '6px 10px',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  <i className={`fas ${file.url ? 'fa-external-link-alt' : 'fa-download'}`}></i>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="document-empty">
+                        <i className="fas fa-folder-open" style={{ fontSize: '1.5rem', marginBottom: '8px', display: 'block' }}></i>
+                        Chưa có giấy tờ liên quan
+                      </div>
+                    )}
                     <button
                       type="button"
-                      className="btn"
-                      onClick={handleAddGalleryUrl}
-                      style={{ padding: '8px 15px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                      className="btn btn-primary"
+                      onClick={startAddDocuments}
+                      style={{ marginTop: '14px' }}
                     >
-                      Thêm
+                      <i className="fas fa-plus"></i>
+                      {' '}Thêm giấy tờ
                     </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Multiple Files */}
-            <div className="form-group">
-              <label>Nhiều file</label>
-              {filesPreview.length > 0 && (
-                <div style={{ marginBottom: '10px' }}>
-                  {filesPreview.map((file, idx) => (
-                    <div key={idx} style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '5px',
-                      background: '#f5f5f5',
-                      borderRadius: '4px',
-                      marginBottom: '5px'
-                    }}>
-                      <span>{file.name || `File ${idx + 1}`}</span>
-                      {!readOnly && (
+                  </>
+                ) : (
+                  <div className="document-rows">
+                    <div className="document-rows__head">
+                      <span>Tên giấy tờ</span>
+                      <span>Link / File</span>
+                      <span></span>
+                    </div>
+                    {filesPreview.map((doc, idx) => (
+                      <div key={idx} className="document-row">
+                        <input
+                          type="text"
+                          placeholder="VD: CCCD, HĐLĐ..."
+                          value={doc.name || ''}
+                          onChange={(e) => updateDocumentRow(idx, 'name', e.target.value)}
+                        />
+                        <div className="document-row__file">
+                          <input
+                            type="text"
+                            placeholder="https://drive.google.com/..."
+                            value={doc.url || ''}
+                            onChange={(e) => updateDocumentRow(idx, 'url', e.target.value)}
+                            disabled={!!doc.data}
+                          />
+                          <label className="btn document-row__upload" title="Upload file">
+                            <i className="fas fa-upload"></i>
+                            <input
+                              type="file"
+                              onChange={(e) => handleRowFileUpload(idx, e)}
+                              style={{ display: 'none' }}
+                            />
+                          </label>
+                          {doc.data && (
+                            <button
+                              type="button"
+                              className="btn"
+                              title="Đã upload — bấm để xóa file"
+                              onClick={() => {
+                                const next = filesPreview.map((item, i) => (
+                                  i === idx ? { ...item, data: '', type: '' } : item
+                                ))
+                                syncDocuments(next)
+                              }}
+                              style={{ padding: '8px 10px', color: '#16a34a' }}
+                            >
+                              <i className="fas fa-paperclip"></i>
+                            </button>
+                          )}
+                        </div>
                         <button
                           type="button"
-                          onClick={() => removeFile(idx)}
-                          style={{
-                            background: 'var(--danger)',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            padding: '2px 6px',
-                            cursor: 'pointer'
-                          }}
+                          className="btn document-row__remove"
+                          title="Xóa dòng"
+                          onClick={() => removeDocumentRow(idx)}
                         >
-                          ×
+                          <i className="fas fa-trash"></i>
                         </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {!readOnly && (
-                <input
-                  type="file"
-                  multiple
-                  onChange={handleFilesChange}
-                />
-              )}
-            </div>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={addDocumentRow}
+                      style={{ alignSelf: 'flex-start', marginTop: '4px' }}
+                    >
+                      <i className="fas fa-plus"></i>
+                      {' '}Thêm dòng
+                    </button>
+                    <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                      Mỗi dòng có thể nhập link hoặc upload file. Bấm “Thêm dòng” để thêm giấy tờ mới.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
 
             <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button type="button" className="btn" onClick={onClose}>
-                {readOnly ? 'Đóng' : 'Hủy'}
+                {readOnly && !editingDocs ? 'Đóng' : 'Hủy'}
               </button>
-              {!readOnly && (
+              {(!readOnly || editingDocs) && (
                 <button type="submit" className="btn btn-primary">
                   <i className="fas fa-save"></i>
                   Lưu
@@ -749,10 +1045,9 @@ function EmployeeModal({ employee, isOpen, onClose, onSave, readOnly = false }) 
             </div>
           </form>
         </div>
-      </div >
-    </div >
+      </div>
+    </div>
   )
 }
 
 export default EmployeeModal
-

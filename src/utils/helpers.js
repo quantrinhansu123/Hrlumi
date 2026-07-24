@@ -97,6 +97,10 @@ export const mapUserToApp = (user) => {
     gioi_tinh: user.gender || '',
     tinh_trang_hon_nhan: user.marital_status || '',
     avatarDataUrl: user.avatar_url || '',
+    files: Array.isArray(user.documents)
+      ? user.documents
+      : (Array.isArray(user.files) ? user.files : []),
+    images: Array.isArray(user.images) ? user.images : [],
     // Preserve other potential fields or map them as needed
     role: user.role || 'user',
     username: user.username || ''
@@ -149,6 +153,13 @@ export const mapAppToUser = (data) => {
     gender: data.gioi_tinh || '',
     marital_status: data.tinh_trang_hon_nhan || '',
     avatar_url: data.avatarDataUrl || data.avatarUrl || data.avatar || '',
+    documents: Array.isArray(data.files) ? data.files.map(f => ({
+      name: f.name || '',
+      url: f.url || f.link || '',
+      type: f.type || '',
+      // Keep uploaded content only when no external url
+      ...(f.url || f.link ? {} : (f.data ? { data: f.data } : {}))
+    })) : [],
     // Add default fields if creating new user, though usually handled by DB defaults
     role: data.role || 'user',
     username: data.username || data.email?.split('@')[0] || data.employeeId || ''
