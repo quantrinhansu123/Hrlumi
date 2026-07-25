@@ -57,8 +57,8 @@ function Employees() {
             if (!item) return false
 
             const status = item.trang_thai || item.status || ''
-            // Không hiện nhân viên nghỉ việc
-            if (status === 'Nghỉ việc') return false
+            // Mặc định ẩn NV nghỉ việc; chỉ hiện khi chọn lọc "Nghỉ việc"
+            if (!filterStatus && status === 'Nghỉ việc') return false
 
             const nameField = item.ho_va_ten || item.name || item.Tên || ""
             const matchSearch = !searchTerm ||
@@ -889,6 +889,7 @@ function Employees() {
                             <option value="Thử việc">Thử việc</option>
                             <option value="Chính thức">Chính thức</option>
                             <option value="Tạm nghỉ">Tạm nghỉ</option>
+                            <option value="Nghỉ việc">Đã nghỉ</option>
                         </select>
                         <select value={filterBirthMonth} onChange={(e) => setFilterBirthMonth(e.target.value)}>
                             <option value="">Tất cả tháng sinh</option>

@@ -84,7 +84,13 @@ function EmployeeDirectory({
                     <label className="employees-search"><i className="fas fa-search"></i><input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Tìm theo mã, họ tên, email, số điện thoại..." /></label>
                     <select value={filterDept} onChange={e => setFilterDept(e.target.value)}><option value="">Tất cả phòng ban</option>{departments.map(value => <option key={value}>{value}</option>)}</select>
                     <select value={filterContract} onChange={e => setFilterContract(e.target.value)}><option value="">Tất cả hợp đồng</option>{contracts.map(value => <option key={value}>{value}</option>)}</select>
-                    <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}><option value="">Tất cả trạng thái</option><option>Thử việc</option><option>Chính thức</option><option>Tạm nghỉ</option></select>
+                    <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                        <option value="">Tất cả trạng thái</option>
+                        <option value="Thử việc">Thử việc</option>
+                        <option value="Chính thức">Chính thức</option>
+                        <option value="Tạm nghỉ">Tạm nghỉ</option>
+                        <option value="Nghỉ việc">Đã nghỉ</option>
+                    </select>
                     <button className="btn btn-icon" title="Làm mới" onClick={onReload}><i className="fas fa-rotate"></i></button>
                 </section>
 
@@ -104,7 +110,7 @@ function EmployeeDirectory({
                                     <td>{employee.bo_phan || 'Chưa phân bổ'}</td><td>{employee.vi_tri || 'Chưa cập nhật'}</td>
                                     <td>{formatDateDisplay(employee.ngay_vao_lam) || '—'}</td>
                                     <td><span className="contract-cell">{employee.loai_hop_dong || employee.contractType || 'Chưa cập nhật'}{days !== null && days >= 0 && days <= 60 && <small>Còn {days} ngày</small>}</span></td>
-                                    <td><span className={`employee-status ${status === 'Chính thức' ? 'success' : status === 'Thử việc' ? 'warning' : ''}`}><i></i>{status}</span></td>
+                                    <td><span className={`employee-status ${status === 'Chính thức' ? 'success' : status === 'Thử việc' ? 'warning' : status === 'Nghỉ việc' ? 'danger' : ''}`}><i></i>{status === 'Nghỉ việc' ? 'Đã nghỉ' : status}</span></td>
                                     <td><button className="employee-row-menu" onClick={event => { event.stopPropagation(); openEmployee(employee, false) }}><i className="fas fa-ellipsis"></i></button></td>
                                 </tr>
                             })}</tbody>

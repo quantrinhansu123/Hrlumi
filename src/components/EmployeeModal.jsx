@@ -120,7 +120,7 @@ function EmployeeModal({
   positionOptions = []
 }) {
   const [activeTab, setActiveTab] = useState('info')
-  const [editingDocs, setEditingDocs] = useState(false)
+  const [editingReadOnly, setEditingReadOnly] = useState(false)
   const [formData, setFormData] = useState({
     ho_va_ten: '',
     employeeId: '',
@@ -160,7 +160,7 @@ function EmployeeModal({
   useEffect(() => {
     if (!isOpen) return
     setActiveTab('info')
-    setEditingDocs(false)
+    setEditingReadOnly(false)
 
     if (employee) {
       const normalizedFiles = normalizeFiles(employee.files || employee.documents || [])
@@ -240,13 +240,13 @@ function EmployeeModal({
     setAvatarUrlInput('')
     setGalleryUrlInput('')
     setActiveTab('info')
-    setEditingDocs(false)
+    setEditingReadOnly(false)
   }
 
-  const docsEditable = !readOnly || editingDocs
+  const editable = !readOnly || editingReadOnly
 
   const startAddDocuments = () => {
-    setEditingDocs(true)
+    setEditingReadOnly(true)
     setActiveTab('documents')
     if (filesPreview.length === 0) {
       syncDocuments([{ name: '', url: '', data: '', type: '' }])
@@ -408,7 +408,7 @@ function EmployeeModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (readOnly && !editingDocs) return
+    if (readOnly && !editingReadOnly) return
 
     try {
       const oldStatus = employee ? (employee.trang_thai || employee.status || '') : ''
@@ -429,7 +429,7 @@ function EmployeeModal({
 
         if (error) throw error
 
-        if (!readOnly && oldStatus !== newStatus) {
+        if (editable && oldStatus !== newStatus) {
           const historyPayload = {
             employee_id: employee.id,
             employee_code: employee.employeeId || '',
@@ -478,7 +478,7 @@ function EmployeeModal({
   if (!isOpen) return null
 
   const getTitle = () => {
-    if (readOnly) return 'Chi tiết hồ sơ nhân viên'
+    if (readOnly && !editingReadOnly) return 'Chi tiết hồ sơ nhân viên'
     return employee ? 'Sửa nhân viên' : 'Thêm nhân viên mới'
   }
 
@@ -487,11 +487,23 @@ function EmployeeModal({
       <div className="modal-content modal-lg" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>
-            <i className={readOnly ? 'fas fa-eye' : 'fas fa-user'}></i>
+            <i className={readOnly && !editingReadOnly ? 'fas fa-eye' : 'fas fa-user'}></i>
             {' '}
             {getTitle()}
           </h3>
-          <button className="modal-close" onClick={onClose}>&times;</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {readOnly && !editingReadOnly && (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => setEditingReadOnly(true)}
+              >
+                <i className="fas fa-pen"></i>
+                {' '}Sửa hồ sơ
+              </button>
+            )}
+            <button className="modal-close" onClick={onClose}>&times;</button>
+          </div>
         </div>
         <div className="modal-body">
           <div className="modal-tabs">
@@ -527,7 +539,7 @@ function EmployeeModal({
           <form onSubmit={handleSubmit}>
             {activeTab === 'info' && (
               <>
-                {readOnly ? (
+                {!editable ? (
                   <div className="employee-profile-header">
                     {avatarPreview ? (
                       <img
@@ -608,7 +620,7 @@ function EmployeeModal({
                       value={formData.ho_va_ten}
                       onChange={handleChange}
                       required
-                      disabled={readOnly}
+                      disabled={!editable}
                     />
                   </div>
                   <div className="form-group">
@@ -618,7 +630,7 @@ function EmployeeModal({
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
-                      disabled={readOnly}
+                      disabled={!editable}
                     />
                   </div>
                 </div>
@@ -631,7 +643,7 @@ function EmployeeModal({
                       name="sđt"
                       value={formData.sđt}
                       onChange={handleChange}
-                      disabled={readOnly}
+                      disabled={!editable}
                     />
                   </div>
                   <div className="form-group">
@@ -640,7 +652,7 @@ function EmployeeModal({
                       name="chi_nhanh"
                       value={formData.chi_nhanh}
                       onChange={handleChange}
-                      disabled={readOnly}
+                      disabled={!editable}
                     >
                       <option value="HCM">HCM</option>
                       <option value="Hà Nội">Hà Nội</option>
@@ -655,7 +667,7 @@ function EmployeeModal({
                     value={formData.bo_phan}
                     options={departmentOptions}
                     onChange={handleChange}
-                    disabled={readOnly}
+                    disabled={!editable}
                     placeholder="Nhập bộ phận mới..."
                   />
                   <SelectOrCreateField
@@ -664,7 +676,7 @@ function EmployeeModal({
                     value={formData.vi_tri}
                     options={positionOptions}
                     onChange={handleChange}
-                    disabled={readOnly}
+                    disabled={!editable}
                     placeholder="Nhập vị trí mới..."
                   />
                 </div>
@@ -676,7 +688,7 @@ function EmployeeModal({
                       name="trang_thai"
                       value={formData.trang_thai}
                       onChange={handleChange}
-                      disabled={readOnly}
+                      disabled={!editable}
                     >
                       <option value="Thử việc">Thử việc</option>
                       <option value="Chính thức">Chính thức</option>
@@ -690,7 +702,7 @@ function EmployeeModal({
                       name="ca_lam_viec"
                       value={formData.ca_lam_viec}
                       onChange={handleChange}
-                      disabled={readOnly}
+                      disabled={!editable}
                     >
                       <option value="Ca full">Ca full</option>
                       <option value="Ca sáng">Ca sáng (8h - 11h30)</option>
@@ -707,7 +719,7 @@ function EmployeeModal({
                       name="ngay_vao_lam"
                       value={formData.ngay_vao_lam}
                       onChange={handleChange}
-                      disabled={readOnly}
+                      disabled={!editable}
                     />
                   </div>
                   <div className="form-group">
@@ -717,7 +729,7 @@ function EmployeeModal({
                       name="ngay_lam_chinh_thuc"
                       value={formData.ngay_lam_chinh_thuc}
                       onChange={handleChange}
-                      disabled={readOnly}
+                      disabled={!editable}
                     />
                   </div>
                 </div>
@@ -731,7 +743,7 @@ function EmployeeModal({
                       value={formData.cccd}
                       onChange={handleChange}
                       placeholder="Số CCCD/CMND"
-                      disabled={readOnly}
+                      disabled={!editable}
                     />
                   </div>
                   <div className="form-group">
@@ -741,7 +753,7 @@ function EmployeeModal({
                       name="ngay_cap"
                       value={formData.ngay_cap}
                       onChange={handleChange}
-                      disabled={readOnly}
+                      disabled={!editable}
                     />
                   </div>
                 </div>
@@ -755,7 +767,7 @@ function EmployeeModal({
                       value={formData.noi_cap}
                       onChange={handleChange}
                       placeholder="Nơi cấp CCCD/CMND"
-                      disabled={readOnly}
+                      disabled={!editable}
                     />
                   </div>
                   <div className="form-group">
@@ -766,7 +778,7 @@ function EmployeeModal({
                       value={formData.que_quan}
                       onChange={handleChange}
                       placeholder="Quê quán"
-                      disabled={readOnly}
+                      disabled={!editable}
                     />
                   </div>
                 </div>
@@ -780,7 +792,7 @@ function EmployeeModal({
                       value={formData.dia_chi_thuong_tru}
                       onChange={handleChange}
                       placeholder="Địa chỉ thường trú"
-                      disabled={readOnly}
+                      disabled={!editable}
                     />
                   </div>
                 </div>
@@ -793,7 +805,7 @@ function EmployeeModal({
                       name="ngay_sinh"
                       value={formData.ngay_sinh}
                       onChange={handleChange}
-                      disabled={readOnly}
+                      disabled={!editable}
                     />
                   </div>
                   <div className="form-group">
@@ -802,7 +814,7 @@ function EmployeeModal({
                       name="gioi_tinh"
                       value={formData.gioi_tinh}
                       onChange={handleChange}
-                      disabled={readOnly}
+                      disabled={!editable}
                     >
                       <option value="">-- Chọn giới tính --</option>
                       <option value="Nam">Nam</option>
@@ -816,7 +828,7 @@ function EmployeeModal({
                       name="tinh_trang_hon_nhan"
                       value={formData.tinh_trang_hon_nhan}
                       onChange={handleChange}
-                      disabled={readOnly}
+                      disabled={!editable}
                     >
                       <option value="">-- Chọn tình trạng --</option>
                       <option value="Độc thân">Độc thân</option>
@@ -843,7 +855,7 @@ function EmployeeModal({
                               borderRadius: '4px'
                             }}
                           />
-                          {!readOnly && (
+                          {editable && (
                             <button
                               type="button"
                               onClick={() => removeImage(idx)}
@@ -866,9 +878,9 @@ function EmployeeModal({
                       ))}
                     </div>
                   ) : (
-                    readOnly && <p style={{ color: '#64748b', margin: '0 0 8px' }}>Chưa có ảnh đính kèm</p>
+                    !editable && <p style={{ color: '#64748b', margin: '0 0 8px' }}>Chưa có ảnh đính kèm</p>
                   )}
-                  {!readOnly && (
+                  {editable && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       <input
                         type="file"
@@ -901,7 +913,7 @@ function EmployeeModal({
 
             {activeTab === 'documents' && (
               <>
-                {!docsEditable ? (
+                {!editable ? (
                   <>
                     {getFilledDocuments().length > 0 ? (
                       <div className="document-list">
@@ -966,12 +978,15 @@ function EmployeeModal({
                     </div>
                     {filesPreview.map((doc, idx) => (
                       <div key={idx} className="document-row">
-                        <input
-                          type="text"
-                          placeholder="VD: CCCD, HĐLĐ..."
-                          value={doc.name || ''}
-                          onChange={(e) => updateDocumentRow(idx, 'name', e.target.value)}
-                        />
+                        <div className="document-row__name">
+                          <i className={`fas ${getFileIcon(doc)}`}></i>
+                          <input
+                            type="text"
+                            placeholder="VD: CCCD, HĐLĐ..."
+                            value={doc.name || ''}
+                            onChange={(e) => updateDocumentRow(idx, 'name', e.target.value)}
+                          />
+                        </div>
                         <div className="document-row__file">
                           <input
                             type="text"
@@ -1024,7 +1039,8 @@ function EmployeeModal({
                       <i className="fas fa-plus"></i>
                       {' '}Thêm dòng
                     </button>
-                    <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                    <p className="document-rows__hint">
+                      <i className="fas fa-circle-info"></i>
                       Mỗi dòng có thể nhập link hoặc upload file. Bấm “Thêm dòng” để thêm giấy tờ mới.
                     </p>
                   </div>
@@ -1034,9 +1050,9 @@ function EmployeeModal({
 
             <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button type="button" className="btn" onClick={onClose}>
-                {readOnly && !editingDocs ? 'Đóng' : 'Hủy'}
+                {readOnly && !editingReadOnly ? 'Đóng' : 'Hủy'}
               </button>
-              {(!readOnly || editingDocs) && (
+              {editable && (
                 <button type="submit" className="btn btn-primary">
                   <i className="fas fa-save"></i>
                   Lưu
