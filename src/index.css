@@ -87,6 +87,25 @@ body {
   min-height: calc(100vh - 80px);
 }
 
+/* Routes that ship their own mobile-optimized layout (e.g. /approvals) collapse
+   the desktop sidebar on narrow viewports so their content gets full width. */
+@media (max-width: 767px) {
+  .container--immersive .sidebar {
+    display: none;
+  }
+
+  .container--immersive .main {
+    padding: 0;
+  }
+}
+
+@media (min-width: 960px) {
+  .container--approvals .main {
+    padding: 0;
+    background: #f8fafc;
+  }
+}
+
 /* Sidebar */
 .sidebar {
   width: 260px;
@@ -912,6 +931,9 @@ tr:hover {
 }
 
 .document-row input[type="text"] {
+  width: 100%;
+  min-height: 40px;
+  box-sizing: border-box;
   background: #fff;
 }
 
@@ -931,11 +953,14 @@ tr:hover {
 }
 
 .document-row__name input[type="text"] {
+  flex: 1;
+  min-width: 0;
   padding-left: 30px;
 }
 
 .document-row__file {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   align-items: center;
   min-width: 0;
@@ -957,6 +982,44 @@ tr:hover {
   border-color: var(--primary);
   color: var(--primary);
   background: rgba(0, 177, 79, 0.06);
+}
+
+.document-row__attachments {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.document-row__attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 4px 7px;
+  color: #334155;
+  background: #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.78rem;
+}
+
+.document-row__attachment > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-row__attachment button {
+  display: inline-flex;
+  padding: 0;
+  color: #64748b;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.document-row__attachment button:hover {
+  color: var(--danger);
 }
 
 .document-row__remove {

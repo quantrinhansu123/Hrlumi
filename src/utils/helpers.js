@@ -135,6 +135,7 @@ export const mapAppToUser = (data) => {
   if (!data) return null
   return {
     // id field is usually handled by Supabase or passed separately for updates
+    employee_id: data.employeeId || data.employee_id || data.username || '',
     name: data.ho_va_ten || '',
     email: data.email || '',
     phone: data.sđt || data.sdt || '',
@@ -148,6 +149,7 @@ export const mapAppToUser = (data) => {
     cccd: data.cccd || '',
     identity_issue_date: formatDateForDB(data.ngay_cap),
     identity_issue_place: data.noi_cap || '',
+    address: data.dia_chi_thuong_tru || data.address || '',
     hometown: data.que_quan || '',
     dob: formatDateForDB(data.ngay_sinh),
     gender: data.gioi_tinh || '',
@@ -156,10 +158,15 @@ export const mapAppToUser = (data) => {
     documents: Array.isArray(data.files) ? data.files.map(f => ({
       name: f.name || '',
       url: f.url || f.link || '',
-      type: f.type || '',
-      // Keep uploaded content only when no external url
-      ...(f.url || f.link ? {} : (f.data ? { data: f.data } : {}))
+      attachments: Array.isArray(f.attachments) ? f.attachments.map(item => ({
+        name: item.name || '',
+        type: item.type || '',
+        data: item.data || ''
+      })).filter(item => item.data) : [],
+      // Backward compatibility for documents saved before multi-file upload.
+      ...(!f.attachments && f.data ? { data: f.data, type: f.type || '' } : {})
     })) : [],
+    images: Array.isArray(data.images) ? data.images : [],
     // Add default fields if creating new user, though usually handled by DB defaults
     role: data.role || 'user',
     username: data.username || data.email?.split('@')[0] || data.employeeId || ''

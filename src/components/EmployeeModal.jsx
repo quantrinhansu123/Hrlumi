@@ -5,13 +5,21 @@ import { mapAppToUser, runUsersMutationWithSchemaFallback } from '../utils/helpe
 function normalizeFiles(files = []) {
   return (files || []).map((file, idx) => {
     if (typeof file === 'string') {
-      return { name: `Giấy tờ ${idx + 1}`, url: file, data: '', type: '' }
+      return { name: `Giấy tờ ${idx + 1}`, url: file, attachments: [] }
     }
+    const attachments = Array.isArray(file.attachments)
+      ? file.attachments.filter(item => item?.data).map(item => ({
+          name: item.name || 'Tệp đính kèm',
+          data: item.data,
+          type: item.type || ''
+        }))
+      : (file.data
+          ? [{ name: file.fileName || file.name || 'Tệp đính kèm', data: file.data, type: file.type || '' }]
+          : [])
     return {
       name: file.name || `Giấy tờ ${idx + 1}`,
       url: file.url || file.link || '',
-      data: file.data || '',
-      type: file.type || ''
+      attachments
     }
   })
 }
@@ -166,7 +174,7 @@ function EmployeeModal({
       const normalizedFiles = normalizeFiles(employee.files || employee.documents || [])
       const initialDocs = normalizedFiles.length > 0
         ? normalizedFiles
-        : (readOnly ? [] : [{ name: '', url: '', data: '', type: '' }])
+        : (readOnly ? [] : [{ name: '', url: '', attachments: [] }])
       setFormData({
         ho_va_ten: employee.ho_va_ten || '',
         employeeId: employee.employeeId || '',
@@ -209,7 +217,7 @@ function EmployeeModal({
   }, [employee, isOpen, readOnly])
 
   const resetForm = () => {
-    const emptyDoc = [{ name: '', url: '', data: '', type: '' }]
+    const emptyDoc = [{ name: '', url: '', attachments: [] }]
     setFormData({
       ho_va_ten: '',
       employeeId: '',
@@ -249,10 +257,10 @@ function EmployeeModal({
     setEditingReadOnly(true)
     setActiveTab('documents')
     if (filesPreview.length === 0) {
-      syncDocuments([{ name: '', url: '', data: '', type: '' }])
+      syncDocuments([{ name: '', url: '', attachments: [] }])
     } else if (getFilledDocuments().length === filesPreview.length) {
       // đã có giấy tờ đầy đủ → thêm 1 dòng trống để nhập tiếp
-      syncDocuments([...filesPreview, { name: '', url: '', data: '', type: '' }])
+      syncDocuments([...filesPreview, { name: '', url: '', attachments: [] }])
     }
   }
 
@@ -306,7 +314,7 @@ function EmployeeModal({
   }
 
   const addDocumentRow = () => {
-    syncDocuments([...filesPreview, { name: '', url: '', data: '', type: '' }])
+    syncDocuments([...filesPreview, { name: '', url: '', attachments: [] }])
   }
 
   const updateDocumentRow = (index, field, value) => {
@@ -317,26 +325,42 @@ function EmployeeModal({
   }
 
   const handleRowFileUpload = (index, e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const selectedFiles = Array.from(e.target.files || [])
+    if (selectedFiles.length === 0) return
 
-    const reader = new FileReader()
-    reader.onload = (ev) => {
+    Promise.all(selectedFiles.map(file => new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (ev) => resolve({
+        name: file.name,
+        data: ev.target.result,
+        type: file.type
+      })
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    }))).then((newAttachments) => {
       const next = filesPreview.map((doc, i) => (
         i === index
           ? {
               ...doc,
-              name: doc.name || file.name,
-              data: ev.target.result,
-              url: '',
-              type: file.type
+              attachments: [...(doc.attachments || []), ...newAttachments]
             }
           : doc
       ))
       syncDocuments(next)
-    }
-    reader.readAsDataURL(file)
+    })
     e.target.value = ''
+  }
+
+  const removeRowAttachment = (rowIndex, attachmentIndex) => {
+    const next = filesPreview.map((doc, i) => (
+      i === rowIndex
+        ? {
+            ...doc,
+            attachments: (doc.attachments || []).filter((_, fileIndex) => fileIndex !== attachmentIndex)
+          }
+        : doc
+    ))
+    syncDocuments(next)
   }
 
   const openDocument = (file) => {
@@ -361,11 +385,11 @@ function EmployeeModal({
 
   const removeDocumentRow = (index) => {
     const next = filesPreview.filter((_, i) => i !== index)
-    syncDocuments(next.length > 0 ? next : [{ name: '', url: '', data: '', type: '' }])
+    syncDocuments(next.length > 0 ? next : [{ name: '', url: '', attachments: [] }])
   }
 
   const getFilledDocuments = () => filesPreview.filter(doc =>
-    (doc.name && doc.name.trim()) || doc.url || doc.data
+    (doc.name && doc.name.trim()) || doc.url || (doc.attachments || []).length > 0
   )
 
   const processImageUrl = (url) => {
@@ -923,31 +947,31 @@ function EmployeeModal({
                               <i className={`fas ${getFileIcon(file)}`} style={{ color: '#2563eb' }}></i>
                               <div style={{ minWidth: 0 }}>
                                 <span style={{ display: 'block', fontWeight: 600 }}>{file.name || `Giấy tờ ${idx + 1}`}</span>
-                                {(file.url || file.data) && (
+                                {(file.url || (file.attachments || []).length > 0) && (
                                   <span style={{ display: 'block', fontSize: '0.82rem', color: '#64748b' }}>
-                                    {file.url || 'File đã tải lên'}
+                                    {file.url || `${file.attachments.length} file đã tải lên`}
                                   </span>
                                 )}
                               </div>
                             </div>
-                            {(file.url || file.data) && (
+                            {(file.url || (file.attachments || []).length > 0) && (
                               <div className="document-item-actions">
-                                <button
-                                  type="button"
-                                  className="btn"
-                                  onClick={() => openDocument(file)}
-                                  title={file.url ? 'Mở link' : 'Tải xuống'}
-                                  style={{
-                                    background: '#16a34a',
-                                    color: '#fff',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    padding: '6px 10px',
-                                    cursor: 'pointer'
-                                  }}
-                                >
-                                  <i className={`fas ${file.url ? 'fa-external-link-alt' : 'fa-download'}`}></i>
-                                </button>
+                                {file.url && (
+                                  <button type="button" className="btn" onClick={() => openDocument(file)} title="Mở link">
+                                    <i className="fas fa-external-link-alt"></i>
+                                  </button>
+                                )}
+                                {(file.attachments || []).map((attachment, attachmentIndex) => (
+                                  <button
+                                    key={attachmentIndex}
+                                    type="button"
+                                    className="btn"
+                                    onClick={() => openDocument(attachment)}
+                                    title={`Tải xuống ${attachment.name}`}
+                                  >
+                                    <i className="fas fa-download"></i>
+                                  </button>
+                                ))}
                               </div>
                             )}
                           </div>
@@ -993,31 +1017,32 @@ function EmployeeModal({
                             placeholder="https://drive.google.com/..."
                             value={doc.url || ''}
                             onChange={(e) => updateDocumentRow(idx, 'url', e.target.value)}
-                            disabled={!!doc.data}
                           />
-                          <label className="btn document-row__upload" title="Upload file">
+                          <label className="btn document-row__upload" title="Tải lên một hoặc nhiều file">
                             <i className="fas fa-upload"></i>
                             <input
                               type="file"
+                              multiple
                               onChange={(e) => handleRowFileUpload(idx, e)}
                               style={{ display: 'none' }}
                             />
                           </label>
-                          {doc.data && (
-                            <button
-                              type="button"
-                              className="btn"
-                              title="Đã upload — bấm để xóa file"
-                              onClick={() => {
-                                const next = filesPreview.map((item, i) => (
-                                  i === idx ? { ...item, data: '', type: '' } : item
-                                ))
-                                syncDocuments(next)
-                              }}
-                              style={{ padding: '8px 10px', color: '#16a34a' }}
-                            >
-                              <i className="fas fa-paperclip"></i>
-                            </button>
+                          {(doc.attachments || []).length > 0 && (
+                            <div className="document-row__attachments">
+                              {doc.attachments.map((attachment, attachmentIndex) => (
+                                <span className="document-row__attachment" key={`${attachment.name}-${attachmentIndex}`}>
+                                  <i className={`fas ${getFileIcon(attachment)}`}></i>
+                                  <span title={attachment.name}>{attachment.name}</span>
+                                  <button
+                                    type="button"
+                                    title={`Xóa ${attachment.name}`}
+                                    onClick={() => removeRowAttachment(idx, attachmentIndex)}
+                                  >
+                                    <i className="fas fa-times"></i>
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
                           )}
                         </div>
                         <button
@@ -1041,7 +1066,7 @@ function EmployeeModal({
                     </button>
                     <p className="document-rows__hint">
                       <i className="fas fa-circle-info"></i>
-                      Mỗi dòng có thể nhập link hoặc upload file. Bấm “Thêm dòng” để thêm giấy tờ mới.
+                      Mỗi dòng có thể nhập link và tải lên nhiều file cùng lúc. Bấm “Thêm dòng” để thêm giấy tờ mới.
                     </p>
                   </div>
                 )}
