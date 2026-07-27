@@ -52,6 +52,53 @@ create table if not exists public.users (
   updated_at timestamptz not null default now()
 );
 
+-- Nếu bảng users đã tồn tại (schema cũ), bổ sung các cột còn thiếu
+alter table public.users add column if not exists employee_id text;
+alter table public.users add column if not exists username text;
+alter table public.users add column if not exists email text;
+alter table public.users add column if not exists password text;
+alter table public.users add column if not exists name text;
+alter table public.users add column if not exists phone text;
+alter table public.users add column if not exists branch text;
+alter table public.users add column if not exists department text;
+alter table public.users add column if not exists position text;
+alter table public.users add column if not exists employment_status text;
+alter table public.users add column if not exists status text;
+alter table public.users add column if not exists shift text;
+alter table public.users add column if not exists role text;
+alter table public.users add column if not exists join_date date;
+alter table public.users add column if not exists official_date date;
+alter table public.users add column if not exists dob date;
+alter table public.users add column if not exists cccd text;
+alter table public.users add column if not exists identity_issue_date date;
+alter table public.users add column if not exists identity_issue_place text;
+alter table public.users add column if not exists address text;
+alter table public.users add column if not exists hometown text;
+alter table public.users add column if not exists gender text;
+alter table public.users add column if not exists marital_status text;
+alter table public.users add column if not exists avatar_url text;
+alter table public.users add column if not exists documents jsonb;
+alter table public.users add column if not exists images jsonb;
+alter table public.users add column if not exists created_at timestamptz;
+alter table public.users add column if not exists updated_at timestamptz;
+
+-- Default an toàn cho cột mới / cột cũ thiếu default
+update public.users set name = coalesce(name, '') where name is null;
+update public.users set role = coalesce(role, 'user') where role is null;
+update public.users set employment_status = coalesce(employment_status, 'Thử việc') where employment_status is null;
+update public.users set documents = '[]'::jsonb where documents is null;
+update public.users set images = '[]'::jsonb where images is null;
+update public.users set created_at = coalesce(created_at, now()) where created_at is null;
+update public.users set updated_at = coalesce(updated_at, now()) where updated_at is null;
+
+alter table public.users alter column name set default '';
+alter table public.users alter column role set default 'user';
+alter table public.users alter column employment_status set default 'Thử việc';
+alter table public.users alter column documents set default '[]'::jsonb;
+alter table public.users alter column images set default '[]'::jsonb;
+alter table public.users alter column created_at set default now();
+alter table public.users alter column updated_at set default now();
+
 -- Unique indexes (cho phép nhiều NULL)
 create unique index if not exists users_email_unique
   on public.users (lower(email))
