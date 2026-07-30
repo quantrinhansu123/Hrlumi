@@ -736,7 +736,7 @@ function EmployeeModal({
                       onChange={handleChange}
                       placeholder="Hệ thống tự tạo (VD: NV001)"
                       required
-                      readOnly
+                      disabled={!editable}
                     />
                   </div>
                 </div>

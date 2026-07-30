@@ -8,6 +8,7 @@ const getStatus = (employee) => employee.trang_thai || employee.status || 'Chưa
 
 function EmployeeDirectory({
     employees, filteredEmployees, activeTab, setActiveTab, searchTerm, setSearchTerm,
+    filterBranch, setFilterBranch,
     filterDept, setFilterDept, filterStatus, setFilterStatus, filterContract, setFilterContract,
     selectedEmployee, setSelectedEmployee, isModalOpen, setIsModalOpen, isReadOnly, setIsReadOnly,
     onReload, onExport, onImport
@@ -29,6 +30,7 @@ function EmployeeDirectory({
         return days !== null && days >= 0 && days <= 60
     })
     const month = new Date().getMonth()
+    const branches = [...new Set(activeEmployees.map(employee => employee.chi_nhanh).filter(Boolean))].sort()
     const departments = [...new Set(activeEmployees.map(employee => employee.bo_phan).filter(Boolean))].sort()
     const contracts = [...new Set(activeEmployees.map(employee => employee.loai_hop_dong || employee.contractType).filter(Boolean))].sort()
     const stats = [
@@ -82,6 +84,11 @@ function EmployeeDirectory({
             {activeTab === 'history' ? <StatusHistoryView employees={employees} onDataChange={onReload} /> : <>
                 <section className="employees-filter-card">
                     <label className="employees-search"><i className="fas fa-search"></i><input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Tìm theo mã, họ tên, email, số điện thoại..." /></label>
+                    <select value={filterBranch} onChange={e => setFilterBranch(e.target.value)}>
+                        <option value="">Tất cả chi nhánh</option>
+                        {branches.map(value => <option key={value}>{value}</option>)}
+                        <option value="__none__">Chưa có chi nhánh</option>
+                    </select>
                     <select value={filterDept} onChange={e => setFilterDept(e.target.value)}><option value="">Tất cả phòng ban</option>{departments.map(value => <option key={value}>{value}</option>)}</select>
                     <select value={filterContract} onChange={e => setFilterContract(e.target.value)}><option value="">Tất cả hợp đồng</option>{contracts.map(value => <option key={value}>{value}</option>)}</select>
                     <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>

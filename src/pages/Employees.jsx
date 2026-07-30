@@ -657,6 +657,8 @@ function Employees() {
         setActiveTab={setActiveTab}
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
+        filterBranch={filterBranch}
+        setFilterBranch={setFilterBranch}
         filterDept={filterDept}
         setFilterDept={setFilterDept}
         filterStatus={filterStatus}
