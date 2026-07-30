@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
 import AttendanceImportModal from '../components/AttendanceImportModal'
 import AttendanceModal, { dayOfWeekFromDate, formatTimeHM } from '../components/AttendanceModal'
@@ -95,6 +95,54 @@ function Attendance() {
   const [manualWorkdays, setManualWorkdays] = useState({}) // New State for Manual Overrides
   const [filterAttendanceMonth, setFilterAttendanceMonth] = useState(new Date().toISOString().slice(0, 7))
   const [filterAttendanceEmployee, setFilterAttendanceEmployee] = useState('')
+  const [filterAttendanceEmployeeKey, setFilterAttendanceEmployeeKey] = useState('')
+
+  const employeesById = useMemo(
+    () => new Map(employees.map(employee => [String(employee.id), employee])),
+    [employees]
+  )
+
+  const attendanceEmployeeOptions = useMemo(() => {
+    const uniqueEmployees = new Map()
+
+    attendanceLogs.forEach(log => {
+      const employee = employeesById.get(String(log.employeeId))
+      const name = String(
+        log.employeeName ||
+        employee?.ho_va_ten ||
+        employee?.name ||
+        log.machineName ||
+        log.tenTheoMayChamCong ||
+        ''
+      ).replace(/\s+/g, ' ').trim()
+      const code = String(
+        log.employeeCode ||
+        employee?.employeeId ||
+        employee?.username ||
+        ''
+      ).trim()
+      const key = normalizeString(name) || `code:${normalizeString(code)}`
+      if (!key) return
+
+      const existing = uniqueEmployees.get(key)
+      if (existing) {
+        existing.recordCount += 1
+        if (code) existing.codes.add(code)
+        return
+      }
+
+      uniqueEmployees.set(key, {
+        key,
+        name: name || code,
+        codes: new Set(code ? [code] : []),
+        recordCount: 1
+      })
+    })
+
+    return Array.from(uniqueEmployees.values())
+      .map(option => ({ ...option, codes: Array.from(option.codes) }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+  }, [attendanceLogs, employeesById])
 
   useEffect(() => {
     loadData()
@@ -1193,6 +1241,22 @@ function Attendance() {
                 style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ddd', minWidth: '250px' }}
               />
               <select
+                value={filterAttendanceEmployeeKey}
+                onChange={(e) => setFilterAttendanceEmployeeKey(e.target.value)}
+                aria-label="Lọc theo nhân viên không trùng tên"
+                title="Mỗi nhân viên chỉ xuất hiện một lần trong danh sách lọc"
+                style={{ padding: '8px', borderRadius: '4px', minWidth: '230px' }}
+              >
+                <option value="">Tất cả nhân viên ({attendanceEmployeeOptions.length})</option>
+                {attendanceEmployeeOptions.map(option => (
+                  <option key={option.key} value={option.key}>
+                    {option.name}
+                    {option.codes.length > 0 ? ` (${option.codes.join(', ')})` : ''}
+                    {` — ${option.recordCount} lượt`}
+                  </option>
+                ))}
+              </select>
+              <select
                 value={filterAttendanceMonth}
                 onChange={(e) => setFilterAttendanceMonth(e.target.value)}
                 style={{ padding: '8px', borderRadius: '4px' }}
@@ -1250,7 +1314,7 @@ function Attendance() {
 
                       // Filter by employee name or ID
                       if (filterAttendanceEmployee) {
-                        const emp = employees.find(e => e.id === log.employeeId)
+                        const emp = employeesById.get(String(log.employeeId))
                         const empName = log.employeeName || emp?.ho_va_ten || emp?.name || ''
                         const machineName = log.machineName || log.tenTheoMayChamCong || ''
                         const empId = log.employeeCode || log.employeeId || ''
@@ -1259,6 +1323,27 @@ function Attendance() {
                         return normalizeString(empName).includes(searchTerm) ||
                           normalizeString(machineName).includes(searchTerm) ||
                           normalizeString(empId).includes(searchTerm)
+                      }
+
+                      if (filterAttendanceEmployeeKey) {
+                        const emp = employeesById.get(String(log.employeeId))
+                        const empName =
+                          log.employeeName ||
+                          emp?.ho_va_ten ||
+                          emp?.name ||
+                          log.machineName ||
+                          log.tenTheoMayChamCong ||
+                          ''
+                        const empCode =
+                          log.employeeCode ||
+                          emp?.employeeId ||
+                          emp?.username ||
+                          ''
+                        const employeeKey =
+                          normalizeString(empName) ||
+                          `code:${normalizeString(empCode)}`
+
+                        if (employeeKey !== filterAttendanceEmployeeKey) return false
                       }
 
                       return true

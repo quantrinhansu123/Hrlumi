@@ -643,8 +643,22 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
         alert(`Không tìm thấy dữ liệu hợp lệ.\n${hint || 'Vui lòng kiểm tra lại file và mã NV khớp hệ thống.'}`)
         setPreviewData(null)
       } else {
+        const uniqueEmployeeCount = new Set(
+          result.logs
+            .map(log => normalizeString(
+              log.employeeName ||
+              log.machineName ||
+              log.tenTheoMayChamCong ||
+              log.employeeCode ||
+              log.employeeId ||
+              ''
+            ))
+            .filter(Boolean)
+        ).size
+
         setPreviewData({
           count: result.logs.length,
+          uniqueEmployeeCount,
           modeLabel,
           isMatrixMode: format === 'matrix',
           detectedDays,
@@ -761,7 +775,8 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
               <h4>Kết quả phân tích:</h4>
               <ul>
                 <li><strong>Chế độ:</strong> {previewData.modeLabel}</li>
-                <li><strong>Số lượng bản ghi:</strong> {previewData.count}</li>
+                <li><strong>Số nhân viên (không trùng):</strong> {previewData.uniqueEmployeeCount}</li>
+                <li><strong>Tổng số dòng chấm công:</strong> {previewData.count}</li>
                 {previewData.isMatrixMode && (
                   <li>
                     <strong>Các cột ngày tìm thấy:</strong>{' '}
