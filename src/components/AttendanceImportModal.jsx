@@ -185,33 +185,140 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
     return null
   }
 
-  const buildLog = (sysEmp, dateStr, stats) => {
+  const buildLog = (sysEmp, dateStr, stats, extra = {}) => {
     const baseDate = new Date(`${dateStr}T00:00:00`)
-    const [inH, inM] = stats.checkIn.split(':')
-    const checkInDate = new Date(baseDate)
-    checkInDate.setHours(Number(inH), Number(inM), 0, 0)
+    const checkInStr = stats.checkIn || extra.vao || ''
+    const checkOutStr = stats.checkOut || extra.ra || ''
+
+    let checkInDate = null
+    if (checkInStr) {
+      const [inH, inM] = String(checkInStr).split(':')
+      checkInDate = new Date(baseDate)
+      checkInDate.setHours(Number(inH), Number(inM) || 0, 0, 0)
+    }
 
     let checkOutDate = null
-    if (stats.checkOut) {
-      const [outH, outM] = stats.checkOut.split(':')
+    if (checkOutStr) {
+      const [outH, outM] = String(checkOutStr).split(':')
       checkOutDate = new Date(baseDate)
-      checkOutDate.setHours(Number(outH), Number(outM), 0, 0)
+      checkOutDate.setHours(Number(outH), Number(outM) || 0, 0, 0)
     }
+
+    const hours = Number(extra.hours ?? stats.hours ?? 0) || 0
+    const gioPlus = Number(extra.gioPlus ?? 0) || 0
+    const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7']
 
     return {
       employeeId: sysEmp.id,
-      employeeCode: sysEmp.employeeId || '',
-      employeeName: sysEmp.ho_va_ten || sysEmp.name || '',
+      employeeCode: extra.employeeCode || sysEmp.employeeId || sysEmp.username || '',
+      employeeName: extra.employeeName || sysEmp.ho_va_ten || sysEmp.name || '',
+      department: extra.department || sysEmp.bo_phan || '',
+      position: extra.position || sysEmp.vi_tri || '',
       date: dateStr,
+      dayOfWeek: extra.dayOfWeek || dayNames[baseDate.getDay()] || '',
       timestamp: baseDate.getTime(),
-      checkIn: checkInDate.toISOString(),
+      checkIn: checkInDate ? checkInDate.toISOString() : null,
       checkOut: checkOutDate ? checkOutDate.toISOString() : null,
-      hours: stats.hours,
-      status: stats.status,
-      lateMinutes: stats.lateMinutes || 0,
-      earlyMinutes: stats.earlyMinutes || 0,
+      vao: checkInStr,
+      ra: checkOutStr,
+      cong: Number(extra.cong ?? (hours >= 8 ? 1 : hours > 0 ? 0.5 : 0)) || 0,
+      hours,
+      gio: hours,
+      congPlus: Number(extra.congPlus ?? 0) || 0,
+      gioPlus,
+      lateMinutes: Number(extra.lateMinutes ?? stats.lateMinutes ?? 0) || 0,
+      earlyMinutes: Number(extra.earlyMinutes ?? stats.earlyMinutes ?? 0) || 0,
+      tc1: Number(extra.tc1 ?? 0) || 0,
+      tc2: Number(extra.tc2 ?? 0) || 0,
+      tc3: Number(extra.tc3 ?? 0) || 0,
+      shiftName: extra.shiftName || '',
+      tenCa: extra.shiftName || '',
+      kyHieu: extra.kyHieu || stats.status || '',
+      kyHieuPlus: extra.kyHieuPlus || '',
+      tongGio: Number(extra.tongGio ?? hours + gioPlus) || 0,
+      status: extra.kyHieu || stats.status || '',
       punches: stats.punches || []
     }
+  }
+
+  /** Format đầy đủ theo bảng chấm công công ty */
+  const processFullAttendanceFormat = (jsonData, headers, headerRowIdx) => {
+    const idxOf = (...keys) => headers.findIndex(h => keys.some(k => h.includes(k)))
+    const codeIdx = idxOf('mã n', 'ma n', 'mã nv', 'ma nv', 'employee')
+    const nameIdx = idxOf('tên nhân', 'ten nhan', 'họ tên', 'ho ten', 'tên nv')
+    const deptIdx = idxOf('phòng ban', 'phong ban')
+    const posIdx = idxOf('chức vụ', 'chuc vu')
+    const dateIdx = idxOf('ngày', 'ngay')
+    const thuIdx = idxOf('thứ', 'thu')
+    const vaoIdx = headers.findIndex(h => h === 'vào' || h === 'vao' || h.includes('giờ vào') || h.includes('check-in'))
+    const raIdx = headers.findIndex(h => h === 'ra' || h.includes('giờ ra') || h.includes('check-out') || (h.includes('ra') && !h.includes('sớm') && !h.includes('som')))
+    const congIdx = headers.findIndex(h => h === 'công' || h === 'cong')
+    const gioIdx = headers.findIndex(h => h === 'giờ' || h === 'gio')
+    const congPlusIdx = idxOf('công+', 'cong+')
+    const gioPlusIdx = idxOf('giờ+', 'gio+')
+    const lateIdx = idxOf('vào trễ', 'vao tre', 'vào t')
+    const earlyIdx = idxOf('ra sớm', 'ra som')
+    const tc1Idx = headers.findIndex(h => h === 'tc1')
+    const tc2Idx = headers.findIndex(h => h === 'tc2')
+    const tc3Idx = headers.findIndex(h => h === 'tc3')
+    const caIdx = idxOf('tên ca', 'ten ca')
+    const kyIdx = headers.findIndex(h => h === 'kí hiệu' || h === 'ki hieu' || h === 'ký hiệu')
+    const kyPlusIdx = idxOf('kí hiệu+', 'ki hieu+', 'ký hiệu+')
+    const tongIdx = idxOf('tổng giờ', 'tong gio')
+
+    const logs = []
+    const skipped = []
+    const num = (v) => {
+      const n = parseFloat(String(v ?? '').replace(',', '.'))
+      return isNaN(n) ? 0 : n
+    }
+
+    for (let i = headerRowIdx + 1; i < jsonData.length; i++) {
+      const row = jsonData[i]
+      const empCode = codeIdx >= 0 ? row[codeIdx] : ''
+      const empName = nameIdx >= 0 ? row[nameIdx] : ''
+      const dateRaw = dateIdx >= 0 ? row[dateIdx] : ''
+      if ((!empCode && !empName) || (dateRaw === '' || dateRaw == null)) continue
+
+      const sysEmp = findEmployee(empCode, empName)
+      if (!sysEmp) {
+        skipped.push(`Không tìm thấy NV "${empCode || empName}"`)
+        continue
+      }
+
+      const dateStr = parseDateValue(dateRaw)
+      if (!dateStr) continue
+
+      const vao = vaoIdx >= 0 ? (parseTime(row[vaoIdx])?.str || '') : ''
+      const ra = raIdx >= 0 ? (parseTime(row[raIdx])?.str || '') : ''
+      const times = [vao, ra].filter(Boolean)
+      const stats = times.length ? calculateStats(times) : { checkIn: vao, checkOut: ra, hours: num(row[gioIdx]), status: 'Đủ', lateMinutes: 0, earlyMinutes: 0, punches: times }
+
+      logs.push(buildLog(sysEmp, dateStr, stats, {
+        employeeCode: String(empCode || sysEmp.employeeId || ''),
+        employeeName: String(empName || sysEmp.ho_va_ten || ''),
+        department: deptIdx >= 0 ? String(row[deptIdx] || '') : '',
+        position: posIdx >= 0 ? String(row[posIdx] || '') : '',
+        dayOfWeek: thuIdx >= 0 ? String(row[thuIdx] || '') : '',
+        vao,
+        ra,
+        cong: congIdx >= 0 ? num(row[congIdx]) : undefined,
+        hours: gioIdx >= 0 ? num(row[gioIdx]) : undefined,
+        congPlus: congPlusIdx >= 0 ? num(row[congPlusIdx]) : 0,
+        gioPlus: gioPlusIdx >= 0 ? num(row[gioPlusIdx]) : 0,
+        lateMinutes: lateIdx >= 0 ? num(row[lateIdx]) : undefined,
+        earlyMinutes: earlyIdx >= 0 ? num(row[earlyIdx]) : undefined,
+        tc1: tc1Idx >= 0 ? num(row[tc1Idx]) : 0,
+        tc2: tc2Idx >= 0 ? num(row[tc2Idx]) : 0,
+        tc3: tc3Idx >= 0 ? num(row[tc3Idx]) : 0,
+        shiftName: caIdx >= 0 ? String(row[caIdx] || '') : '',
+        kyHieu: kyIdx >= 0 ? String(row[kyIdx] || '') : '',
+        kyHieuPlus: kyPlusIdx >= 0 ? String(row[kyPlusIdx] || '') : '',
+        tongGio: tongIdx >= 0 ? num(row[tongIdx]) : undefined
+      }))
+    }
+
+    return { logs, skipped }
   }
 
   /** Format mới: Mã NV | Tên NV | Phòng ban | Ngày | Lần 1 ... Lần 7 */
@@ -412,10 +519,13 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
   }
 
   const detectFormat = (headers) => {
+    const hasFull =
+      headers.some(h => h.includes('công+') || h.includes('cong+') || h === 'tc1' || h.includes('kí hiệu') || h.includes('tổng giờ') || h.includes('chức vụ'))
     const hasLan = headers.some(h => /l[aầ]n\s*\d+/i.test(h) || h.startsWith('lần') || h.startsWith('lan '))
     const hasNgay = headers.some(h => h.includes('ngày') || h.includes('ngay') || h === 'date')
     const hasDayCols = headers.some(h => /^\d{1,2}$/.test(String(h).trim()) && Number(h) >= 1 && Number(h) <= 31)
 
+    if (hasFull && hasNgay) return 'full'
     if (hasLan && hasNgay) return 'punch'
     if (hasDayCols) return 'matrix'
     return 'list'
@@ -464,7 +574,10 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
       let detectedDays = []
       let modeLabel = 'Danh sách'
 
-      if (format === 'punch') {
+      if (format === 'full') {
+        result = processFullAttendanceFormat(jsonData, headers, headerRowIdx)
+        modeLabel = 'Bảng chấm công đầy đủ'
+      } else if (format === 'punch') {
         result = processPunchLogFormat(jsonData, headers, headerRowIdx)
         modeLabel = 'Nhật ký chấm công (Lần 1–7)'
       } else if (format === 'matrix') {
@@ -534,11 +647,14 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
   }
 
   const downloadNewTemplate = () => {
-    const headers = ['Mã NV', 'Tên NV', 'Phòng ban', 'Ngày', 'Lần 1', 'Lần 2', 'Lần 3', 'Lần 4', 'Lần 5', 'Lần 6', 'Lần 7']
+    const headers = [
+      'Mã N.Viên', 'Tên nhân viên', 'Phòng ban', 'Chức vụ', 'Ngày', 'Thứ',
+      'Vào', 'Ra', 'Công', 'Giờ', 'Công+', 'Giờ+', 'Vào trễ', 'Ra sớm',
+      'TC1', 'TC2', 'TC3', 'Tên ca', 'Kí hiệu', 'Kí hiệu+', 'Tổng giờ'
+    ]
     const sample = [
-      ['NV001', 'Nguyễn Văn A', 'Kế toán', '5/1/2026', '08:00', '12:00', '13:30', '17:30', '', '', ''],
-      ['NV001', 'Nguyễn Văn A', 'Kế toán', '5/2/2026', '07:55', '17:35', '', '', '', '', ''],
-      ['1', 'Cu Van Toan', '------', '5/1/2026', '08:05', '12:01', '13:30', '17:28', '', '', '']
+      ['NV001', 'Nguyễn Văn A', 'Kế toán', 'Nhân viên', '2026-05-01', 'Thứ 6', '08:00', '17:30', 1, 8, 0, 0, 0, 0, 0, 0, 0, 'Ca full', 'X', '', 8],
+      ['NV001', 'Nguyễn Văn A', 'Kế toán', 'Nhân viên', '2026-05-02', 'Thứ 7', '07:55', '17:35', 1, 8, 0.5, 1, 0, 0, 0, 0, 0, 'Ca full', 'X', 'TC', 9]
     ]
     const ws = utils.aoa_to_sheet([headers, ...sample])
     const wb = utils.book_new()
@@ -580,22 +696,21 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
                 <label>File Excel dữ liệu</label>
                 <input type="file" accept=".xlsx,.xls" onChange={handleFileChange} style={{ width: '100%', padding: '10px' }} />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-10px', marginBottom: '10px' }}>
+              <div style={{ marginTop: '-10px', marginBottom: '10px' }}>
                 <button
                   type="button"
                   className="btn btn-link"
                   style={{ fontSize: '0.85rem', padding: 0 }}
                   onClick={downloadNewTemplate}
                 >
-                  <i className="fas fa-download"></i> Tải file mẫu (Mã NV + Ngày + Lần 1–7)
+                  <i className="fas fa-download"></i> Tải file mẫu (đầy đủ cột chấm công)
                 </button>
               </div>
               <div className="alert alert-info" style={{ marginTop: '15px', background: '#e8f5e9', padding: '10px', borderRadius: '4px' }}>
                 <small>
-                  <strong>Mẫu mới hỗ trợ:</strong><br />
-                  Cột: <code>Mã NV | Tên NV | Phòng ban | Ngày | Lần 1 … Lần 7</code><br />
-                  • Lần đầu = Check-in, Lần cuối = Check-out<br />
-                  • Ngày dạng <code>5/1/2026</code> hoặc <code>01/05/2026</code><br />
+                  <strong>Hỗ trợ import:</strong><br />
+                  1) Bảng đầy đủ: Mã N.Viên, Tên, Phòng ban, Chức vụ, Ngày, Thứ, Vào, Ra, Công, Giờ, Công+, Giờ+, Vào trễ, Ra sớm, TC1–3, Tên ca, Kí hiệu, Kí hiệu+, Tổng giờ<br />
+                  2) Nhật ký Lần 1–7 (vẫn dùng được)<br />
                   • Mã NV cần khớp mã nhân viên trên hệ thống
                 </small>
               </div>

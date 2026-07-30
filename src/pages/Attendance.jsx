@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import * as XLSX from 'xlsx'
 import AttendanceImportModal from '../components/AttendanceImportModal'
-import AttendanceModal from '../components/AttendanceModal'
+import AttendanceModal, { dayOfWeekFromDate, formatTimeHM } from '../components/AttendanceModal'
 import DependentModal from '../components/DependentModal'
 import InsuranceModal from '../components/InsuranceModal'
 import PayrollDetailModal from '../components/PayrollDetailModal'
@@ -527,15 +527,10 @@ function Attendance() {
     }
 
     if (dataToExport.length === 0 && attendanceLogs.length === 0) {
-      // If absolutely no data, export just empty template with headers
       const headers = [
-        'Mã NV',
-        'Họ và tên',
-        'Ngày (YYYY-MM-DD)',
-        'Check-in (HH:MM)',
-        'Check-out (HH:MM)',
-        'Số giờ làm',
-        'Trạng thái'
+        'Mã N.Viên', 'Tên nhân viên', 'Phòng ban', 'Chức vụ', 'Ngày', 'Thứ',
+        'Vào', 'Ra', 'Công', 'Giờ', 'Công+', 'Giờ+', 'Vào trễ', 'Ra sớm',
+        'TC1', 'TC2', 'TC3', 'Tên ca', 'Kí hiệu', 'Kí hiệu+', 'Tổng giờ'
       ]
       const ws = XLSX.utils.aoa_to_sheet([headers])
       const wb = XLSX.utils.book_new()
@@ -544,29 +539,34 @@ function Attendance() {
       return
     }
 
-    // Map data to export format
     const exportData = dataToExport.map((log, idx) => {
       const employee = employees.find(e => e.id === log.employeeId)
-
-      const checkIn = log.checkIn ? new Date(log.checkIn).toLocaleTimeString('vi-VN') : ''
-      const checkOut = log.checkOut ? new Date(log.checkOut).toLocaleTimeString('vi-VN') : ''
-
-      let hours = 0
-      if (log.hours !== undefined && log.hours !== null) {
-        hours = typeof log.hours === 'string' ? parseFloat(log.hours) : Number(log.hours)
-      } else if (log.soGio !== undefined && log.soGio !== null) {
-        hours = typeof log.soGio === 'string' ? parseFloat(log.soGio) : Number(log.soGio)
-      }
-
+      const dateStr = log.date ? String(log.date).slice(0, 10) : ''
+      const hours = Number(log.hours ?? log.soGio ?? log.gio ?? 0) || 0
+      const gioPlus = Number(log.gioPlus ?? 0) || 0
       return {
         'STT': idx + 1,
-        'Mã NV': log.employeeId || '',
-        'Họ và tên': employee ? (employee.ho_va_ten || employee.name || '') : '',
-        'Ngày': log.date ? new Date(log.date).toLocaleDateString('vi-VN') : '',
-        'Check-in': checkIn,
-        'Check-out': checkOut,
-        'Số giờ làm': typeof hours === 'number' && !isNaN(hours) ? hours.toFixed(1) : 0,
-        'Trạng thái': log.status || ''
+        'Mã N.Viên': log.employeeCode || employee?.employeeId || log.employeeId || '',
+        'Tên nhân viên': log.employeeName || employee?.ho_va_ten || employee?.name || '',
+        'Phòng ban': log.department || employee?.bo_phan || '',
+        'Chức vụ': log.position || employee?.vi_tri || '',
+        'Ngày': dateStr,
+        'Thứ': log.dayOfWeek || dayOfWeekFromDate(dateStr) || '',
+        'Vào': formatTimeHM(log.checkIn || log.vao),
+        'Ra': formatTimeHM(log.checkOut || log.ra),
+        'Công': log.cong ?? '',
+        'Giờ': hours || '',
+        'Công+': log.congPlus ?? '',
+        'Giờ+': gioPlus || '',
+        'Vào trễ': log.lateMinutes ?? log.vaoTre ?? '',
+        'Ra sớm': log.earlyMinutes ?? log.raSom ?? '',
+        'TC1': log.tc1 ?? '',
+        'TC2': log.tc2 ?? '',
+        'TC3': log.tc3 ?? '',
+        'Tên ca': log.shiftName || log.tenCa || '',
+        'Kí hiệu': log.kyHieu || log.status || '',
+        'Kí hiệu+': log.kyHieuPlus || '',
+        'Tổng giờ': log.tongGio ?? (hours + gioPlus)
       }
     })
 
@@ -766,10 +766,13 @@ function Attendance() {
   }
 
   const downloadAttendanceTemplate = () => {
-    const headers = ['Mã NV', 'Tên NV', 'Phòng ban', 'Ngày', 'Lần 1', 'Lần 2', 'Lần 3', 'Lần 4', 'Lần 5', 'Lần 6', 'Lần 7']
+    const headers = [
+      'Mã N.Viên', 'Tên nhân viên', 'Phòng ban', 'Chức vụ', 'Ngày', 'Thứ',
+      'Vào', 'Ra', 'Công', 'Giờ', 'Công+', 'Giờ+', 'Vào trễ', 'Ra sớm',
+      'TC1', 'TC2', 'TC3', 'Tên ca', 'Kí hiệu', 'Kí hiệu+', 'Tổng giờ'
+    ]
     const sample = [
-      ['NV001', 'Nguyễn Văn A', 'Kế toán', '5/1/2026', '08:00', '12:00', '13:30', '17:30', '', '', ''],
-      ['NV001', 'Nguyễn Văn A', 'Kế toán', '5/2/2026', '07:55', '17:35', '', '', '', '', '']
+      ['NV001', 'Nguyễn Văn A', 'Kế toán', 'Nhân viên', '2026-05-01', 'Thứ 6', '08:00', '17:30', 1, 8, 0, 0, 0, 0, 0, 0, 0, 'Ca full', 'X', '', 8]
     ]
     const ws = XLSX.utils.aoa_to_sheet([headers, ...sample])
     const wb = XLSX.utils.book_new()
@@ -1207,17 +1210,29 @@ function Attendance() {
             <table style={{ minWidth: '101%', marginBottom: 0 }}>
               <thead>
                 <tr>
-                  <th style={{ minWidth: '50px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
-                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã NV</th>
-                  <th style={{ minWidth: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Họ và tên</th>
-                  <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ngày</th>
-                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Check-in đầu</th>
-                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Đi muộn (phút)</th>
-                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Check-out cuối</th>
-                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Về sớm (phút)</th>
-                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Số giờ làm</th>
-                  <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Trạng thái</th>
-                  <th style={{ minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
+                  <th style={{ minWidth: '45px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
+                  <th style={{ minWidth: '90px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã N.Viên</th>
+                  <th style={{ minWidth: '140px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tên nhân viên</th>
+                  <th style={{ minWidth: '110px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Phòng ban</th>
+                  <th style={{ minWidth: '110px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Chức vụ</th>
+                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ngày</th>
+                  <th style={{ minWidth: '80px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thứ</th>
+                  <th style={{ minWidth: '70px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Vào</th>
+                  <th style={{ minWidth: '70px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ra</th>
+                  <th style={{ minWidth: '60px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Công</th>
+                  <th style={{ minWidth: '60px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Giờ</th>
+                  <th style={{ minWidth: '60px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Công+</th>
+                  <th style={{ minWidth: '60px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Giờ+</th>
+                  <th style={{ minWidth: '70px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Vào trễ</th>
+                  <th style={{ minWidth: '70px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ra sớm</th>
+                  <th style={{ minWidth: '55px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>TC1</th>
+                  <th style={{ minWidth: '55px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>TC2</th>
+                  <th style={{ minWidth: '55px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>TC3</th>
+                  <th style={{ minWidth: '90px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tên ca</th>
+                  <th style={{ minWidth: '70px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Kí hiệu</th>
+                  <th style={{ minWidth: '70px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Kí hiệu+</th>
+                  <th style={{ minWidth: '75px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tổng giờ</th>
+                  <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -1262,38 +1277,44 @@ function Attendance() {
                     })
                     .map((log, idx) => {
                       const employee = employees.find(e => e.id === log.employeeId)
-                      const checkIn = log.checkIn ? new Date(log.checkIn).toLocaleTimeString('vi-VN') : '-'
-                      const checkOut = log.checkOut ? new Date(log.checkOut).toLocaleTimeString('vi-VN') : '-'
-                      let hours = 0
-                      if (log.hours !== undefined && log.hours !== null) {
-                        hours = typeof log.hours === 'string' ? parseFloat(log.hours) : Number(log.hours)
-                      } else if (log.soGio !== undefined && log.soGio !== null) {
-                        hours = typeof log.soGio === 'string' ? parseFloat(log.soGio) : Number(log.soGio)
-                      }
+                      const empCode = log.employeeCode || employee?.employeeId || employee?.username || log.employeeId || '-'
+                      const empName = log.employeeName || employee?.ho_va_ten || employee?.name || '-'
+                      const department = log.department || log.phongBan || employee?.bo_phan || '-'
+                      const position = log.position || log.chucVu || employee?.vi_tri || '-'
+                      const dateStr = log.date ? String(log.date).slice(0, 10) : ''
+                      const thu = log.dayOfWeek || log.thu || dayOfWeekFromDate(dateStr) || '-'
+                      const checkIn = formatTimeHM(log.checkIn || log.vao) || '-'
+                      const checkOut = formatTimeHM(log.checkOut || log.ra) || '-'
+                      let hours = Number(log.hours ?? log.soGio ?? log.gio ?? 0)
                       if (isNaN(hours)) hours = 0
+                      const gioPlus = Number(log.gioPlus ?? 0) || 0
+                      const tongGio = Number(log.tongGio ?? hours + gioPlus) || 0
+                      const late = Number(log.lateMinutes ?? log.vaoTre ?? 0) || 0
+                      const early = Number(log.earlyMinutes ?? log.raSom ?? 0) || 0
                       return (
                         <tr key={log.id}>
                           <td>{idx + 1}</td>
-                          <td>{log.employeeId || '-'}</td>
-                          <td>{employee ? (employee.ho_va_ten || employee.name || '-') : '-'}</td>
-                          <td>{log.date ? new Date(log.date).toLocaleDateString('vi-VN') : '-'}</td>
+                          <td>{empCode}</td>
+                          <td>{empName}</td>
+                          <td>{department}</td>
+                          <td>{position}</td>
+                          <td>{dateStr ? new Date(`${dateStr}T00:00:00`).toLocaleDateString('vi-VN') : '-'}</td>
+                          <td>{thu}</td>
                           <td>{checkIn}</td>
-                          <td style={{ color: log.lateMinutes > 0 ? '#dc3545' : '#6c757d' }}>
-                            {log.lateMinutes > 0 ? `${log.lateMinutes}p` : '-'}
-                          </td>
                           <td>{checkOut}</td>
-                          <td style={{ color: log.earlyMinutes > 0 ? '#ffc107' : '#6c757d' }}>
-                            {log.earlyMinutes > 0 ? `${log.earlyMinutes}p` : '-'}
-                          </td>
-                          <td>{typeof hours === 'number' && !isNaN(hours) ? hours.toFixed(1) + 'h' : '0.0h'}</td>
-                          <td>
-                            <span className={`badge ${log.status === 'Đủ' ? 'badge-success' :
-                              log.status === 'Thiếu' ? 'badge-warning' :
-                                'badge-danger'
-                              }`}>
-                              {log.status || '-'}
-                            </span>
-                          </td>
+                          <td>{log.cong ?? '-'}</td>
+                          <td>{hours ? hours.toFixed(1) : '-'}</td>
+                          <td>{log.congPlus ?? '-'}</td>
+                          <td>{gioPlus || '-'}</td>
+                          <td style={{ color: late > 0 ? '#dc3545' : '#6c757d' }}>{late > 0 ? `${late}p` : '-'}</td>
+                          <td style={{ color: early > 0 ? '#ffc107' : '#6c757d' }}>{early > 0 ? `${early}p` : '-'}</td>
+                          <td>{log.tc1 ?? '-'}</td>
+                          <td>{log.tc2 ?? '-'}</td>
+                          <td>{log.tc3 ?? '-'}</td>
+                          <td>{log.shiftName || log.tenCa || '-'}</td>
+                          <td>{log.kyHieu || log.status || '-'}</td>
+                          <td>{log.kyHieuPlus || '-'}</td>
+                          <td><strong>{tongGio ? tongGio.toFixed(1) : '-'}</strong></td>
                           <td>
                             <div className="actions">
                               <button
@@ -1330,7 +1351,7 @@ function Attendance() {
                     })
                 ) : (
                   <tr>
-                    <td colSpan="9" className="empty-state">Chưa có dữ liệu chấm công</td>
+                    <td colSpan="23" className="empty-state">Chưa có dữ liệu chấm công</td>
                   </tr>
                 )}
               </tbody>

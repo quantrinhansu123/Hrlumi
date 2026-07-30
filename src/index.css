@@ -668,6 +668,93 @@ tr:hover {
   gap: 15px;
 }
 
+/* Employee password admin box */
+.emp-password-box {
+  margin: 8px 0 16px;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.emp-password-box__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.emp-password-box__head strong {
+  display: block;
+  color: #0f172a;
+  font-size: 0.95rem;
+}
+
+.emp-password-box__head p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.emp-password-badge {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.emp-password-badge.is-set {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.emp-password-badge.is-empty {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.emp-password-input {
+  position: relative;
+}
+
+.emp-password-input input {
+  width: 100%;
+  padding-right: 42px;
+}
+
+.emp-password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  padding: 6px 8px;
+}
+
+.emp-password-toggle:hover {
+  color: var(--primary);
+}
+
+.emp-password-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.emp-password-error {
+  color: #dc2626;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 /* Modals */
 .modal {
   display: none;

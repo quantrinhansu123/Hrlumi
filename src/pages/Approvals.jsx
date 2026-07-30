@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { fbGet, fbPush, fbUpdate } from '../services/firebase'
+import { fbDelete, fbGet, fbPush, fbUpdate } from '../services/firebase'
 import { supabase } from '../services/supabase'
 import { normalizeString } from '../utils/helpers'
 import './Approvals.css'
 
 const REQUESTS_PATH = 'hr/approvalRequests'
+const TEMPLATES_PATH = 'hr/approvalTemplates'
 // Auth isn't wired up app-wide yet (no <AuthProvider>/login route mounted), so this page
 // keeps its own lightweight "who am I" choice in localStorage and prefers a real auth user
 // automatically the moment one becomes available.
@@ -14,7 +15,7 @@ const ME_STORAGE_KEY = 'apv_current_person'
 const RECENT_TEMPLATES_KEY = 'apv_recent_templates'
 const MAX_APPROVAL_STEPS = 4
 
-const REQUEST_TEMPLATES = [
+const BUILTIN_TEMPLATES = [
   {
     id: 'print',
     category: 'HÀNH CHÍNH',
@@ -241,17 +242,19 @@ function Approvals() {
   const authUser = auth?.user || null
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const view = searchParams.get('view') || 'list' // list | create | detail
+  const view = searchParams.get('view') || 'list' // list | create | detail | template-form
   const tab = searchParams.get('tab') || 'inbox' // inbox | sent | admin | templates | stats
   const subFilter = searchParams.get('filter') || 'todo' // todo | done
   const selectedId = searchParams.get('id') || null
   const templateParam = searchParams.get('template') || ''
+  const editTemplateId = searchParams.get('tplId') || null
   const statsPeriod = searchParams.get('period') || 'month' // week | month | year
   const statsDateParam = searchParams.get('date') || new Date().toISOString().slice(0, 10)
   const statsDetailCode = searchParams.get('statEmp') || null
 
   const [employees, setEmployees] = useState([])
   const [requests, setRequests] = useState([])
+  const [customTemplates, setCustomTemplates] = useState([])
   const [loading, setLoading] = useState(true)
 
   const [meLocal, setMeLocal] = useState(null)
@@ -261,11 +264,51 @@ function Approvals() {
   const [toast, setToast] = useState('')
   const [recentTemplateIds, setRecentTemplateIds] = useState([])
 
+  const allTemplates = useMemo(() => {
+    const customs = (customTemplates || []).map((t) => ({
+      ...t,
+      isCustom: true,
+      icon: t.icon || 'fa-file-signature',
+      color: t.color || '#16a34a',
+      category: t.category || 'CHUNG',
+      description: t.description || '',
+      defaultSubject: t.defaultSubject || t.title || '',
+      defaultContent: t.defaultContent || '',
+      defaultApprovers: Array.isArray(t.defaultApprovers) ? t.defaultApprovers : []
+    }))
+    const builtin = BUILTIN_TEMPLATES.map((t) => {
+      const override = customs.find((c) => c.baseId === t.id)
+      if (!override) {
+        return {
+          ...t,
+          isCustom: false,
+          defaultSubject: t.title,
+          defaultContent: '',
+          defaultApprovers: []
+        }
+      }
+      return {
+        ...t,
+        ...override,
+        id: t.id,
+        recordId: override.id || override.recordId,
+        isCustom: true,
+        baseId: t.id,
+        title: override.title || t.title,
+        defaultSubject: override.defaultSubject || override.title || t.title,
+        defaultContent: override.defaultContent || '',
+        defaultApprovers: Array.isArray(override.defaultApprovers) ? override.defaultApprovers : []
+      }
+    })
+    const extraCustoms = customs.filter((c) => !c.baseId || !BUILTIN_TEMPLATES.some((b) => b.id === c.baseId))
+    return [...extraCustoms, ...builtin]
+  }, [customTemplates])
+
   const selectedTemplate = useMemo(() => {
-    return REQUEST_TEMPLATES.find((t) => t.id === templateParam)
-      || REQUEST_TEMPLATES.find((t) => t.id === 'proposal')
-      || REQUEST_TEMPLATES[0]
-  }, [templateParam])
+    return allTemplates.find((t) => t.id === templateParam)
+      || allTemplates.find((t) => t.id === 'proposal')
+      || allTemplates[0]
+  }, [templateParam, allTemplates])
 
   // Create-form state
   const [subject, setSubject] = useState('')
@@ -277,6 +320,24 @@ function Approvals() {
   const [submitting, setSubmitting] = useState(false)
   const [pickerStepIndex, setPickerStepIndex] = useState(null) // step index, or 'followers'
   const fileInputRef = useRef(null)
+
+  // Template editor state (HR)
+  const [tplForm, setTplForm] = useState({
+    title: '',
+    category: 'NHÂN SỰ',
+    description: '',
+    defaultSubject: '',
+    defaultContent: '',
+    icon: 'fa-file-signature',
+    color: '#16a34a',
+    baseId: '',
+    defaultApprovers: []
+  })
+  const [tplSaving, setTplSaving] = useState(false)
+  const [tplApproverSearch, setTplApproverSearch] = useState('')
+  const [tplFilterBranch, setTplFilterBranch] = useState('')
+  const [tplFilterDept, setTplFilterDept] = useState('')
+  const [tplFilterPos, setTplFilterPos] = useState('')
 
   // Decision state (detail view)
   const [rejectPrompt, setRejectPrompt] = useState(false)
@@ -300,6 +361,7 @@ function Approvals() {
       view: null,
       id: null,
       template: null,
+      tplId: null,
       filter: nextFilter === 'todo' ? null : nextFilter
     })
 
@@ -329,9 +391,10 @@ function Approvals() {
       // reads/writes) — only the columns the picker/avatars need are selected so this
       // stays fast even as the table grows (avoids the heavy documents/images blobs
       // that a `select('*')` would drag along).
-      const [usersRes, reqData] = await Promise.all([
-        supabase.from('users').select('id, name, department, avatar_url, employee_id, username, email'),
-        fbGet(REQUESTS_PATH)
+      const [usersRes, reqData, tplData] = await Promise.all([
+        supabase.from('users').select('id, name, department, position, branch, avatar_url, employee_id, username, email, role'),
+        fbGet(REQUESTS_PATH),
+        fbGet(TEMPLATES_PATH)
       ])
       if (usersRes.error) throw usersRes.error
 
@@ -339,15 +402,23 @@ function Approvals() {
         id: u.id,
         ho_va_ten: u.name || '',
         bo_phan: u.department || '',
+        vi_tri: u.position || '',
+        chi_nhanh: u.branch || '',
         avatarUrl: u.avatar_url || '',
         employeeId: u.employee_id || u.username || '',
         username: u.username || '',
-        email: u.email || ''
+        email: u.email || '',
+        role: u.role || 'user'
       }))
       setEmployees(empList)
 
       const reqList = reqData ? Object.entries(reqData).map(([k, v]) => ({ ...v, id: k })) : []
       setRequests(reqList)
+
+      const tplList = tplData
+        ? Object.entries(tplData).map(([k, v]) => ({ ...v, id: k, recordId: k }))
+        : []
+      setCustomTemplates(tplList)
     } catch (e) {
       console.error('Lỗi tải dữ liệu phê duyệt:', e)
     } finally {
@@ -374,7 +445,8 @@ function Approvals() {
             authUser.employeeId ||
             authUser.username ||
             authUser.ma_nhan_vien ||
-            ''
+            '',
+          role: authUser.role || 'user'
         }
       : meLocal
 
@@ -401,15 +473,31 @@ function Approvals() {
           ? base.name
           : emp.ho_va_ten || emp.name || base.name,
       avatar: base.avatar || emp.avatarUrl || emp.avatarDataUrl || emp.avatar || '',
-      employeeCode: base.employeeCode || emp.employeeId || emp.username || ''
+      employeeCode: base.employeeCode || emp.employeeId || emp.username || '',
+      role: emp.role || base.role || 'user'
     }
   }, [authUser, meLocal, employees])
 
+  // Nội bộ HR: ai vào tab Mẫu yêu cầu cũng tạo/sửa được mẫu (không chặn theo role)
+  const canManageTemplates = true
+
   useEffect(() => {
-    if (view === 'create' && selectedTemplate?.title) {
-      setSubject(selectedTemplate.title)
+    if (view !== 'create' || !selectedTemplate) return
+    setSubject(selectedTemplate.defaultSubject || selectedTemplate.title || '')
+    if (selectedTemplate.defaultContent) {
+      setContent(selectedTemplate.defaultContent)
     }
-  }, [view, selectedTemplate?.id, selectedTemplate?.title])
+    const defaults = Array.isArray(selectedTemplate.defaultApprovers)
+      ? selectedTemplate.defaultApprovers.filter((a) => a?.approverId)
+      : []
+    if (defaults.length > 0) {
+      setApproverSteps(defaults.map((a) => ({
+        approverId: a.approverId,
+        approverName: a.approverName || '',
+        approverAvatar: a.approverAvatar || ''
+      })))
+    }
+  }, [view, selectedTemplate?.id, selectedTemplate?.defaultSubject, selectedTemplate?.defaultContent, selectedTemplate?.title, selectedTemplate?.defaultApprovers])
 
   const resolveEmployeeCode = (requesterId, requesterName, requesterCode) => {
     if (requesterCode) return String(requesterCode)
@@ -662,11 +750,18 @@ function Approvals() {
   const selectedRequest = requests.find((r) => r.id === selectedId) || null
 
   // ---- Create form helpers ----
-  const resetForm = (defaultSubject = '') => {
-    setSubject(defaultSubject)
-    setContent('')
+  const resetForm = (tpl = null) => {
+    setSubject(tpl?.defaultSubject || tpl?.title || '')
+    setContent(tpl?.defaultContent || '')
     setAttachments([])
-    setApproverSteps([emptyStep()])
+    const defaults = Array.isArray(tpl?.defaultApprovers)
+      ? tpl.defaultApprovers.filter((a) => a?.approverId)
+      : []
+    setApproverSteps(defaults.length > 0 ? defaults.map((a) => ({
+      approverId: a.approverId,
+      approverName: a.approverName || '',
+      approverAvatar: a.approverAvatar || ''
+    })) : [emptyStep()])
     setFollowers([])
     setErrors({})
     setPickerStepIndex(null)
@@ -689,10 +784,160 @@ function Approvals() {
       setShowMePicker(true)
       return
     }
-    const tpl = template || selectedTemplate || REQUEST_TEMPLATES.find((t) => t.id === 'proposal') || REQUEST_TEMPLATES[0]
-    resetForm(tpl.title || '')
+    const tpl = template || selectedTemplate || allTemplates.find((t) => t.id === 'proposal') || allTemplates[0]
+    resetForm(tpl)
     rememberTemplate(tpl.id)
-    navigateApv({ view: 'create', template: tpl.id, id: null })
+    navigateApv({ view: 'create', template: tpl.id, id: null, tplId: null })
+  }
+
+  const openTemplateForm = (tpl = null) => {
+    setTplApproverSearch('')
+    setTplFilterBranch('')
+    setTplFilterDept('')
+    setTplFilterPos('')
+    if (tpl) {
+      const isBuiltin = BUILTIN_TEMPLATES.some((b) => b.id === tpl.id)
+      const recordId = tpl.recordId || null
+      setTplForm({
+        title: tpl.title || '',
+        category: tpl.category || 'NHÂN SỰ',
+        description: tpl.description || '',
+        defaultSubject: tpl.defaultSubject || tpl.title || '',
+        defaultContent: tpl.defaultContent || '',
+        icon: tpl.icon || 'fa-file-signature',
+        color: tpl.color || '#16a34a',
+        baseId: tpl.baseId || (isBuiltin ? tpl.id : ''),
+        defaultApprovers: Array.isArray(tpl.defaultApprovers) ? tpl.defaultApprovers : []
+      })
+      navigateApv({
+        view: 'template-form',
+        tab: 'templates',
+        tplId: recordId,
+        template: null,
+        id: null
+      })
+    } else {
+      setTplForm({
+        title: '',
+        category: 'NHÂN SỰ',
+        description: '',
+        defaultSubject: '',
+        defaultContent: '',
+        icon: 'fa-file-signature',
+        color: '#16a34a',
+        baseId: '',
+        defaultApprovers: []
+      })
+      navigateApv({ view: 'template-form', tab: 'templates', tplId: null, template: null, id: null })
+    }
+  }
+
+  const toggleTplApprover = (emp) => {
+    const id = emp.id
+    setTplForm((prev) => {
+      const list = Array.isArray(prev.defaultApprovers) ? [...prev.defaultApprovers] : []
+      const idx = list.findIndex((a) => String(a.approverId) === String(id))
+      if (idx >= 0) {
+        list.splice(idx, 1)
+      } else {
+        if (list.length >= MAX_APPROVAL_STEPS) {
+          showToast(`Tối đa ${MAX_APPROVAL_STEPS} người phê duyệt`)
+          return prev
+        }
+        list.push({
+          approverId: emp.id,
+          approverName: emp.ho_va_ten || emp.name || 'N/A',
+          approverAvatar: emp.avatarDataUrl || emp.avatarUrl || emp.avatar || ''
+        })
+      }
+      return { ...prev, defaultApprovers: list }
+    })
+  }
+
+  const moveTplApprover = (index, dir) => {
+    setTplForm((prev) => {
+      const list = [...(prev.defaultApprovers || [])]
+      const next = index + dir
+      if (next < 0 || next >= list.length) return prev
+      ;[list[index], list[next]] = [list[next], list[index]]
+      return { ...prev, defaultApprovers: list }
+    })
+  }
+
+  const saveTemplateForm = async (e) => {
+    e?.preventDefault?.()
+    const title = (tplForm.title || '').trim()
+    if (!title) {
+      showToast('Vui lòng nhập tên mẫu')
+      return
+    }
+    setTplSaving(true)
+    try {
+      const payload = {
+        title,
+        category: tplForm.category || 'CHUNG',
+        description: (tplForm.description || '').trim(),
+        defaultSubject: (tplForm.defaultSubject || title).trim(),
+        defaultContent: tplForm.defaultContent || '',
+        icon: tplForm.icon || 'fa-file-signature',
+        color: tplForm.color || '#16a34a',
+        baseId: tplForm.baseId || '',
+        defaultApprovers: (tplForm.defaultApprovers || [])
+          .filter((a) => a?.approverId)
+          .map((a) => ({
+            approverId: a.approverId,
+            approverName: a.approverName || '',
+            approverAvatar: a.approverAvatar || ''
+          })),
+        updatedAt: new Date().toISOString(),
+        updatedBy: me?.name || '',
+        updatedById: me?.id || ''
+      }
+      if (editTemplateId && customTemplates.some((t) => t.id === editTemplateId || t.recordId === editTemplateId)) {
+        await fbUpdate(`${TEMPLATES_PATH}/${editTemplateId}`, payload)
+        showToast('Đã cập nhật mẫu đề xuất')
+      } else {
+        payload.createdAt = new Date().toISOString()
+        await fbPush(TEMPLATES_PATH, payload)
+        showToast('Đã tạo mẫu đề xuất')
+      }
+      setTplForm({
+        title: '',
+        category: 'NHÂN SỰ',
+        description: '',
+        defaultSubject: '',
+        defaultContent: '',
+        icon: 'fa-file-signature',
+        color: '#16a34a',
+        baseId: '',
+        defaultApprovers: []
+      })
+      setTplApproverSearch('')
+      await loadData()
+      // Đóng form, về danh sách mẫu
+      navigateApv(
+        { view: null, tplId: null, template: null, id: null, tab: 'templates' },
+        { replace: true }
+      )
+    } catch (err) {
+      console.error(err)
+      showToast('Lỗi khi lưu mẫu: ' + (err.message || 'unknown'))
+    } finally {
+      setTplSaving(false)
+    }
+  }
+
+  const deleteCustomTemplate = async (tpl) => {
+    const rid = tpl.recordId || tpl.id
+    if (!rid || !canManageTemplates) return
+    if (!confirm(`Xóa mẫu "${tpl.title}"?`)) return
+    try {
+      await fbDelete(`${TEMPLATES_PATH}/${rid}`)
+      showToast('Đã xóa mẫu')
+      await loadData()
+    } catch (err) {
+      showToast('Lỗi xóa mẫu: ' + (err.message || ''))
+    }
   }
 
   const openDetail = (id) => {
@@ -703,24 +948,24 @@ function Approvals() {
   const closeStatsDetail = () => navigateApv({ statEmp: null })
 
   const goBackToList = () => {
-    navigateApv({ view: null, id: null, template: null })
+    navigateApv({ view: null, id: null, template: null, tplId: null })
     setRejectPrompt(false)
     setDecisionComment('')
   }
 
   const filteredTemplates = useMemo(() => {
     const q = normalizeString(search)
-    if (!q) return REQUEST_TEMPLATES
-    return REQUEST_TEMPLATES.filter((t) =>
+    if (!q) return allTemplates
+    return allTemplates.filter((t) =>
       normalizeString(`${t.title} ${t.category} ${t.description}`).includes(q)
     )
-  }, [search])
+  }, [search, allTemplates])
 
   const recentTemplates = useMemo(
     () => recentTemplateIds
-      .map((id) => REQUEST_TEMPLATES.find((t) => t.id === id))
+      .map((id) => allTemplates.find((t) => t.id === id))
       .filter(Boolean),
-    [recentTemplateIds]
+    [recentTemplateIds, allTemplates]
   )
 
   const updateStep = (idx, patch) =>
@@ -781,7 +1026,10 @@ function Approvals() {
       await fbPush(REQUESTS_PATH, payload)
       showToast('Đã nộp yêu cầu')
       resetForm()
-      navigateApv({ tab: 'sent', filter: null, view: null, id: null, template: null })
+      navigateApv(
+        { tab: 'sent', filter: null, view: null, id: null, template: null, tplId: null },
+        { replace: true }
+      )
       await loadData()
     } catch (e) {
       console.error(e)
@@ -843,7 +1091,8 @@ function Approvals() {
       id: emp.id,
       name: emp.ho_va_ten || emp.name || 'N/A',
       avatar: emp.avatarDataUrl || emp.avatarUrl || emp.avatar || '',
-      employeeCode: emp.employeeId || emp.username || ''
+      employeeCode: emp.employeeId || emp.username || '',
+      role: emp.role || 'user'
     }
     setMeLocal(person)
     try {
@@ -859,6 +1108,259 @@ function Approvals() {
       <div className="apv" data-view={view} data-tab={tab}>
         {loading ? (
           <div className="loadingState">Đang tải dữ liệu...</div>
+        ) : view === 'template-form' ? (
+          <>
+            <div className="apv-topbar">
+              <button className="apv-topbar__back" onClick={goBackToList}>
+                <i className="fas fa-arrow-left"></i>
+              </button>
+              <div className="apv-topbar__title">
+                {editTemplateId ? 'Sửa mẫu đề xuất' : 'Tạo mẫu đề xuất'}
+              </div>
+            </div>
+            <div className="apv-body">
+              <div className="apv-card-block">
+                <p className="apv-tpl-hint">
+                  HR tạo mẫu sẵn (tiêu đề, nội dung, người duyệt). Khi nhân viên chọn mẫu, form sẽ tự điền.
+                </p>
+                <div className="apv-field">
+                  <label>Tên mẫu <span className="req">*</span></label>
+                  <input
+                    type="text"
+                    value={tplForm.title}
+                    onChange={(e) => setTplForm((p) => ({
+                      ...p,
+                      title: e.target.value,
+                      defaultSubject: p.defaultSubject || e.target.value
+                    }))}
+                    placeholder="VD: ĐỀ XUẤT MUA VPP"
+                  />
+                </div>
+                <div className="apv-field">
+                  <label>Nhóm</label>
+                  <select
+                    className="apv-select"
+                    value={tplForm.category}
+                    onChange={(e) => setTplForm((p) => ({ ...p, category: e.target.value }))}
+                  >
+                    {TEMPLATE_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="apv-field">
+                  <label>Mô tả ngắn</label>
+                  <input
+                    type="text"
+                    value={tplForm.description}
+                    onChange={(e) => setTplForm((p) => ({ ...p, description: e.target.value }))}
+                    placeholder="Hiện dưới tên mẫu trong danh sách"
+                  />
+                </div>
+                <div className="apv-field">
+                  <label>Về việc (mặc định)</label>
+                  <input
+                    type="text"
+                    value={tplForm.defaultSubject}
+                    onChange={(e) => setTplForm((p) => ({ ...p, defaultSubject: e.target.value }))}
+                    placeholder="Tự điền vào ô Về việc khi tạo đề xuất"
+                  />
+                </div>
+                <div className="apv-field">
+                  <label>Nội dung mẫu (mặc định)</label>
+                  <textarea
+                    rows={8}
+                    value={tplForm.defaultContent}
+                    onChange={(e) => setTplForm((p) => ({ ...p, defaultContent: e.target.value }))}
+                    placeholder={'Kính gửi Ban Lãnh đạo,\n\nTôi xin đề xuất...\n\nTrân trọng.'}
+                  />
+                </div>
+
+                <div className="apv-field">
+                  <label>Người phê duyệt mặc định</label>
+                  <p className="apv-tpl-hint" style={{ marginBottom: 8 }}>
+                    Tick nhiều người — thứ tự tick / sắp xếp sẽ là luồng duyệt khi nhân viên tạo đề xuất.
+                  </p>
+                  {(tplForm.defaultApprovers || []).length > 0 && (
+                    <div className="apv-tpl-approver-selected">
+                      {(tplForm.defaultApprovers || []).map((a, idx) => (
+                        <div key={a.approverId} className="apv-tpl-approver-chip">
+                          <span className="apv-tpl-approver-chip__ord">{idx + 1}</span>
+                          <Avatar name={a.approverName} avatar={a.approverAvatar} size={22} />
+                          <span className="apv-tpl-approver-chip__name">{a.approverName}</span>
+                          <button type="button" title="Lên" onClick={() => moveTplApprover(idx, -1)} disabled={idx === 0}>
+                            <i className="fas fa-arrow-up"></i>
+                          </button>
+                          <button
+                            type="button"
+                            title="Xuống"
+                            onClick={() => moveTplApprover(idx, 1)}
+                            disabled={idx === tplForm.defaultApprovers.length - 1}
+                          >
+                            <i className="fas fa-arrow-down"></i>
+                          </button>
+                          <button type="button" title="Bỏ" onClick={() => toggleTplApprover({ id: a.approverId })}>
+                            <i className="fas fa-times"></i>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="apv-tpl-approver-filters">
+                    <input
+                      type="text"
+                      value={tplApproverSearch}
+                      onChange={(e) => setTplApproverSearch(e.target.value)}
+                      placeholder="Tìm nhân sự để chọn..."
+                    />
+                    <select
+                      className="apv-select"
+                      value={tplFilterBranch}
+                      onChange={(e) => {
+                        setTplFilterBranch(e.target.value)
+                        setTplFilterDept('')
+                        setTplFilterPos('')
+                      }}
+                    >
+                      <option value="">Tất cả chi nhánh</option>
+                      {[...new Set(employees.map((e) => e.chi_nhanh).filter(Boolean))]
+                        .sort((a, b) => a.localeCompare(b, 'vi'))
+                        .map((b) => (
+                          <option key={b} value={b}>
+                            {b}
+                          </option>
+                        ))}
+                    </select>
+                    <select
+                      className="apv-select"
+                      value={tplFilterDept}
+                      onChange={(e) => {
+                        setTplFilterDept(e.target.value)
+                        setTplFilterPos('')
+                      }}
+                    >
+                      <option value="">Tất cả bộ phận</option>
+                      {[
+                        ...new Set(
+                          employees
+                            .filter((e) => !tplFilterBranch || e.chi_nhanh === tplFilterBranch)
+                            .map((e) => e.bo_phan)
+                            .filter(Boolean)
+                        )
+                      ]
+                        .sort((a, b) => a.localeCompare(b, 'vi'))
+                        .map((d) => (
+                          <option key={d} value={d}>
+                            {d}
+                          </option>
+                        ))}
+                    </select>
+                    <select
+                      className="apv-select"
+                      value={tplFilterPos}
+                      onChange={(e) => setTplFilterPos(e.target.value)}
+                    >
+                      <option value="">Tất cả vị trí</option>
+                      {[
+                        ...new Set(
+                          employees
+                            .filter((e) => {
+                              if (tplFilterBranch && e.chi_nhanh !== tplFilterBranch) return false
+                              if (tplFilterDept && e.bo_phan !== tplFilterDept) return false
+                              return true
+                            })
+                            .map((e) => e.vi_tri)
+                            .filter(Boolean)
+                        )
+                      ]
+                        .sort((a, b) => a.localeCompare(b, 'vi'))
+                        .map((p) => (
+                          <option key={p} value={p}>
+                            {p}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div className="apv-tpl-approver-list">
+                    {employees
+                      .filter((emp) => {
+                        if (tplFilterBranch && emp.chi_nhanh !== tplFilterBranch) return false
+                        if (tplFilterDept && emp.bo_phan !== tplFilterDept) return false
+                        if (tplFilterPos && emp.vi_tri !== tplFilterPos) return false
+                        const q = normalizeString(tplApproverSearch)
+                        if (!q) return true
+                        return normalizeString(
+                          `${emp.ho_va_ten || emp.name || ''} ${emp.employeeId || ''} ${emp.chi_nhanh || ''} ${emp.bo_phan || ''} ${emp.vi_tri || ''}`
+                        ).includes(q)
+                      })
+                      .slice(0, 80)
+                      .map((emp) => {
+                        const checked = (tplForm.defaultApprovers || []).some(
+                          (a) => String(a.approverId) === String(emp.id)
+                        )
+                        return (
+                          <label key={emp.id} className={`apv-tpl-approver-row ${checked ? 'is-checked' : ''}`}>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleTplApprover(emp)}
+                            />
+                            <Avatar
+                              name={emp.ho_va_ten || emp.name}
+                              avatar={emp.avatarDataUrl || emp.avatarUrl || emp.avatar}
+                              size={28}
+                            />
+                            <span className="apv-tpl-approver-row__info">
+                              <span className="apv-tpl-approver-row__name">{emp.ho_va_ten || emp.name || 'N/A'}</span>
+                              <small>
+                                {[emp.employeeId, emp.chi_nhanh, emp.bo_phan, emp.vi_tri]
+                                  .filter(Boolean)
+                                  .join(' · ')}
+                              </small>
+                            </span>
+                          </label>
+                        )
+                      })}
+                    {employees.length === 0 && (
+                      <div className="apv-picker__empty">Chưa có danh sách nhân sự</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="apv-field-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="apv-field">
+                    <label>Màu icon</label>
+                    <input
+                      type="color"
+                      value={tplForm.color}
+                      onChange={(e) => setTplForm((p) => ({ ...p, color: e.target.value }))}
+                    />
+                  </div>
+                  <div className="apv-field">
+                    <label>Gắn đè mẫu hệ thống (tuỳ chọn)</label>
+                    <select
+                      className="apv-select"
+                      value={tplForm.baseId}
+                      onChange={(e) => setTplForm((p) => ({ ...p, baseId: e.target.value }))}
+                    >
+                      <option value="">— Mẫu mới riêng —</option>
+                      {BUILTIN_TEMPLATES.map((b) => (
+                        <option key={b.id} value={b.id}>{b.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="apv-actionbar">
+              <button type="button" className="apv-btn" style={{ background: '#f1f3f5', color: '#344054' }} onClick={goBackToList}>
+                Hủy
+              </button>
+              <button type="button" className="apv-btn apv-btn--approve" disabled={tplSaving} onClick={saveTemplateForm}>
+                {tplSaving ? 'Đang lưu...' : 'Lưu mẫu đề xuất'}
+              </button>
+            </div>
+          </>
         ) : view === 'create' ? (
           <>
             <div className="apv-topbar">
@@ -966,19 +1468,33 @@ function Approvals() {
                     className="apv-select"
                     value={selectedTemplate?.id || ''}
                     onChange={(e) => {
-                      const tpl = REQUEST_TEMPLATES.find((t) => t.id === e.target.value)
+                      const tpl = allTemplates.find((t) => t.id === e.target.value)
                       if (!tpl) return
-                      setSubject(tpl.title)
+                      setSubject(tpl.defaultSubject || tpl.title)
+                      if (tpl.defaultContent) setContent(tpl.defaultContent)
+                      const defaults = Array.isArray(tpl.defaultApprovers)
+                        ? tpl.defaultApprovers.filter((a) => a?.approverId)
+                        : []
+                      setApproverSteps(
+                        defaults.length > 0
+                          ? defaults.map((a) => ({
+                              approverId: a.approverId,
+                              approverName: a.approverName || '',
+                              approverAvatar: a.approverAvatar || ''
+                            }))
+                          : [emptyStep()]
+                      )
                       rememberTemplate(tpl.id)
                       navigateApv({ template: tpl.id })
                       if (errors.subject) setErrors((prev) => ({ ...prev, subject: undefined }))
+                      if (errors.approvers) setErrors((prev) => ({ ...prev, approvers: undefined }))
                     }}
                   >
                     <option value="" disabled>
                       Chọn mẫu yêu cầu
                     </option>
                     {TEMPLATE_CATEGORIES.map((category) => {
-                      const items = REQUEST_TEMPLATES.filter((t) => t.category === category)
+                      const items = allTemplates.filter((t) => t.category === category)
                       if (!items.length) return null
                       return (
                         <optgroup key={category} label={category}>
@@ -1521,23 +2037,38 @@ function Approvals() {
 
             {tab === 'templates' ? (
               <div className="apv-templates">
+                <div className="apv-tpl-toolbar">
+                  <button
+                    type="button"
+                    className="apv-btn apv-btn--approve"
+                    style={{ padding: '10px 16px', fontWeight: 700 }}
+                    onClick={() => openTemplateForm()}
+                  >
+                    <i className="fas fa-file-medical"></i> Tạo mẫu đề xuất
+                  </button>
+                  <span className="apv-tpl-toolbar__hint">
+                    Tạo mẫu sẵn → khi chọn mẫu, form tự điền Về việc & nội dung
+                  </span>
+                </div>
+
                 {recentTemplates.length > 0 && !normalizeString(search) && (
                   <section className="apv-template-group">
                     <h4>Chỉnh sửa gần nhất</h4>
                     <div className="apv-template-list">
                       {recentTemplates.map((tpl) => (
-                        <button
-                          key={`recent-${tpl.id}`}
-                          type="button"
-                          className="apv-template-item"
-                          onClick={() => openCreate(tpl)}
-                        >
-                          <span className="apv-template-item__icon" style={{ background: tpl.color }}>
-                            <i className={`fas ${tpl.icon}`}></i>
-                          </span>
-                          <span className="apv-template-item__title">{tpl.title}</span>
-                          <i className="fas fa-chevron-right apv-template-item__arrow"></i>
-                        </button>
+                        <div key={`recent-${tpl.id}`} className="apv-template-item-row">
+                          <button
+                            type="button"
+                            className="apv-template-item"
+                            onClick={() => openCreate(tpl)}
+                          >
+                            <span className="apv-template-item__icon" style={{ background: tpl.color }}>
+                              <i className={`fas ${tpl.icon}`}></i>
+                            </span>
+                            <span className="apv-template-item__title">{tpl.title}</span>
+                            <i className="fas fa-chevron-right apv-template-item__arrow"></i>
+                          </button>
+                        </div>
                       ))}
                     </div>
                   </section>
@@ -1551,18 +2082,64 @@ function Approvals() {
                       <h4>{category}</h4>
                       <div className="apv-template-list">
                         {items.map((tpl) => (
-                          <button
-                            key={tpl.id}
-                            type="button"
-                            className="apv-template-item"
-                            onClick={() => openCreate(tpl)}
-                          >
-                            <span className="apv-template-item__icon" style={{ background: tpl.color }}>
-                              <i className={`fas ${tpl.icon}`}></i>
-                            </span>
-                            <span className="apv-template-item__title">{tpl.title}</span>
-                            <i className="fas fa-chevron-right apv-template-item__arrow"></i>
-                          </button>
+                          <div key={tpl.id} className="apv-template-item-row">
+                            <button
+                              type="button"
+                              className="apv-template-item"
+                              onClick={() => openCreate(tpl)}
+                            >
+                              <span className="apv-template-item__icon" style={{ background: tpl.color }}>
+                                <i className={`fas ${tpl.icon}`}></i>
+                              </span>
+                              <span className="apv-template-item__title">
+                                {tpl.title}
+                                {tpl.defaultContent ? (
+                                  <small className="apv-template-item__badge">Có nội dung mẫu</small>
+                                ) : null}
+                              </span>
+                              <i className="fas fa-chevron-right apv-template-item__arrow"></i>
+                            </button>
+                            {canManageTemplates && (
+                              <div className="apv-template-item__actions">
+                                <button
+                                  type="button"
+                                  title="Sửa / gắn nội dung mẫu"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    const custom = customTemplates.find(
+                                      (c) => c.id === tpl.id || c.baseId === tpl.id || c.recordId === tpl.recordId
+                                    )
+                                    if (custom) {
+                                      openTemplateForm({ ...tpl, ...custom, recordId: custom.id })
+                                    } else {
+                                      openTemplateForm({
+                                        ...tpl,
+                                        recordId: null,
+                                        baseId: BUILTIN_TEMPLATES.some((b) => b.id === tpl.id) ? tpl.id : ''
+                                      })
+                                    }
+                                  }}
+                                >
+                                  <i className="fas fa-pen"></i>
+                                </button>
+                                {customTemplates.some((c) => c.id === tpl.id || c.baseId === tpl.id) && (
+                                  <button
+                                    type="button"
+                                    title="Xóa mẫu tùy chỉnh"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      const custom = customTemplates.find(
+                                        (c) => c.id === tpl.id || c.baseId === tpl.id
+                                      )
+                                      if (custom) deleteCustomTemplate(custom)
+                                    }}
+                                  >
+                                    <i className="fas fa-trash"></i>
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         ))}
                       </div>
                     </section>
@@ -1575,6 +2152,10 @@ function Approvals() {
                     Không tìm thấy mẫu yêu cầu
                   </div>
                 )}
+
+                <button className="apv-fab" onClick={() => openTemplateForm()} title="Tạo mẫu đề xuất">
+                  <i className="fas fa-plus"></i>
+                </button>
               </div>
             ) : tab === 'stats' ? (
               <div className="apv-stats">
