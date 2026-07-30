@@ -24,6 +24,7 @@ function emptyForm(today) {
     employeeId: '',
     employeeCode: '',
     employeeName: '',
+    machineName: '',
     department: '',
     position: '',
     date: today,
@@ -65,6 +66,7 @@ function AttendanceModal({ attendance, employees, isOpen, onClose, onSave, readO
         employeeId: attendance.employeeId || '',
         employeeCode: attendance.employeeCode || emp?.employeeId || emp?.username || '',
         employeeName: attendance.employeeName || emp?.ho_va_ten || emp?.name || '',
+        machineName: attendance.machineName || attendance.tenTheoMayChamCong || attendance.employeeName || emp?.ho_va_ten || emp?.name || '',
         department: attendance.department || attendance.phongBan || emp?.bo_phan || '',
         position: attendance.position || attendance.chucVu || emp?.vi_tri || '',
         date,
@@ -116,6 +118,7 @@ function AttendanceModal({ attendance, employees, isOpen, onClose, onSave, readO
       employeeId: emp.id,
       employeeCode: emp.employeeId || emp.username || '',
       employeeName: emp.ho_va_ten || emp.name || '',
+      machineName: prev.machineName || emp.ho_va_ten || emp.name || '',
       department: emp.bo_phan || '',
       position: emp.vi_tri || '',
       shiftName: prev.shiftName || emp.ca_lam_viec || ''
@@ -174,6 +177,8 @@ function AttendanceModal({ attendance, employees, isOpen, onClose, onSave, readO
         employeeId: formData.employeeId,
         employeeCode: formData.employeeCode,
         employeeName: formData.employeeName,
+        machineName: formData.machineName || formData.employeeName,
+        tenTheoMayChamCong: formData.machineName || formData.employeeName,
         department: formData.department,
         position: formData.position,
         date: formData.date,
@@ -247,6 +252,7 @@ function AttendanceModal({ attendance, employees, isOpen, onClose, onSave, readO
                         employeeId: '',
                         employeeCode: '',
                         employeeName: '',
+                        machineName: '',
                         department: '',
                         position: ''
                       }))
@@ -298,6 +304,16 @@ function AttendanceModal({ attendance, employees, isOpen, onClose, onSave, readO
               <div className="form-group">
                 <label>Tên nhân viên</label>
                 <input name="employeeName" value={formData.employeeName} onChange={handleChange} disabled={readOnly} />
+              </div>
+              <div className="form-group">
+                <label>Tên theo máy chấm công</label>
+                <input
+                  name="machineName"
+                  value={formData.machineName}
+                  onChange={handleChange}
+                  disabled={readOnly}
+                  placeholder="Tên hiển thị trên máy chấm công"
+                />
               </div>
             </div>
 

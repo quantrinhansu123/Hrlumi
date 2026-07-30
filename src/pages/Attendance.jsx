@@ -528,7 +528,7 @@ function Attendance() {
 
     if (dataToExport.length === 0 && attendanceLogs.length === 0) {
       const headers = [
-        'Mã N.Viên', 'Tên nhân viên', 'Phòng ban', 'Chức vụ', 'Ngày', 'Thứ',
+        'Mã N.Viên', 'Tên nhân viên', 'Tên theo máy chấm công', 'Phòng ban', 'Chức vụ', 'Ngày', 'Thứ',
         'Vào', 'Ra', 'Công', 'Giờ', 'Công+', 'Giờ+', 'Vào trễ', 'Ra sớm',
         'TC1', 'TC2', 'TC3', 'Tên ca', 'Kí hiệu', 'Kí hiệu+', 'Tổng giờ'
       ]
@@ -548,6 +548,7 @@ function Attendance() {
         'STT': idx + 1,
         'Mã N.Viên': log.employeeCode || employee?.employeeId || log.employeeId || '',
         'Tên nhân viên': log.employeeName || employee?.ho_va_ten || employee?.name || '',
+        'Tên theo máy chấm công': log.machineName || log.tenTheoMayChamCong || log.employeeName || employee?.ho_va_ten || employee?.name || '',
         'Phòng ban': log.department || employee?.bo_phan || '',
         'Chức vụ': log.position || employee?.vi_tri || '',
         'Ngày': dateStr,
@@ -767,12 +768,12 @@ function Attendance() {
 
   const downloadAttendanceTemplate = () => {
     const headers = [
-      'Mã N.Viên', 'Tên nhân viên', 'Phòng ban', 'Chức vụ', 'Ngày', 'Thứ',
+      'Mã N.Viên', 'Tên nhân viên', 'Tên theo máy chấm công', 'Phòng ban', 'Chức vụ', 'Ngày', 'Thứ',
       'Vào', 'Ra', 'Công', 'Giờ', 'Công+', 'Giờ+', 'Vào trễ', 'Ra sớm',
       'TC1', 'TC2', 'TC3', 'Tên ca', 'Kí hiệu', 'Kí hiệu+', 'Tổng giờ'
     ]
     const sample = [
-      ['NV001', 'Nguyễn Văn A', 'Kế toán', 'Nhân viên', '2026-05-01', 'Thứ 6', '08:00', '17:30', 1, 8, 0, 0, 0, 0, 0, 0, 0, 'Ca full', 'X', '', 8]
+      ['NV001', 'Nguyễn Văn A', 'Nguyen Van A', 'Kế toán', 'Nhân viên', '2026-05-01', 'Thứ 6', '08:00', '17:30', 1, 8, 0, 0, 0, 0, 0, 0, 0, 'Ca full', 'X', '', 8]
     ]
     const ws = XLSX.utils.aoa_to_sheet([headers, ...sample])
     const wb = XLSX.utils.book_new()
@@ -1213,6 +1214,7 @@ function Attendance() {
                   <th style={{ minWidth: '45px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>STT</th>
                   <th style={{ minWidth: '90px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Mã N.Viên</th>
                   <th style={{ minWidth: '140px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tên nhân viên</th>
+                  <th style={{ minWidth: '170px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Tên theo máy chấm công</th>
                   <th style={{ minWidth: '110px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Phòng ban</th>
                   <th style={{ minWidth: '110px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Chức vụ</th>
                   <th style={{ minWidth: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 10 }}>Ngày</th>
@@ -1249,11 +1251,13 @@ function Attendance() {
                       // Filter by employee name or ID
                       if (filterAttendanceEmployee) {
                         const emp = employees.find(e => e.id === log.employeeId)
-                        const empName = emp?.ho_va_ten || emp?.name || ''
-                        const empId = log.employeeId || ''
+                        const empName = log.employeeName || emp?.ho_va_ten || emp?.name || ''
+                        const machineName = log.machineName || log.tenTheoMayChamCong || ''
+                        const empId = log.employeeCode || log.employeeId || ''
                         const searchTerm = normalizeString(filterAttendanceEmployee)
 
                         return normalizeString(empName).includes(searchTerm) ||
+                          normalizeString(machineName).includes(searchTerm) ||
                           normalizeString(empId).includes(searchTerm)
                       }
 
@@ -1279,6 +1283,7 @@ function Attendance() {
                       const employee = employees.find(e => e.id === log.employeeId)
                       const empCode = log.employeeCode || employee?.employeeId || employee?.username || log.employeeId || '-'
                       const empName = log.employeeName || employee?.ho_va_ten || employee?.name || '-'
+                      const machineName = log.machineName || log.tenTheoMayChamCong || empName
                       const department = log.department || log.phongBan || employee?.bo_phan || '-'
                       const position = log.position || log.chucVu || employee?.vi_tri || '-'
                       const dateStr = log.date ? String(log.date).slice(0, 10) : ''
@@ -1296,6 +1301,7 @@ function Attendance() {
                           <td>{idx + 1}</td>
                           <td>{empCode}</td>
                           <td>{empName}</td>
+                          <td>{machineName || '-'}</td>
                           <td>{department}</td>
                           <td>{position}</td>
                           <td>{dateStr ? new Date(`${dateStr}T00:00:00`).toLocaleDateString('vi-VN') : '-'}</td>
@@ -1351,7 +1357,7 @@ function Attendance() {
                     })
                 ) : (
                   <tr>
-                    <td colSpan="23" className="empty-state">Chưa có dữ liệu chấm công</td>
+                    <td colSpan="24" className="empty-state">Chưa có dữ liệu chấm công</td>
                   </tr>
                 )}
               </tbody>

@@ -118,6 +118,21 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
   const findEmployee = (code, name) => {
     const codeStr = String(code || '').trim()
     const nameStr = String(name || '').trim()
+    const normalizedName = normalizeString(nameStr)
+
+    // Prefer name matching first so import does not depend on exact employee code.
+    if (normalizedName) {
+      const exactByName = employees.find(e =>
+        normalizeString(e.ho_va_ten || e.name || '') === normalizedName
+      )
+      if (exactByName) return exactByName
+
+      const fuzzyByName = employees.find(e =>
+        normalizeString(e.ho_va_ten || e.name || '').includes(normalizedName) ||
+        normalizedName.includes(normalizeString(e.ho_va_ten || e.name || ''))
+      )
+      if (fuzzyByName) return fuzzyByName
+    }
 
     if (codeStr) {
       const byCode = employees.find(e =>
@@ -128,13 +143,18 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
         String(e.id || '') === codeStr
       )
       if (byCode) return byCode
-    }
 
-    if (nameStr) {
-      const byName = employees.find(e =>
-        normalizeString(e.ho_va_ten || e.name || '') === normalizeString(nameStr)
-      )
-      if (byName) return byName
+      // Soft code match for files where formatting differs (spaces, dashes, etc.)
+      const normalizedCode = normalizeString(codeStr).replace(/[^a-z0-9]/g, '')
+      if (normalizedCode) {
+        const bySoftCode = employees.find(e => {
+          const candidate = normalizeString(
+            e.employeeId || e.employee_id || e.username || e.code || e.id || ''
+          ).replace(/[^a-z0-9]/g, '')
+          return candidate && candidate === normalizedCode
+        })
+        if (bySoftCode) return bySoftCode
+      }
     }
 
     return null
@@ -212,6 +232,8 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
       employeeId: sysEmp.id,
       employeeCode: extra.employeeCode || sysEmp.employeeId || sysEmp.username || '',
       employeeName: extra.employeeName || sysEmp.ho_va_ten || sysEmp.name || '',
+      machineName: extra.machineName || extra.employeeName || sysEmp.ho_va_ten || sysEmp.name || '',
+      tenTheoMayChamCong: extra.machineName || extra.employeeName || sysEmp.ho_va_ten || sysEmp.name || '',
       department: extra.department || sysEmp.bo_phan || '',
       position: extra.position || sysEmp.vi_tri || '',
       date: dateStr,
@@ -246,6 +268,7 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
     const idxOf = (...keys) => headers.findIndex(h => keys.some(k => h.includes(k)))
     const codeIdx = idxOf('mã n', 'ma n', 'mã nv', 'ma nv', 'employee')
     const nameIdx = idxOf('tên nhân', 'ten nhan', 'họ tên', 'ho ten', 'tên nv')
+    const machineNameIdx = idxOf('tên theo máy', 'ten theo may', 'tên máy', 'ten may', 'tên chấm công', 'ten cham cong')
     const deptIdx = idxOf('phòng ban', 'phong ban')
     const posIdx = idxOf('chức vụ', 'chuc vu')
     const dateIdx = idxOf('ngày', 'ngay')
@@ -277,6 +300,7 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
       const row = jsonData[i]
       const empCode = codeIdx >= 0 ? row[codeIdx] : ''
       const empName = nameIdx >= 0 ? row[nameIdx] : ''
+      const machineName = machineNameIdx >= 0 ? row[machineNameIdx] : ''
       const dateRaw = dateIdx >= 0 ? row[dateIdx] : ''
       if ((!empCode && !empName) || (dateRaw === '' || dateRaw == null)) continue
 
@@ -297,6 +321,7 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
       logs.push(buildLog(sysEmp, dateStr, stats, {
         employeeCode: String(empCode || sysEmp.employeeId || ''),
         employeeName: String(empName || sysEmp.ho_va_ten || ''),
+        machineName: String(machineName || empName || sysEmp.ho_va_ten || ''),
         department: deptIdx >= 0 ? String(row[deptIdx] || '') : '',
         position: posIdx >= 0 ? String(row[posIdx] || '') : '',
         dayOfWeek: thuIdx >= 0 ? String(row[thuIdx] || '') : '',
@@ -384,7 +409,13 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
       }
 
       const stats = calculateStats(times)
-      if (stats) logs.push(buildLog(sysEmp, dateStr, stats))
+      if (stats) {
+        logs.push(buildLog(sysEmp, dateStr, stats, {
+          employeeCode: String(empCode || sysEmp.employeeId || ''),
+          employeeName: String(empName || sysEmp.ho_va_ten || ''),
+          machineName: String(empName || sysEmp.ho_va_ten || '')
+        }))
+      }
     }
 
     return { logs, skipped }
@@ -512,7 +543,13 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
       if (!dateStr) continue
 
       const stats = calculateStats(group.times)
-      if (stats) logs.push(buildLog(sysEmp, dateStr, stats))
+      if (stats) {
+        logs.push(buildLog(sysEmp, dateStr, stats, {
+          employeeCode: String(group.empCode || sysEmp.employeeId || ''),
+          employeeName: String(group.empName || sysEmp.ho_va_ten || ''),
+          machineName: String(group.empName || sysEmp.ho_va_ten || '')
+        }))
+      }
     }
 
     return { logs, skipped }
@@ -648,13 +685,13 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
 
   const downloadNewTemplate = () => {
     const headers = [
-      'Mã N.Viên', 'Tên nhân viên', 'Phòng ban', 'Chức vụ', 'Ngày', 'Thứ',
+      'Mã N.Viên', 'Tên nhân viên', 'Tên theo máy chấm công', 'Phòng ban', 'Chức vụ', 'Ngày', 'Thứ',
       'Vào', 'Ra', 'Công', 'Giờ', 'Công+', 'Giờ+', 'Vào trễ', 'Ra sớm',
       'TC1', 'TC2', 'TC3', 'Tên ca', 'Kí hiệu', 'Kí hiệu+', 'Tổng giờ'
     ]
     const sample = [
-      ['NV001', 'Nguyễn Văn A', 'Kế toán', 'Nhân viên', '2026-05-01', 'Thứ 6', '08:00', '17:30', 1, 8, 0, 0, 0, 0, 0, 0, 0, 'Ca full', 'X', '', 8],
-      ['NV001', 'Nguyễn Văn A', 'Kế toán', 'Nhân viên', '2026-05-02', 'Thứ 7', '07:55', '17:35', 1, 8, 0.5, 1, 0, 0, 0, 0, 0, 'Ca full', 'X', 'TC', 9]
+      ['NV001', 'Nguyễn Văn A', 'Nguyen Van A', 'Kế toán', 'Nhân viên', '2026-05-01', 'Thứ 6', '08:00', '17:30', 1, 8, 0, 0, 0, 0, 0, 0, 0, 'Ca full', 'X', '', 8],
+      ['NV001', 'Nguyễn Văn A', 'Nguyen Van A', 'Kế toán', 'Nhân viên', '2026-05-02', 'Thứ 7', '07:55', '17:35', 1, 8, 0.5, 1, 0, 0, 0, 0, 0, 'Ca full', 'X', 'TC', 9]
     ]
     const ws = utils.aoa_to_sheet([headers, ...sample])
     const wb = utils.book_new()
@@ -709,9 +746,9 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
               <div className="alert alert-info" style={{ marginTop: '15px', background: '#e8f5e9', padding: '10px', borderRadius: '4px' }}>
                 <small>
                   <strong>Hỗ trợ import:</strong><br />
-                  1) Bảng đầy đủ: Mã N.Viên, Tên, Phòng ban, Chức vụ, Ngày, Thứ, Vào, Ra, Công, Giờ, Công+, Giờ+, Vào trễ, Ra sớm, TC1–3, Tên ca, Kí hiệu, Kí hiệu+, Tổng giờ<br />
+                  1) Bảng đầy đủ: Mã N.Viên, Tên, Tên theo máy chấm công, Phòng ban, Chức vụ, Ngày, Thứ, Vào, Ra, Công, Giờ, Công+, Giờ+, Vào trễ, Ra sớm, TC1–3, Tên ca, Kí hiệu, Kí hiệu+, Tổng giờ<br />
                   2) Nhật ký Lần 1–7 (vẫn dùng được)<br />
-                  • Mã NV cần khớp mã nhân viên trên hệ thống
+                  • Không bắt buộc mã NV khớp tuyệt đối, hệ thống sẽ ưu tiên ghép theo tên nhân viên
                 </small>
               </div>
             </>
@@ -738,33 +775,44 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
                   </li>
                 )}
               </ul>
-              <div style={{ maxHeight: '220px', overflowY: 'auto', marginTop: '10px', fontSize: '0.85rem' }}>
+              <div style={{ marginTop: '10px' }}>
+                <strong>Danh sách chấm công tải lên:</strong>
+              </div>
+              <div style={{ maxHeight: '260px', overflowY: 'auto', marginTop: '8px', fontSize: '0.85rem', border: '1px solid #ddd', borderRadius: '6px' }}>
                 <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ background: '#eee' }}>
-                      <th style={{ padding: '5px' }}>NV</th>
+                      <th style={{ padding: '5px' }}>STT</th>
+                      <th style={{ padding: '5px' }}>Mã NV</th>
+                      <th style={{ padding: '5px' }}>Tên NV</th>
+                      <th style={{ padding: '5px' }}>Tên máy chấm công</th>
                       <th style={{ padding: '5px' }}>Ngày</th>
                       <th style={{ padding: '5px' }}>Vào</th>
                       <th style={{ padding: '5px' }}>Ra</th>
+                      <th style={{ padding: '5px' }}>Công</th>
                       <th style={{ padding: '5px' }}>Giờ</th>
                       <th style={{ padding: '5px' }}>Trạng thái</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {previewData.logs.slice(0, 15).map((l, i) => (
+                    {previewData.logs.slice(0, 50).map((l, i) => (
                       <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
+                        <td style={{ padding: '5px', textAlign: 'center' }}>{i + 1}</td>
+                        <td style={{ padding: '5px' }}>{l.employeeCode || '-'}</td>
                         <td style={{ padding: '5px' }}>{l.employeeName || employees.find(e => e.id === l.employeeId)?.ho_va_ten || l.employeeId}</td>
+                        <td style={{ padding: '5px' }}>{l.machineName || l.tenTheoMayChamCong || l.employeeName || '-'}</td>
                         <td style={{ padding: '5px' }}>{l.date}</td>
                         <td style={{ padding: '5px' }}>{l.checkIn ? new Date(l.checkIn).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
                         <td style={{ padding: '5px' }}>{l.checkOut ? new Date(l.checkOut).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                        <td style={{ padding: '5px', textAlign: 'center' }}>{l.cong ?? '-'}</td>
                         <td style={{ padding: '5px' }}>{l.hours}</td>
                         <td style={{ padding: '5px' }}>{l.status}</td>
                       </tr>
                     ))}
-                    {previewData.logs.length > 15 && (
+                    {previewData.logs.length > 50 && (
                       <tr>
-                        <td colSpan="6" style={{ textAlign: 'center', padding: '5px' }}>
-                          ...và {previewData.logs.length - 15} dòng khác
+                        <td colSpan="10" style={{ textAlign: 'center', padding: '5px' }}>
+                          ...và {previewData.logs.length - 50} dòng khác
                         </td>
                       </tr>
                     )}
