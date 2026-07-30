@@ -1,4 +1,9 @@
 {
+    "functions": {
+        "api/attendance-match.js": {
+            "maxDuration": 60
+        }
+    },
     "rewrites": [
         {
             "source": "/(.*)",

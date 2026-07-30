@@ -10,6 +10,10 @@ import SeedAttendanceDataButton from '../components/SeedAttendanceDataButton'
 import SeedPayrollDataButton from '../components/SeedPayrollDataButton'
 import TaxModal from '../components/TaxModal'
 import { fbDelete, fbGet, fbPush, fbUpdate } from '../services/firebase'
+import {
+  buildAttendanceSummary,
+  buildDailyAttendanceMap
+} from '../utils/attendanceSummary'
 import { TAX_CONFIG } from '../utils/constants'
 import { calculateProgressiveTax, formatMoney, normalizeString } from '../utils/helpers'
 
@@ -143,6 +147,39 @@ function Attendance() {
       .map(option => ({ ...option, codes: Array.from(option.codes) }))
       .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
   }, [attendanceLogs, employeesById])
+
+  const dailyAttendanceMap = useMemo(
+    () => buildDailyAttendanceMap(attendanceLogs, filterAttendanceMonth),
+    [attendanceLogs, filterAttendanceMonth]
+  )
+
+  const attendanceSummary = useMemo(
+    () => buildAttendanceSummary({
+      attendanceLogs,
+      employees,
+      month: filterAttendanceMonth,
+      attendanceAdjustments,
+      manualWorkdays
+    }),
+    [
+      attendanceLogs,
+      employees,
+      filterAttendanceMonth,
+      attendanceAdjustments,
+      manualWorkdays
+    ]
+  )
+
+  const filteredAttendanceSummary = useMemo(() => {
+    const searchTerm = normalizeString(filterAttendanceEmployee)
+    if (!searchTerm) return attendanceSummary
+
+    return attendanceSummary.filter(row =>
+      normalizeString(row.employeeName).includes(searchTerm) ||
+      normalizeString(row.employeeCode).includes(searchTerm) ||
+      normalizeString(row.department).includes(searchTerm)
+    )
+  }, [attendanceSummary, filterAttendanceEmployee])
 
   useEffect(() => {
     loadData()
@@ -628,6 +665,53 @@ function Attendance() {
     XLSX.writeFile(wb, fileName)
   }
 
+  const handleExportAttendanceSummary = () => {
+    if (!filterAttendanceMonth) {
+      alert('Vui lòng chọn tháng cần xuất báo cáo.')
+      return
+    }
+    if (!filteredAttendanceSummary.length) {
+      alert('Không có dữ liệu tổng hợp trong tháng đã chọn.')
+      return
+    }
+
+    const exportRows = filteredAttendanceSummary.map((row, index) => ({
+      STT: index + 1,
+      'Mã nhân viên': row.employeeCode,
+      'Họ và tên': row.employeeName,
+      'Chi nhánh': row.branch,
+      'Phòng ban': row.department,
+      'Số ngày có dữ liệu': row.attendanceDays,
+      'Tổng công': row.workdays,
+      'Tổng giờ': row.totalHours,
+      'Số lần đi muộn': row.lateCount,
+      'Tổng phút đi muộn': row.lateMinutes,
+      'Số lần về sớm': row.earlyCount,
+      'Tổng phút về sớm': row.earlyMinutes
+    }))
+    const worksheet = XLSX.utils.json_to_sheet(exportRows)
+    worksheet['!cols'] = [
+      { wch: 6 },
+      { wch: 16 },
+      { wch: 28 },
+      { wch: 14 },
+      { wch: 20 },
+      { wch: 18 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 18 },
+      { wch: 20 },
+      { wch: 18 },
+      { wch: 20 }
+    ]
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'TongHopCong')
+    XLSX.writeFile(
+      workbook,
+      `Bao_cao_tong_hop_cong_${filterAttendanceMonth}.xlsx`
+    )
+  }
+
   // --- NEW FEATURES: Calculate Workdays & Batch Export Payslips ---
 
   const handleCalculateWorkdays = async () => {
@@ -639,35 +723,19 @@ function Attendance() {
 
     setLoading(true)
     try {
-      // 2. Get all attendance logs for this month
-      const logsInMonth = attendanceLogs.filter(log => {
-        const d = new Date(log.date || log.timestamp)
-        return log.date && log.date.startsWith(period)
+      // 2. Tổng hợp theo nhân viên + ngày để không tính trùng khi một ngày có nhiều ca.
+      const periodSummary = buildAttendanceSummary({
+        attendanceLogs,
+        employees,
+        month: period,
+        attendanceAdjustments,
+        manualWorkdays
       })
+      const empWorkdays = Object.fromEntries(
+        periodSummary.map(row => [row.employeeId, row.workdays])
+      )
 
-      // 3. Group by Employee
-      const empWorkdays = {} // { empId: count }
-
-      logsInMonth.forEach(log => {
-        let hours = 0
-        if (log.hours !== undefined && log.hours !== null) {
-          hours = typeof log.hours === 'string' ? parseFloat(log.hours) : Number(log.hours)
-        } else if (log.soGio !== undefined && log.soGio !== null) {
-          hours = typeof log.soGio === 'string' ? parseFloat(log.soGio) : Number(log.soGio)
-        }
-
-        // Logic updated:
-        // >= 7.5h => 1 công
-        // >= 3h & < 7.5h => 0.5 công
-        // < 3h => 0 công
-        if (hours >= 7.5) {
-          empWorkdays[log.employeeId] = (empWorkdays[log.employeeId] || 0) + 1
-        } else if (hours >= 3) {
-          empWorkdays[log.employeeId] = (empWorkdays[log.employeeId] || 0) + 0.5
-        }
-      })
-
-      // 4. Update or Create Payrolls
+      // 3. Update or Create Payrolls
       let updateCount = 0
 
       // Iterate all employees to ensure everyone gets a record for the period? 
@@ -861,9 +929,10 @@ function Attendance() {
             <button
               className="btn btn-primary"
               onClick={() => setIsImportModalOpen(true)}
+              title="Đối sánh tên/mã nhân sự rồi import dữ liệu chấm công"
             >
-              <i className="fas fa-file-import"></i>
-              Import chấm công
+              <i className="fas fa-robot"></i>
+              AI đối soát & Import
             </button>
             <button
               className="btn btn-primary"
@@ -885,6 +954,15 @@ function Attendance() {
             </button>
             <SeedAttendanceDataButton employees={employees} onComplete={loadData} />
           </>
+        )}
+        {activeTab === 'workday_summary' && (
+          <button
+            className="btn btn-success"
+            onClick={handleExportAttendanceSummary}
+          >
+            <i className="fas fa-file-excel"></i>
+            Xuất báo cáo tổng hợp
+          </button>
         )}
         {activeTab === 'payroll' && (
           <>
@@ -1081,6 +1159,61 @@ function Attendance() {
             </div>
           </div>
 
+          <div style={{ padding: '12px 0 18px' }}>
+            <h4 style={{ margin: '0 0 10px' }}>Kết quả tổng hợp cuối kỳ</h4>
+            {!filterAttendanceMonth ? (
+              <div className="empty-state">Vui lòng chọn tháng để xem báo cáo</div>
+            ) : (
+              <div style={{ overflowX: 'auto', border: '1px solid #ddd', borderRadius: '6px' }}>
+                <table className="table table-bordered table-sm" style={{ minWidth: '1050px', marginBottom: 0 }}>
+                  <thead>
+                    <tr style={{ background: '#eef6ff' }}>
+                      <th>STT</th>
+                      <th>Mã NV</th>
+                      <th>Họ tên</th>
+                      <th>Chi nhánh</th>
+                      <th>Phòng ban</th>
+                      <th style={{ textAlign: 'center' }}>Ngày có dữ liệu</th>
+                      <th style={{ textAlign: 'center', background: '#dcfce7' }}>Tổng công</th>
+                      <th style={{ textAlign: 'center' }}>Tổng giờ</th>
+                      <th style={{ textAlign: 'center', background: '#fef3c7' }}>Đi muộn</th>
+                      <th style={{ textAlign: 'center' }}>Phút muộn</th>
+                      <th style={{ textAlign: 'center', background: '#fee2e2' }}>Về sớm</th>
+                      <th style={{ textAlign: 'center' }}>Phút sớm</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAttendanceSummary.length > 0 ? (
+                      filteredAttendanceSummary.map((row, index) => (
+                        <tr key={row.employeeId}>
+                          <td>{index + 1}</td>
+                          <td>{row.employeeCode || '-'}</td>
+                          <td><strong>{row.employeeName || '-'}</strong></td>
+                          <td>{row.branch || '-'}</td>
+                          <td>{row.department || '-'}</td>
+                          <td style={{ textAlign: 'center' }}>{row.attendanceDays}</td>
+                          <td style={{ textAlign: 'center', fontWeight: 700, background: '#f0fdf4' }}>{row.workdays}</td>
+                          <td style={{ textAlign: 'center' }}>{row.totalHours}</td>
+                          <td style={{ textAlign: 'center', background: '#fffbeb' }}>{row.lateCount}</td>
+                          <td style={{ textAlign: 'center' }}>{row.lateMinutes}</td>
+                          <td style={{ textAlign: 'center', background: '#fef2f2' }}>{row.earlyCount}</td>
+                          <td style={{ textAlign: 'center' }}>{row.earlyMinutes}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="12" className="empty-state">
+                          Không có dữ liệu tổng hợp trong tháng này
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <h4 style={{ margin: '0 0 10px' }}>Chi tiết công theo ngày</h4>
           <div style={{ padding: '0', overflowX: 'scroll', overflowY: 'auto', maxHeight: 'calc(100vh - 350px)', border: '1px solid #ddd', borderRadius: '4px' }}>
             {!filterAttendanceMonth ? (
               <div className="empty-state">Vui lòng chọn tháng để xem bảng công</div>
@@ -1130,33 +1263,21 @@ function Attendance() {
                           </td>
                           {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
                             const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-                            const log = attendanceLogs.find(l =>
-                              l.employeeId === emp.id &&
-                              (l.date === dateStr || (l.timestamp && new Date(l.timestamp || 0).toISOString().startsWith(dateStr)))
-                            )
+                            const daySummary = dailyAttendanceMap.get(`${emp.id}::${dateStr}`)
 
                             let cellContent = ''
                             let cellClass = ''
                             let val = 0
 
-                            if (log) {
-                              let hours = 0
-                              if (log.hours !== undefined && log.hours !== null) hours = Number(log.hours)
-                              else if (log.soGio !== undefined && log.soGio !== null) hours = Number(log.soGio)
-
-                              if (hours >= 8) {
-                                val = 1
-                                cellContent = '1.0'
-                                cellClass = 'text-success'
-                              } else if (hours >= 4) {
-                                val = 0.5
-                                cellContent = '0.5'
-                                cellClass = 'text-warning'
-                              } else {
-                                val = 0
-                                cellContent = '0'
-                                cellClass = 'text-muted'
-                              }
+                            if (daySummary) {
+                              val = Number(daySummary.workdays) || 0
+                              cellContent = val.toFixed(2).replace(/\.?0+$/, '')
+                              cellClass =
+                                val >= 1
+                                  ? 'text-success'
+                                  : val > 0
+                                    ? 'text-warning'
+                                    : 'text-muted'
                             }
 
                             // Override logic if "Has Permission"
@@ -1901,6 +2022,7 @@ function Attendance() {
       {/* Modals */}
       <AttendanceImportModal
         employees={employees}
+        attendanceLogs={attendanceLogs}
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         onSave={loadData}

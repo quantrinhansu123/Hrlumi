@@ -1,13 +1,60 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { read, utils, writeFile } from 'xlsx'
-import { fbPush } from '../services/firebase'
-import { normalizeString } from '../utils/helpers'
+import { fbPush, fbUpdate } from '../services/firebase'
+import {
+  applyEmployeeToAttendanceLog,
+  buildAttendanceRecordKey,
+  buildSourceEmployeeKey,
+  matchAttendanceEmployee,
+  normalizeEmployeeIdentity
+} from '../utils/attendanceMatching'
 
-function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
+function AttendanceImportModal({
+  employees,
+  attendanceLogs = [],
+  isOpen,
+  onClose,
+  onSave
+}) {
   const [file, setFile] = useState(null)
+  const [referenceImage, setReferenceImage] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
   const [previewData, setPreviewData] = useState(null)
   const [importMonth, setImportMonth] = useState(new Date().toISOString().slice(0, 7)) // YYYY-MM
+  const [matchBranch, setMatchBranch] = useState('Hà Nội')
+
+  const availableBranches = useMemo(
+    () => Array.from(new Set(
+      employees
+        .map(employee => String(employee.chi_nhanh || employee.branch || '').trim())
+        .filter(Boolean)
+    )).sort((left, right) => left.localeCompare(right, 'vi')),
+    [employees]
+  )
+
+  const employeesById = useMemo(
+    () => new Map(employees.map(employee => [String(employee.id), employee])),
+    [employees]
+  )
+
+  const employeesForMatching = useMemo(() => {
+    const normalizedBranch = normalizeEmployeeIdentity(matchBranch)
+    const inBranch = normalizedBranch
+      ? employees.filter(employee =>
+          normalizeEmployeeIdentity(employee.chi_nhanh || employee.branch || '') ===
+          normalizedBranch
+        )
+      : employees
+    return (inBranch.length ? inBranch : employees)
+      .slice()
+      .sort((left, right) =>
+        String(left.ho_va_ten || left.name || '').localeCompare(
+          String(right.ho_va_ten || right.name || ''),
+          'vi'
+        )
+      )
+  }, [employees, matchBranch])
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0])
@@ -116,48 +163,7 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
   }
 
   const findEmployee = (code, name) => {
-    const codeStr = String(code || '').trim()
-    const nameStr = String(name || '').trim()
-    const normalizedName = normalizeString(nameStr)
-
-    // Prefer name matching first so import does not depend on exact employee code.
-    if (normalizedName) {
-      const exactByName = employees.find(e =>
-        normalizeString(e.ho_va_ten || e.name || '') === normalizedName
-      )
-      if (exactByName) return exactByName
-
-      const fuzzyByName = employees.find(e =>
-        normalizeString(e.ho_va_ten || e.name || '').includes(normalizedName) ||
-        normalizedName.includes(normalizeString(e.ho_va_ten || e.name || ''))
-      )
-      if (fuzzyByName) return fuzzyByName
-    }
-
-    if (codeStr) {
-      const byCode = employees.find(e =>
-        String(e.employeeId || '') === codeStr ||
-        String(e.employee_id || '') === codeStr ||
-        String(e.username || '') === codeStr ||
-        String(e.code || '') === codeStr ||
-        String(e.id || '') === codeStr
-      )
-      if (byCode) return byCode
-
-      // Soft code match for files where formatting differs (spaces, dashes, etc.)
-      const normalizedCode = normalizeString(codeStr).replace(/[^a-z0-9]/g, '')
-      if (normalizedCode) {
-        const bySoftCode = employees.find(e => {
-          const candidate = normalizeString(
-            e.employeeId || e.employee_id || e.username || e.code || e.id || ''
-          ).replace(/[^a-z0-9]/g, '')
-          return candidate && candidate === normalizedCode
-        })
-        if (bySoftCode) return bySoftCode
-      }
-    }
-
-    return null
+    return matchAttendanceEmployee(code, name, employees, matchBranch).employee
   }
 
   const buildFallbackEmployee = (code, name, rowIndex = 0) => {
@@ -165,8 +171,9 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
     const nameStr = String(name || '').trim()
     const fallbackCode = codeStr || `ROW${rowIndex + 1}`
     const fallbackName = nameStr || `NV ${fallbackCode}`
+    const sourceKey = buildSourceEmployeeKey(fallbackCode, fallbackName)
     return {
-      id: `external:${fallbackCode}:${rowIndex + 1}`,
+      id: `external:${sourceKey}`,
       employeeId: fallbackCode,
       username: fallbackCode,
       ho_va_ten: fallbackName,
@@ -175,6 +182,12 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
       vi_tri: ''
     }
   }
+
+  const attachSourceIdentity = (employee, code, name) => ({
+    ...employee,
+    _sourceEmployeeCode: String(code || '').trim(),
+    _sourceEmployeeName: String(name || '').replace(/\s+/g, ' ').trim()
+  })
 
   const parseDateValue = (dateRaw) => {
     if (dateRaw === null || dateRaw === undefined || dateRaw === '') return null
@@ -246,10 +259,43 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
 
     return {
       employeeId: sysEmp.id,
-      employeeCode: extra.employeeCode || sysEmp.employeeId || sysEmp.username || '',
-      employeeName: extra.employeeName || sysEmp.ho_va_ten || sysEmp.name || '',
-      machineName: extra.machineName || extra.employeeName || sysEmp.ho_va_ten || sysEmp.name || '',
-      tenTheoMayChamCong: extra.machineName || extra.employeeName || sysEmp.ho_va_ten || sysEmp.name || '',
+      employeeCode:
+        extra.employeeCode ||
+        sysEmp._sourceEmployeeCode ||
+        sysEmp.employeeId ||
+        sysEmp.username ||
+        '',
+      employeeName:
+        extra.employeeName ||
+        sysEmp._sourceEmployeeName ||
+        sysEmp.ho_va_ten ||
+        sysEmp.name ||
+        '',
+      sourceEmployeeCode:
+        sysEmp._sourceEmployeeCode ||
+        extra.employeeCode ||
+        sysEmp.employeeId ||
+        '',
+      sourceEmployeeName:
+        sysEmp._sourceEmployeeName ||
+        extra.employeeName ||
+        sysEmp.ho_va_ten ||
+        sysEmp.name ||
+        '',
+      machineName:
+        extra.machineName ||
+        sysEmp._sourceEmployeeName ||
+        extra.employeeName ||
+        sysEmp.ho_va_ten ||
+        sysEmp.name ||
+        '',
+      tenTheoMayChamCong:
+        extra.machineName ||
+        sysEmp._sourceEmployeeName ||
+        extra.employeeName ||
+        sysEmp.ho_va_ten ||
+        sysEmp.name ||
+        '',
       department: extra.department || sysEmp.bo_phan || '',
       position: extra.position || sysEmp.vi_tri || '',
       date: dateStr,
@@ -320,7 +366,11 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
       const dateRaw = dateIdx >= 0 ? row[dateIdx] : ''
       if ((!empCode && !empName) || (dateRaw === '' || dateRaw == null)) continue
 
-      const sysEmp = findEmployee(empCode, empName) || buildFallbackEmployee(empCode, empName, i)
+      const sysEmp = attachSourceIdentity(
+        findEmployee(empCode, empName) || buildFallbackEmployee(empCode, empName, i),
+        empCode,
+        empName
+      )
 
       const dateStr = parseDateValue(dateRaw)
       if (!dateStr) continue
@@ -414,7 +464,11 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
         continue
       }
 
-      const sysEmp = findEmployee(empCode, empName) || buildFallbackEmployee(empCode, empName, i)
+      const sysEmp = attachSourceIdentity(
+        findEmployee(empCode, empName) || buildFallbackEmployee(empCode, empName, i),
+        empCode,
+        empName
+      )
 
       const stats = calculateStats(times)
       if (stats) {
@@ -457,7 +511,11 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
       const empCode = codeColIdx >= 0 ? row[codeColIdx] : ''
 
       if (empName || empCode) {
-        currentSysEmp = findEmployee(empCode, empName) || buildFallbackEmployee(empCode, empName, r)
+        currentSysEmp = attachSourceIdentity(
+          findEmployee(empCode, empName) || buildFallbackEmployee(empCode, empName, r),
+          empCode,
+          empName
+        )
       }
       if (!currentSysEmp) continue
 
@@ -541,7 +599,12 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
       const group = groupedData[key]
       if (group.times.length === 0) continue
 
-      const sysEmp = findEmployee(group.empCode, group.empName) || buildFallbackEmployee(group.empCode, group.empName)
+      const sysEmp = attachSourceIdentity(
+        findEmployee(group.empCode, group.empName) ||
+          buildFallbackEmployee(group.empCode, group.empName),
+        group.empCode,
+        group.empName
+      )
 
       const dateStr = parseDateValue(group.dateRaw)
       if (!dateStr) continue
@@ -570,6 +633,246 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
     if (hasLan && hasNgay) return 'punch'
     if (hasDayCols) return 'matrix'
     return 'list'
+  }
+
+  const prepareMatchingPreview = (
+    logs,
+    metadata = {},
+    preserveExistingMatches = false
+  ) => {
+    const groups = new Map()
+
+    logs.forEach(log => {
+      const sourceCode =
+        log.sourceEmployeeCode ||
+        log.employeeCode ||
+        ''
+      const sourceName =
+        log.sourceEmployeeName ||
+        log.employeeName ||
+        log.machineName ||
+        log.tenTheoMayChamCong ||
+        ''
+      const sourceKey = buildSourceEmployeeKey(sourceCode, sourceName)
+
+      if (!groups.has(sourceKey)) {
+        const currentEmployee = preserveExistingMatches
+          ? employeesById.get(String(log.employeeId))
+          : null
+        const smartMatch = currentEmployee
+          ? {
+              employee: currentEmployee,
+              suggestedEmployee: currentEmployee,
+              confidence: 1,
+              gap: 1,
+              method: 'Đã gắn với hồ sơ Lumi',
+              status: 'matched',
+              candidates: [{ employee: currentEmployee, score: 1 }]
+            }
+          : matchAttendanceEmployee(
+              sourceCode,
+              sourceName,
+              employees,
+              matchBranch
+            )
+
+        groups.set(sourceKey, {
+          key: sourceKey,
+          sourceCode: String(sourceCode || '').trim(),
+          sourceName: String(sourceName || '').replace(/\s+/g, ' ').trim(),
+          rowCount: 0,
+          selectedEmployeeId: smartMatch.employee?.id || '',
+          suggestedEmployeeId: smartMatch.suggestedEmployee?.id || '',
+          confidence: smartMatch.confidence,
+          gap: smartMatch.gap,
+          method: smartMatch.method,
+          status: smartMatch.status,
+          candidates: smartMatch.candidates
+        })
+      }
+
+      groups.get(sourceKey).rowCount += 1
+    })
+
+    const matchGroups = Array.from(groups.values())
+    const groupByKey = new Map(matchGroups.map(group => [group.key, group]))
+    const matchedLogs = logs.map(log => {
+      const sourceCode = log.sourceEmployeeCode || log.employeeCode || ''
+      const sourceName =
+        log.sourceEmployeeName ||
+        log.employeeName ||
+        log.machineName ||
+        log.tenTheoMayChamCong ||
+        ''
+      const sourceKey = buildSourceEmployeeKey(sourceCode, sourceName)
+      const group = groupByKey.get(sourceKey)
+      const selectedEmployee = employeesById.get(String(group?.selectedEmployeeId))
+      const preparedLog = {
+        ...log,
+        sourceEmployeeCode: sourceCode,
+        sourceEmployeeName: sourceName,
+        _sourceEmployeeKey: sourceKey,
+        _originalEmployeeId: log.employeeId || '',
+        _sourceDepartment: log.department || log.phongBan || '',
+        _sourcePosition: log.position || log.chucVu || ''
+      }
+
+      return selectedEmployee
+        ? applyEmployeeToAttendanceLog(preparedLog, selectedEmployee)
+        : preparedLog
+    })
+
+    return {
+      ...metadata,
+      count: matchedLogs.length,
+      uniqueEmployeeCount: matchGroups.length,
+      matchGroups,
+      logs: matchedLogs
+    }
+  }
+
+  const handleMatchChange = (sourceKey, employeeId, method = 'Người dùng xác nhận') => {
+    setPreviewData(previous => {
+      if (!previous) return previous
+      const isSkipped = employeeId === '__skip__'
+      const selectedEmployee = employeesById.get(String(employeeId))
+      const matchGroups = previous.matchGroups.map(group =>
+        group.key === sourceKey
+          ? {
+              ...group,
+              selectedEmployeeId: isSkipped ? '__skip__' : selectedEmployee?.id || '',
+              confidence: selectedEmployee ? 1 : group.confidence,
+              method: isSkipped
+                ? 'Không có hồ sơ trong Lumi - bỏ qua'
+                : selectedEmployee
+                  ? method
+                  : group.method,
+              status: isSkipped
+                ? 'skipped'
+                : selectedEmployee
+                  ? 'matched'
+                  : group.status
+            }
+          : group
+      )
+
+      const logs = previous.logs.map(log => {
+        if (log._sourceEmployeeKey !== sourceKey) return log
+        if (selectedEmployee) {
+          return applyEmployeeToAttendanceLog(log, selectedEmployee)
+        }
+
+        return {
+          ...log,
+          employeeId: `external:${sourceKey}`,
+          employeeCode: log.sourceEmployeeCode || '',
+          employeeName: log.sourceEmployeeName || '',
+          department: log._sourceDepartment || '',
+          position: log._sourcePosition || ''
+        }
+      })
+
+      return { ...previous, matchGroups, logs }
+    })
+  }
+
+  const handleReconcileExisting = () => {
+    if (!attendanceLogs.length) {
+      alert('Chưa có dữ liệu chấm công trong Lumi để đối soát.')
+      return
+    }
+
+    setPreviewData(
+      prepareMatchingPreview(
+        attendanceLogs,
+        {
+          modeLabel: 'Đối soát dữ liệu đã có trong Lumi',
+          isMatrixMode: false,
+          detectedDays: [],
+          skipped: [],
+          isReconcileMode: true
+        },
+        true
+      )
+    )
+  }
+
+  const readFileAsDataUrl = (imageFile) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = () => reject(new Error('Không đọc được ảnh danh sách nhân sự'))
+      reader.readAsDataURL(imageFile)
+    })
+
+  const handleAiMatch = async () => {
+    if (!previewData?.matchGroups?.length) return
+    const pendingGroups = previewData.matchGroups.filter(
+      group => !group.selectedEmployeeId
+    )
+    if (!pendingGroups.length) {
+      alert('Tất cả nhân viên đã được ghép. Không cần gọi AI.')
+      return
+    }
+    if (!referenceImage) {
+      alert('Vui lòng chọn ảnh danh sách nhân sự để AI đọc và đối sánh.')
+      return
+    }
+    if (referenceImage.size > 3 * 1024 * 1024) {
+      alert('Ảnh vượt quá 3MB. Vui lòng giảm kích thước ảnh.')
+      return
+    }
+
+    setAiLoading(true)
+    try {
+      const imageDataUrl = await readFileAsDataUrl(referenceImage)
+      const response = await fetch('/api/attendance-match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageDataUrl,
+          branch: matchBranch,
+          sourcePeople: pendingGroups.map(group => ({
+            sourceKey: group.key,
+            sourceCode: group.sourceCode,
+            sourceName: group.sourceName
+          })),
+          employees: employees.map(employee => ({
+            id: employee.id,
+            employeeCode:
+              employee.employeeId ||
+              employee.employee_id ||
+              employee.username ||
+              '',
+            name: employee.ho_va_ten || employee.name || '',
+            branch: employee.chi_nhanh || employee.branch || '',
+            department: employee.bo_phan || employee.department || ''
+          }))
+        })
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(payload.error || 'AI không xử lý được ảnh')
+      }
+
+      ;(payload.matches || []).forEach(match => {
+        if (
+          match?.sourceKey &&
+          match?.employeeId &&
+          employeesById.has(String(match.employeeId))
+        ) {
+          handleMatchChange(
+            match.sourceKey,
+            match.employeeId,
+            `AI xác nhận: ${match.reason || 'khớp theo ảnh'}`
+          )
+        }
+      })
+    } catch (error) {
+      alert(`Không thể dùng AI: ${error.message}`)
+    } finally {
+      setAiLoading(false)
+    }
   }
 
   const handlePreview = async () => {
@@ -643,28 +946,15 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
         alert(`Không tìm thấy dữ liệu hợp lệ.\n${hint || 'Vui lòng kiểm tra lại file và mã NV khớp hệ thống.'}`)
         setPreviewData(null)
       } else {
-        const uniqueEmployeeCount = new Set(
-          result.logs
-            .map(log => normalizeString(
-              log.employeeName ||
-              log.machineName ||
-              log.tenTheoMayChamCong ||
-              log.employeeCode ||
-              log.employeeId ||
-              ''
-            ))
-            .filter(Boolean)
-        ).size
-
-        setPreviewData({
-          count: result.logs.length,
-          uniqueEmployeeCount,
-          modeLabel,
-          isMatrixMode: format === 'matrix',
-          detectedDays,
-          skipped: result.skipped,
-          logs: result.logs
-        })
+        setPreviewData(
+          prepareMatchingPreview(result.logs, {
+            modeLabel,
+            isMatrixMode: format === 'matrix',
+            detectedDays,
+            skipped: result.skipped,
+            isReconcileMode: false
+          })
+        )
       }
     } catch (error) {
       alert('Lỗi: ' + error.message)
@@ -677,28 +967,152 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
 
   const executeImport = async () => {
     if (!previewData || !previewData.logs) return
+    const unresolvedCount = previewData.matchGroups.filter(
+      group => !group.selectedEmployeeId && group.status !== 'skipped'
+    ).length
+    if (unresolvedCount > 0) {
+      alert(`Còn ${unresolvedCount} nhân viên chưa được ghép với hồ sơ Lumi.`)
+      return
+    }
+
     setLoading(true)
     try {
-      const logs = previewData.logs
       const BATCH_SIZE = 50
       let count = 0
+      let skippedCount = 0
+      const sanitizeLog = (log) =>
+        Object.fromEntries(
+          Object.entries(log).filter(([key]) => key !== 'id' && !key.startsWith('_'))
+        )
 
-      for (let i = 0; i < logs.length; i += BATCH_SIZE) {
-        const chunk = logs.slice(i, i + BATCH_SIZE)
-        await Promise.all(chunk.map(log => fbPush('hr/attendanceLogs', log)))
-        count += chunk.length
+      if (previewData.isReconcileMode) {
+        const changedLogs = previewData.logs.filter(
+          log =>
+            log.id &&
+            String(log.employeeId || '') !== String(log._originalEmployeeId || '')
+        )
+
+        for (let i = 0; i < changedLogs.length; i += BATCH_SIZE) {
+          const chunk = changedLogs.slice(i, i + BATCH_SIZE)
+          await Promise.all(
+            chunk.map(log =>
+              fbUpdate(`hr/attendanceLogs/${log.id}`, sanitizeLog(log))
+            )
+          )
+          count += chunk.length
+        }
+      } else {
+        const existingKeys = new Set(attendanceLogs.map(buildAttendanceRecordKey))
+        const importKeys = new Set()
+        const skippedSourceKeys = new Set(
+          previewData.matchGroups
+            .filter(group => group.status === 'skipped')
+            .map(group => group.key)
+        )
+        const logsToInsert = previewData.logs.filter(log => {
+          if (skippedSourceKeys.has(log._sourceEmployeeKey)) {
+            skippedCount += 1
+            return false
+          }
+          const key = buildAttendanceRecordKey(log)
+          if (existingKeys.has(key) || importKeys.has(key)) {
+            skippedCount += 1
+            return false
+          }
+          importKeys.add(key)
+          return true
+        })
+
+        for (let i = 0; i < logsToInsert.length; i += BATCH_SIZE) {
+          const chunk = logsToInsert.slice(i, i + BATCH_SIZE)
+          await Promise.all(
+            chunk.map(log => fbPush('hr/attendanceLogs', sanitizeLog(log)))
+          )
+          count += chunk.length
+        }
       }
 
-      alert(`Đã import thành công ${count} bản ghi!`)
-      onSave()
+      alert(
+        previewData.isReconcileMode
+          ? `Đã cập nhật liên kết nhân sự cho ${count} dòng chấm công.`
+          : `Đã import ${count} dòng chấm công.${skippedCount ? ` Bỏ qua ${skippedCount} dòng đã có.` : ''}`
+      )
+      await onSave()
       onClose()
       setFile(null)
+      setReferenceImage(null)
       setPreviewData(null)
     } catch (error) {
       alert('Lỗi khi lưu dữ liệu: ' + error.message)
     } finally {
       setLoading(false)
     }
+  }
+
+  const formatExportTime = (value) => {
+    if (!value) return ''
+    const raw = String(value)
+    if (/^\d{1,2}:\d{2}/.test(raw)) return raw.slice(0, 5)
+    const parsed = new Date(raw)
+    if (isNaN(parsed.getTime())) return raw
+    return parsed.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  const downloadMatchedExcel = () => {
+    if (!previewData?.logs?.length) return
+    const groupByKey = new Map(
+      previewData.matchGroups.map(group => [group.key, group])
+    )
+    const skippedSourceKeys = new Set(
+      previewData.matchGroups
+        .filter(group => group.status === 'skipped')
+        .map(group => group.key)
+    )
+    const rows = previewData.logs
+      .filter(log => !skippedSourceKeys.has(log._sourceEmployeeKey))
+      .map((log, index) => {
+      const group = groupByKey.get(log._sourceEmployeeKey)
+      return {
+        STT: index + 1,
+        'Mã nguồn': log.sourceEmployeeCode || '',
+        'Tên nguồn': log.sourceEmployeeName || '',
+        'Mã N.Viên Lumi': log.employeeCode || '',
+        'Tên nhân viên Lumi': log.employeeName || '',
+        'Tên theo máy chấm công':
+          log.machineName || log.tenTheoMayChamCong || '',
+        'Phòng ban': log.department || '',
+        'Chức vụ': log.position || '',
+        'Ngày': String(log.date || '').slice(0, 10),
+        'Thứ': log.dayOfWeek || '',
+        'Vào': formatExportTime(log.checkIn || log.vao),
+        'Ra': formatExportTime(log.checkOut || log.ra),
+        'Công': log.cong ?? '',
+        'Giờ': log.hours ?? log.gio ?? '',
+        'Công+': log.congPlus ?? '',
+        'Giờ+': log.gioPlus ?? '',
+        'Vào trễ': log.lateMinutes ?? log.vaoTre ?? '',
+        'Ra sớm': log.earlyMinutes ?? log.raSom ?? '',
+        TC1: log.tc1 ?? '',
+        TC2: log.tc2 ?? '',
+        TC3: log.tc3 ?? '',
+        'Tên ca': log.shiftName || log.tenCa || '',
+        'Kí hiệu': log.kyHieu || log.status || '',
+        'Kí hiệu+': log.kyHieuPlus || '',
+        'Tổng giờ': log.tongGio ?? '',
+        'Độ tin cậy': group ? `${Math.round(group.confidence * 100)}%` : '',
+        'Cách đối sánh': group?.method || ''
+      }
+      })
+    const worksheet = utils.json_to_sheet(rows)
+    const workbook = utils.book_new()
+    utils.book_append_sheet(workbook, worksheet, 'ChamCongDaKhop')
+    writeFile(
+      workbook,
+      `Cham_cong_da_khop_${importMonth || new Date().toISOString().slice(0, 7)}.xlsx`
+    )
   }
 
   const downloadNewTemplate = () => {
@@ -719,25 +1133,50 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
 
   const handleClose = () => {
     setFile(null)
+    setReferenceImage(null)
     setPreviewData(null)
     onClose()
   }
 
   if (!isOpen) return null
 
+  const matchedEmployeeCount =
+    previewData?.matchGroups?.filter(
+      group => group.selectedEmployeeId && group.status !== 'skipped'
+    ).length || 0
+  const skippedEmployeeCount =
+    previewData?.matchGroups?.filter(group => group.status === 'skipped').length || 0
+  const unresolvedEmployeeCount =
+    (previewData?.matchGroups?.length || 0) -
+    matchedEmployeeCount -
+    skippedEmployeeCount
+
   return (
     <div className="modal show" onClick={handleClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '720px' }}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '1100px' }}>
         <div className="modal-header">
           <h3>
-            <i className="fas fa-file-import"></i>
-            Import Bảng Công (Excel)
+            <i className="fas fa-robot"></i>
+            AI đối soát & Import chấm công
           </h3>
           <button className="modal-close" onClick={handleClose}>&times;</button>
         </div>
         <div className="modal-body">
           {!previewData ? (
             <>
+              <div className="form-group">
+                <label>Chi nhánh dùng để đối sánh nhân sự</label>
+                <select
+                  value={matchBranch}
+                  onChange={(e) => setMatchBranch(e.target.value)}
+                  style={{ width: '100%', padding: '10px', marginBottom: '12px' }}
+                >
+                  <option value="">Tất cả chi nhánh</option>
+                  {availableBranches.map(branch => (
+                    <option key={branch} value={branch}>{branch}</option>
+                  ))}
+                </select>
+              </div>
               <div className="form-group">
                 <label>Chọn tháng chấm công (dùng cho mẫu ma trận ngày) *</label>
                 <input
@@ -748,8 +1187,20 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
                 />
               </div>
               <div className="form-group">
-                <label>File Excel dữ liệu</label>
+                <label>1. File Excel chấm công</label>
                 <input type="file" accept=".xlsx,.xls" onChange={handleFileChange} style={{ width: '100%', padding: '10px' }} />
+              </div>
+              <div className="form-group">
+                <label>2. Ảnh danh sách nhân sự (không bắt buộc)</label>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(e) => setReferenceImage(e.target.files?.[0] || null)}
+                  style={{ width: '100%', padding: '10px' }}
+                />
+                <small style={{ color: '#6b7280' }}>
+                  Dùng khi cần AI đọc ảnh danh sách nhân sự để hỗ trợ các tên khó ghép.
+                </small>
               </div>
               <div style={{ marginTop: '-10px', marginBottom: '10px' }}>
                 <button
@@ -761,12 +1212,41 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
                   <i className="fas fa-download"></i> Tải file mẫu (đầy đủ cột chấm công)
                 </button>
               </div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                  padding: '12px',
+                  marginBottom: '12px',
+                  border: '1px solid #f59e0b',
+                  borderRadius: '6px',
+                  background: '#fffbeb'
+                }}
+              >
+                <div>
+                  <strong>Dữ liệu đã có trong Lumi</strong>
+                  <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                    Kiểm tra và sửa các dòng đang gắn mã tạm hoặc sai nhân sự.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-warning"
+                  onClick={handleReconcileExisting}
+                  disabled={!attendanceLogs.length}
+                >
+                  <i className="fas fa-link"></i>
+                  {` Đối soát ${attendanceLogs.length} dòng đã có`}
+                </button>
+              </div>
               <div className="alert alert-info" style={{ marginTop: '15px', background: '#e8f5e9', padding: '10px', borderRadius: '4px' }}>
                 <small>
-                  <strong>Hỗ trợ import:</strong><br />
-                  1) Bảng đầy đủ: Mã N.Viên, Tên, Tên theo máy chấm công, Phòng ban, Chức vụ, Ngày, Thứ, Vào, Ra, Công, Giờ, Công+, Giờ+, Vào trễ, Ra sớm, TC1–3, Tên ca, Kí hiệu, Kí hiệu+, Tổng giờ<br />
-                  2) Nhật ký Lần 1–7 (vẫn dùng được)<br />
-                  • Không bắt buộc mã NV khớp tuyệt đối, hệ thống sẽ ưu tiên ghép theo tên nhân viên
+                  <strong>Quy tắc đối sánh:</strong><br />
+                  • Ghép được tên có dấu/không dấu, viết liền, khác hoa thường và thiếu tên đệm phổ biến.<br />
+                  • Tên chắc chắn được tự ghép; tên mơ hồ bắt buộc người dùng chọn lại trước khi ghi CSDL.<br />
+                  • Hệ thống giữ tên/mã nguồn để kiểm tra và chống import trùng.
                 </small>
               </div>
             </>
@@ -777,6 +1257,17 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
                 <li><strong>Chế độ:</strong> {previewData.modeLabel}</li>
                 <li><strong>Số nhân viên (không trùng):</strong> {previewData.uniqueEmployeeCount}</li>
                 <li><strong>Tổng số dòng chấm công:</strong> {previewData.count}</li>
+                <li style={{ color: '#15803d' }}>
+                  <strong>Đã ghép với Lumi:</strong> {matchedEmployeeCount}
+                </li>
+                <li style={{ color: unresolvedEmployeeCount ? '#b91c1c' : '#15803d' }}>
+                  <strong>Cần kiểm tra:</strong> {unresolvedEmployeeCount}
+                </li>
+                {skippedEmployeeCount > 0 && (
+                  <li style={{ color: '#6b7280' }}>
+                    <strong>Không có hồ sơ Lumi, sẽ bỏ qua:</strong> {skippedEmployeeCount}
+                  </li>
+                )}
                 {previewData.isMatrixMode && (
                   <li>
                     <strong>Các cột ngày tìm thấy:</strong>{' '}
@@ -794,8 +1285,123 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
                   </li>
                 )}
               </ul>
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                  marginBottom: '10px'
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn btn-info"
+                  onClick={handleAiMatch}
+                  disabled={aiLoading || !referenceImage}
+                  title={referenceImage ? 'Dùng AI đọc ảnh và đối sánh tên' : 'Chọn ảnh danh sách nhân sự trước'}
+                >
+                  <i className={`fas ${aiLoading ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'}`}></i>
+                  {aiLoading ? ' AI đang đối sánh...' : ' AI đọc ảnh & ghép tên'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  onClick={downloadMatchedExcel}
+                  disabled={unresolvedEmployeeCount > 0}
+                >
+                  <i className="fas fa-file-excel"></i>
+                  {' Xuất Excel đã khớp'}
+                </button>
+              </div>
+
               <div style={{ marginTop: '10px' }}>
-                <strong>Danh sách chấm công tải lên:</strong>
+                <strong>Bảng đối sánh tên/mã nhân sự:</strong>
+              </div>
+              <div
+                style={{
+                  maxHeight: '300px',
+                  overflow: 'auto',
+                  marginTop: '8px',
+                  border: '1px solid #ddd',
+                  borderRadius: '6px',
+                  background: '#fff'
+                }}
+              >
+                <table className="table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                  <thead>
+                    <tr style={{ background: '#eee', position: 'sticky', top: 0, zIndex: 2 }}>
+                      <th style={{ padding: '6px' }}>Tên/mã từ file</th>
+                      <th style={{ padding: '6px' }}>Hồ sơ Lumi</th>
+                      <th style={{ padding: '6px' }}>Tin cậy</th>
+                      <th style={{ padding: '6px' }}>Kết quả</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewData.matchGroups.map(group => {
+                      const suggestedEmployee = employeesById.get(String(group.suggestedEmployeeId))
+                      const statusColor = group.status === 'skipped'
+                        ? '#6b7280'
+                        : group.selectedEmployeeId
+                          ? '#15803d'
+                        : group.status === 'review'
+                          ? '#b45309'
+                          : '#b91c1c'
+                      return (
+                        <tr key={group.key} style={{ borderBottom: '1px solid #eee' }}>
+                          <td style={{ padding: '6px' }}>
+                            <strong>{group.sourceName || '-'}</strong>
+                            <div style={{ color: '#6b7280' }}>
+                              {group.sourceCode || 'Không có mã'} · {group.rowCount} dòng
+                            </div>
+                          </td>
+                          <td style={{ padding: '6px', minWidth: '310px' }}>
+                            <select
+                              value={group.selectedEmployeeId}
+                              onChange={(e) => handleMatchChange(group.key, e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '7px',
+                                borderColor: group.selectedEmployeeId ? '#86efac' : '#fca5a5'
+                              }}
+                            >
+                              <option value="">-- Chọn nhân viên Lumi --</option>
+                              <option value="__skip__">-- Không có trong Lumi (bỏ qua) --</option>
+                              {employeesForMatching.map(employee => (
+                                <option key={employee.id} value={employee.id}>
+                                  {employee.ho_va_ten || employee.name || employee.id}
+                                  {employee.employeeId || employee.username
+                                    ? ` (${employee.employeeId || employee.username})`
+                                    : ''}
+                                </option>
+                              ))}
+                            </select>
+                            {!group.selectedEmployeeId && suggestedEmployee && (
+                              <div style={{ color: '#b45309', marginTop: '3px' }}>
+                                Gợi ý: {suggestedEmployee.ho_va_ten || suggestedEmployee.name}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '6px', whiteSpace: 'nowrap' }}>
+                            {Math.round(group.confidence * 100)}%
+                          </td>
+                          <td style={{ padding: '6px', color: statusColor }}>
+                            <strong>
+                              {group.status === 'skipped'
+                                ? 'Sẽ bỏ qua'
+                                : group.selectedEmployeeId
+                                  ? 'Đã ghép'
+                                  : 'Cần chọn'}
+                            </strong>
+                            <div style={{ fontSize: '0.78rem' }}>{group.method}</div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ marginTop: '10px' }}>
+                <strong>Chi tiết chấm công sau đối sánh:</strong>
               </div>
               <div style={{ maxHeight: '260px', overflowY: 'auto', marginTop: '8px', fontSize: '0.85rem', border: '1px solid #ddd', borderRadius: '6px' }}>
                 <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -846,13 +1452,21 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
 
             {!previewData ? (
               <button type="button" className="btn btn-primary" onClick={handlePreview} disabled={loading || !file}>
-                {loading ? <><i className="fas fa-spinner fa-spin"></i> Đang đọc file...</> : 'Tiếp tục (Xem trước) >'}
+                {loading ? <><i className="fas fa-spinner fa-spin"></i> Đang đọc file...</> : 'Phân tích & khớp dữ liệu >'}
               </button>
             ) : (
               <>
                 <button type="button" className="btn btn-secondary" onClick={() => setPreviewData(null)}>{'< Quay lại'}</button>
-                <button type="button" className="btn btn-success" onClick={executeImport} disabled={loading}>
-                  {loading ? <><i className="fas fa-spinner fa-spin"></i> Đang lưu...</> : <><i className="fas fa-check"></i> Xác nhận Import</>}
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  onClick={executeImport}
+                  disabled={loading || unresolvedEmployeeCount > 0}
+                  title={unresolvedEmployeeCount > 0 ? 'Phải ghép hết nhân viên trước khi lưu' : ''}
+                >
+                  {loading
+                    ? <><i className="fas fa-spinner fa-spin"></i> Đang lưu...</>
+                    : <><i className="fas fa-check"></i> {previewData.isReconcileMode ? 'Cập nhật CSDL Lumi' : 'Xác nhận Import'}</>}
                 </button>
               </>
             )}

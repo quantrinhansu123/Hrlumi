@@ -53,17 +53,26 @@ function parsePath(path) {
 }
 
 async function listCollection(collection) {
-  const { data, error } = await supabase
-    .from('hr_records')
-    .select('id, data')
-    .eq('collection', collection)
+  const pageSize = 1000
+  const rows = []
 
-  if (error) throw error
-  if (!data?.length) return null
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('hr_records')
+      .select('id, data')
+      .eq('collection', collection)
+      .range(from, from + pageSize - 1)
+
+    if (error) throw error
+    rows.push(...(data || []))
+    if (!data || data.length < pageSize) break
+  }
+
+  if (!rows.length) return null
 
   const prefix = `${collection}::`
   const out = {}
-  data.forEach((row) => {
+  rows.forEach((row) => {
     const logicalId = row.id.startsWith(prefix) ? row.id.slice(prefix.length) : row.id
     out[logicalId] = row.data || {}
   })
