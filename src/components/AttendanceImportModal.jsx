@@ -5,6 +5,7 @@ import {
   applyEmployeeToAttendanceLog,
   buildAttendanceRecordKey,
   buildSourceEmployeeKey,
+  getCanonicalEmployeeCode,
   matchAttendanceEmployee,
   normalizeEmployeeIdentity
 } from '../utils/attendanceMatching'
@@ -1218,9 +1219,9 @@ function AttendanceImportModal({
                   disabled={aiAvailable === false}
                   style={{ width: '100%', padding: '10px' }}
                 />
-                <small style={{ color: '#6b7280' }}>
+                  <small style={{ color: '#6b7280' }}>
                   {aiAvailable === false
-                    ? 'Chưa cấu hình OPENAI_API_KEY trên production. Đối sánh tên trong Excel vẫn hoạt động.'
+                    ? 'Chưa cấu hình GROQ_API_KEY trên production. Đối sánh tên/mã trong Excel vẫn hoạt động.'
                     : 'Dùng khi cần AI đọc ảnh danh sách nhân sự để hỗ trợ các tên khó ghép.'}
                 </small>
               </div>
@@ -1250,7 +1251,7 @@ function AttendanceImportModal({
                 <div>
                   <strong>Dữ liệu đã có trong Lumi</strong>
                   <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
-                    Kiểm tra và sửa các dòng đang gắn mã tạm hoặc sai nhân sự.
+                    Đổi mã máy chấm công sang mã nhân viên chuẩn trong hồ sơ Lumi.
                   </div>
                 </div>
                 <button
@@ -1260,12 +1261,13 @@ function AttendanceImportModal({
                   disabled={!attendanceLogs.length}
                 >
                   <i className="fas fa-link"></i>
-                  {` Đối soát ${attendanceLogs.length} dòng đã có`}
+                  {` Khớp mã nhân viên (${attendanceLogs.length} dòng)`}
                 </button>
               </div>
               <div className="alert alert-info" style={{ marginTop: '15px', background: '#e8f5e9', padding: '10px', borderRadius: '4px' }}>
                 <small>
                   <strong>Quy tắc đối sánh:</strong><br />
+                  • Mã máy và mã Lumi được giữ riêng; kết quả dùng mã nhân viên chuẩn của hồ sơ Lumi.<br />
                   • Ghép được tên có dấu/không dấu, viết liền, khác hoa thường và thiếu tên đệm phổ biến.<br />
                   • Tên chắc chắn được tự ghép; tên mơ hồ bắt buộc người dùng chọn lại trước khi ghi CSDL.<br />
                   • Hệ thống giữ tên/mã nguồn để kiểm tra và chống import trùng.
@@ -1322,14 +1324,14 @@ function AttendanceImportModal({
                   disabled={aiLoading || !referenceImage || aiAvailable === false}
                   title={
                     aiAvailable === false
-                      ? 'Production chưa cấu hình OPENAI_API_KEY'
+                      ? 'Production chưa cấu hình GROQ_API_KEY'
                       : referenceImage
-                        ? 'Dùng AI đọc ảnh và đối sánh tên'
+                        ? 'Dùng AI đọc ảnh và đối sánh mã/tên'
                         : 'Chọn ảnh danh sách nhân sự trước'
                   }
                 >
                   <i className={`fas ${aiLoading ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'}`}></i>
-                  {aiLoading ? ' AI đang đối sánh...' : ' AI đọc ảnh & ghép tên'}
+                  {aiLoading ? ' AI đang đối sánh...' : ' AI đọc ảnh & khớp mã'}
                 </button>
                 <button
                   type="button"
@@ -1343,7 +1345,7 @@ function AttendanceImportModal({
               </div>
 
               <div style={{ marginTop: '10px' }}>
-                <strong>Bảng đối sánh tên/mã nhân sự:</strong>
+                <strong>Bảng khớp mã máy → mã nhân viên Lumi:</strong>
               </div>
               <div
                 style={{
@@ -1358,7 +1360,9 @@ function AttendanceImportModal({
                 <table className="table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
                   <thead>
                     <tr style={{ background: '#eee', position: 'sticky', top: 0, zIndex: 2 }}>
-                      <th style={{ padding: '6px' }}>Tên/mã từ file</th>
+                      <th style={{ padding: '6px' }}>Mã máy</th>
+                      <th style={{ padding: '6px' }}>Tên từ máy/file</th>
+                      <th style={{ padding: '6px' }}>Mã NV Lumi</th>
                       <th style={{ padding: '6px' }}>Hồ sơ Lumi</th>
                       <th style={{ padding: '6px' }}>Tin cậy</th>
                       <th style={{ padding: '6px' }}>Kết quả</th>
@@ -1367,6 +1371,7 @@ function AttendanceImportModal({
                   <tbody>
                     {previewData.matchGroups.map(group => {
                       const suggestedEmployee = employeesById.get(String(group.suggestedEmployeeId))
+                      const selectedEmployee = employeesById.get(String(group.selectedEmployeeId))
                       const statusColor = group.status === 'skipped'
                         ? '#6b7280'
                         : group.selectedEmployeeId
@@ -1377,10 +1382,20 @@ function AttendanceImportModal({
                       return (
                         <tr key={group.key} style={{ borderBottom: '1px solid #eee' }}>
                           <td style={{ padding: '6px' }}>
+                            <strong>{group.sourceCode || '-'}</strong>
+                            <div style={{ color: '#6b7280' }}>{group.rowCount} dòng</div>
+                          </td>
+                          <td style={{ padding: '6px' }}>
                             <strong>{group.sourceName || '-'}</strong>
-                            <div style={{ color: '#6b7280' }}>
-                              {group.sourceCode || 'Không có mã'} · {group.rowCount} dòng
-                            </div>
+                          </td>
+                          <td style={{ padding: '6px', color: selectedEmployee ? '#15803d' : '#b91c1c' }}>
+                            <strong>
+                              {selectedEmployee
+                                ? getCanonicalEmployeeCode(selectedEmployee) || '-'
+                                : group.status === 'skipped'
+                                  ? 'Bỏ qua'
+                                  : 'Chưa khớp'}
+                            </strong>
                           </td>
                           <td style={{ padding: '6px', minWidth: '310px' }}>
                             <select

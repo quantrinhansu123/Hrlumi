@@ -55,12 +55,22 @@ const similarity = (left, right) => {
 const employeeName = (employee) =>
   employee?.ho_va_ten || employee?.name || employee?.fullName || ''
 
-const employeeCode = (employee) =>
+export const getCanonicalEmployeeCode = (employee) =>
   employee?.employeeId ||
   employee?.employee_id ||
   employee?.username ||
   employee?.code ||
   ''
+
+const employeeCodes = (employee) =>
+  [
+    employee?.employeeId,
+    employee?.employee_id,
+    employee?.username,
+    employee?.code
+  ]
+    .map(compactEmployeeIdentity)
+    .filter(Boolean)
 
 export const buildSourceEmployeeKey = (code, name) => {
   const normalizedName = compactEmployeeIdentity(name)
@@ -74,7 +84,7 @@ const scoreCandidate = (sourceCode, sourceName, employee) => {
   const sourceWithoutMiddle = compactWithoutCommonMiddleNames(sourceName)
   const candidateWithoutMiddle = compactWithoutCommonMiddleNames(employeeName(employee))
   const sourceCodeCompact = compactEmployeeIdentity(sourceCode)
-  const candidateCodeCompact = compactEmployeeIdentity(employeeCode(employee))
+  const candidateCodes = employeeCodes(employee)
 
   const exactName =
     Boolean(sourceNameCompact) &&
@@ -82,26 +92,34 @@ const scoreCandidate = (sourceCode, sourceName, employee) => {
     sourceNameCompact === candidateNameCompact
   const exactCode =
     Boolean(sourceCodeCompact) &&
-    Boolean(candidateCodeCompact) &&
-    sourceCodeCompact === candidateCodeCompact
+    candidateCodes.includes(sourceCodeCompact)
   const fullNameScore = similarity(sourceNameCompact, candidateNameCompact)
   const withoutMiddleScore = similarity(sourceWithoutMiddle, candidateWithoutMiddle) * 0.96
   let score = Math.max(fullNameScore, withoutMiddleScore)
   let method = withoutMiddleScore > fullNameScore ? 'Bỏ qua tên đệm phổ biến' : 'Tên gần giống'
 
-  if (exactName) {
+  if (exactCode && exactName) {
     score = 1
-    method = 'Tên trùng sau chuẩn hóa'
+    method = 'Mã và tên trùng hồ sơ Lumi'
+  } else if (exactCode && !sourceNameCompact) {
+    score = 1
+    method = 'Mã nhân viên trùng'
   } else if (exactCode && score >= 0.6) {
     score = Math.max(score, 0.99)
-    method = 'Mã và tên tương thích'
-  } else if (exactCode && !sourceNameCompact) {
-    score = 0.99
-    method = 'Mã nhân viên trùng'
+    method = 'Mã trùng, tên tương thích'
+  } else if (exactCode) {
+    // A machine code can coincidentally equal a Lumi code belonging to another
+    // employee. Keep this conflict for manual review instead of linking it.
+    score = Math.max(score, 0.59)
+    method = 'Mã trùng nhưng tên không khớp'
+  } else if (exactName) {
+    score = 1
+    method = 'Tên trùng → gán mã nhân viên Lumi'
   }
 
   return {
     employee,
+    employeeCode: getCanonicalEmployeeCode(employee),
     score: Math.max(0, Math.min(1, score)),
     method,
     exactName,
@@ -161,7 +179,7 @@ export const matchAttendanceEmployee = (
 
 export const applyEmployeeToAttendanceLog = (log, employee) => {
   const canonicalName = employeeName(employee)
-  const canonicalCode = employeeCode(employee)
+  const canonicalCode = getCanonicalEmployeeCode(employee)
   const sourceName =
     log.sourceEmployeeName ||
     log.employeeName ||
