@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { read, utils, writeFile } from 'xlsx'
 import { fbPush, fbUpdate } from '../services/firebase'
 import {
@@ -20,6 +20,7 @@ function AttendanceImportModal({
   const [referenceImage, setReferenceImage] = useState(null)
   const [loading, setLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
+  const [aiAvailable, setAiAvailable] = useState(null)
   const [previewData, setPreviewData] = useState(null)
   const [importMonth, setImportMonth] = useState(new Date().toISOString().slice(0, 7)) // YYYY-MM
   const [matchBranch, setMatchBranch] = useState('Hà Nội')
@@ -55,6 +56,24 @@ function AttendanceImportModal({
         )
       )
   }, [employees, matchBranch])
+
+  useEffect(() => {
+    if (!isOpen) return
+    let cancelled = false
+
+    fetch('/api/attendance-match')
+      .then(response => response.json())
+      .then(payload => {
+        if (!cancelled) setAiAvailable(Boolean(payload.available))
+      })
+      .catch(() => {
+        if (!cancelled) setAiAvailable(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen])
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0])
@@ -1196,10 +1215,13 @@ function AttendanceImportModal({
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
                   onChange={(e) => setReferenceImage(e.target.files?.[0] || null)}
+                  disabled={aiAvailable === false}
                   style={{ width: '100%', padding: '10px' }}
                 />
                 <small style={{ color: '#6b7280' }}>
-                  Dùng khi cần AI đọc ảnh danh sách nhân sự để hỗ trợ các tên khó ghép.
+                  {aiAvailable === false
+                    ? 'Chưa cấu hình OPENAI_API_KEY trên production. Đối sánh tên trong Excel vẫn hoạt động.'
+                    : 'Dùng khi cần AI đọc ảnh danh sách nhân sự để hỗ trợ các tên khó ghép.'}
                 </small>
               </div>
               <div style={{ marginTop: '-10px', marginBottom: '10px' }}>
@@ -1297,8 +1319,14 @@ function AttendanceImportModal({
                   type="button"
                   className="btn btn-info"
                   onClick={handleAiMatch}
-                  disabled={aiLoading || !referenceImage}
-                  title={referenceImage ? 'Dùng AI đọc ảnh và đối sánh tên' : 'Chọn ảnh danh sách nhân sự trước'}
+                  disabled={aiLoading || !referenceImage || aiAvailable === false}
+                  title={
+                    aiAvailable === false
+                      ? 'Production chưa cấu hình OPENAI_API_KEY'
+                      : referenceImage
+                        ? 'Dùng AI đọc ảnh và đối sánh tên'
+                        : 'Chọn ảnh danh sách nhân sự trước'
+                  }
                 >
                   <i className={`fas ${aiLoading ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'}`}></i>
                   {aiLoading ? ' AI đang đối sánh...' : ' AI đọc ảnh & ghép tên'}

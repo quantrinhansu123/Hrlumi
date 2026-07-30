@@ -15,8 +15,14 @@ const outputTextFromResponse = (response) => {
 }
 
 module.exports = async function handler(request, response) {
+  if (request.method === 'GET') {
+    return response.status(200).json({
+      available: Boolean(process.env.OPENAI_API_KEY)
+    })
+  }
+
   if (request.method !== 'POST') {
-    response.setHeader('Allow', 'POST')
+    response.setHeader('Allow', 'GET, POST')
     return response.status(405).json({ error: 'Chỉ hỗ trợ phương thức POST.' })
   }
 
