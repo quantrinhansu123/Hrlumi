@@ -160,6 +160,22 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
     return null
   }
 
+  const buildFallbackEmployee = (code, name, rowIndex = 0) => {
+    const codeStr = String(code || '').trim()
+    const nameStr = String(name || '').trim()
+    const fallbackCode = codeStr || `ROW${rowIndex + 1}`
+    const fallbackName = nameStr || `NV ${fallbackCode}`
+    return {
+      id: `external:${fallbackCode}:${rowIndex + 1}`,
+      employeeId: fallbackCode,
+      username: fallbackCode,
+      ho_va_ten: fallbackName,
+      name: fallbackName,
+      bo_phan: '',
+      vi_tri: ''
+    }
+  }
+
   const parseDateValue = (dateRaw) => {
     if (dateRaw === null || dateRaw === undefined || dateRaw === '') return null
 
@@ -304,11 +320,7 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
       const dateRaw = dateIdx >= 0 ? row[dateIdx] : ''
       if ((!empCode && !empName) || (dateRaw === '' || dateRaw == null)) continue
 
-      const sysEmp = findEmployee(empCode, empName)
-      if (!sysEmp) {
-        skipped.push(`Không tìm thấy NV "${empCode || empName}"`)
-        continue
-      }
+      const sysEmp = findEmployee(empCode, empName) || buildFallbackEmployee(empCode, empName, i)
 
       const dateStr = parseDateValue(dateRaw)
       if (!dateStr) continue
@@ -402,11 +414,7 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
         continue
       }
 
-      const sysEmp = findEmployee(empCode, empName)
-      if (!sysEmp) {
-        skipped.push(`Dòng ${i + 1}: không tìm thấy NV "${empCode || empName}"`)
-        continue
-      }
+      const sysEmp = findEmployee(empCode, empName) || buildFallbackEmployee(empCode, empName, i)
 
       const stats = calculateStats(times)
       if (stats) {
@@ -449,7 +457,7 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
       const empCode = codeColIdx >= 0 ? row[codeColIdx] : ''
 
       if (empName || empCode) {
-        currentSysEmp = findEmployee(empCode, empName)
+        currentSysEmp = findEmployee(empCode, empName) || buildFallbackEmployee(empCode, empName, r)
       }
       if (!currentSysEmp) continue
 
@@ -533,11 +541,7 @@ function AttendanceImportModal({ employees, isOpen, onClose, onSave }) {
       const group = groupedData[key]
       if (group.times.length === 0) continue
 
-      const sysEmp = findEmployee(group.empCode, group.empName)
-      if (!sysEmp) {
-        skipped.push(`Không tìm thấy NV "${group.empCode || group.empName}"`)
-        continue
-      }
+      const sysEmp = findEmployee(group.empCode, group.empName) || buildFallbackEmployee(group.empCode, group.empName)
 
       const dateStr = parseDateValue(group.dateRaw)
       if (!dateStr) continue
