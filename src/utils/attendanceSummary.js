@@ -107,49 +107,63 @@ export const buildAttendanceSummary = ({
   const dailyMap = buildDailyAttendanceMap(attendanceLogs, month)
   const summaryByEmployee = new Map()
 
+  const ensureSummaryRow = (employeeId, log = {}) => {
+    if (summaryByEmployee.has(employeeId)) {
+      return summaryByEmployee.get(employeeId)
+    }
+    const employee = employeesById.get(employeeId)
+    const row = {
+      employeeId,
+      employeeCode:
+        employee?.employeeId ||
+        employee?.username ||
+        log.employeeCode ||
+        '',
+      employeeName:
+        employee?.ho_va_ten ||
+        employee?.name ||
+        log.employeeName ||
+        log.sourceEmployeeName ||
+        '',
+      department:
+        employee?.bo_phan ||
+        employee?.department ||
+        log.department ||
+        '',
+      branch:
+        employee?.chi_nhanh ||
+        employee?.branch ||
+        '',
+      attendanceDays: 0,
+      workdays: 0,
+      totalHours: 0,
+      lateCount: 0,
+      lateMinutes: 0,
+      earlyCount: 0,
+      earlyMinutes: 0,
+      days: new Map()
+    }
+    summaryByEmployee.set(employeeId, row)
+    return row
+  }
+
   dailyMap.forEach((daySummary, key) => {
     const separatorIndex = key.lastIndexOf('::')
     const employeeId = key.slice(0, separatorIndex)
     const date = key.slice(separatorIndex + 2)
     const log = daySummary.logs[0] || {}
-    const employee = employeesById.get(employeeId)
-
-    if (!summaryByEmployee.has(employeeId)) {
-      summaryByEmployee.set(employeeId, {
-        employeeId,
-        employeeCode:
-          employee?.employeeId ||
-          employee?.username ||
-          log.employeeCode ||
-          '',
-        employeeName:
-          employee?.ho_va_ten ||
-          employee?.name ||
-          log.employeeName ||
-          log.sourceEmployeeName ||
-          '',
-        department:
-          employee?.bo_phan ||
-          employee?.department ||
-          log.department ||
-          '',
-        branch:
-          employee?.chi_nhanh ||
-          employee?.branch ||
-          '',
-        attendanceDays: 0,
-        workdays: 0,
-        totalHours: 0,
-        lateCount: 0,
-        lateMinutes: 0,
-        earlyCount: 0,
-        earlyMinutes: 0,
-        days: new Map()
-      })
-    }
-
-    const row = summaryByEmployee.get(employeeId)
+    const row = ensureSummaryRow(employeeId, log)
     row.days.set(date, daySummary)
+  })
+
+  const adjustedEmployeeIds = new Set([
+    ...Object.keys(attendanceAdjustments || {}),
+    ...Object.keys(manualWorkdays || {})
+  ])
+  adjustedEmployeeIds.forEach((employeeId) => {
+    if (employeesById.has(String(employeeId))) {
+      ensureSummaryRow(String(employeeId))
+    }
   })
 
   summaryByEmployee.forEach(row => {

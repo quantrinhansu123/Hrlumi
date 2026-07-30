@@ -14,6 +14,10 @@ import {
   buildAttendanceSummary,
   buildDailyAttendanceMap
 } from '../utils/attendanceSummary'
+import {
+  isPaidLeaveRequest,
+  listRequestLeaveDates
+} from '../utils/approvalPolicy'
 import { TAX_CONFIG } from '../utils/constants'
 import { calculateProgressiveTax, formatMoney, normalizeString } from '../utils/helpers'
 
@@ -64,6 +68,7 @@ function Attendance() {
   const [insuranceInfo, setInsuranceInfo] = useState([])
   const [taxInfo, setTaxInfo] = useState([])
   const [dependents, setDependents] = useState([])
+  const [approvalRequests, setApprovalRequests] = useState([])
   const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -153,20 +158,103 @@ function Attendance() {
     [attendanceLogs, filterAttendanceMonth]
   )
 
+  const paidLeaveStatsByEmployee = useMemo(() => {
+    const stats = new Map()
+
+    approvalRequests.forEach((request) => {
+      if (!isPaidLeaveRequest(request)) return
+      const leaveDates = listRequestLeaveDates(request)
+      const belongsToMonth = leaveDates.length
+        ? leaveDates.some((date) => date.startsWith(filterAttendanceMonth))
+        : String(request.createdAt || '').startsWith(filterAttendanceMonth)
+      if (!belongsToMonth) return
+
+      const employee =
+        employeesById.get(String(request.requesterId)) ||
+        employees.find((item) =>
+          (request.requesterCode &&
+            String(item.employeeId || item.username || '') ===
+            String(request.requesterCode)) ||
+          (request.requesterName &&
+            normalizeString(item.ho_va_ten || item.name || '') ===
+            normalizeString(request.requesterName))
+        )
+      const employeeId = String(employee?.id || request.requesterId || '')
+      if (!employeeId) return
+
+      if (!stats.has(employeeId)) {
+        stats.set(employeeId, {
+          employee,
+          approved: 0,
+          rejected: 0,
+          pending: 0
+        })
+      }
+      const row = stats.get(employeeId)
+      if (request.status === 'approved') row.approved += 1
+      else if (request.status === 'rejected') row.rejected += 1
+      else row.pending += 1
+    })
+
+    return stats
+  }, [approvalRequests, employees, employeesById, filterAttendanceMonth])
+
   const attendanceSummary = useMemo(
-    () => buildAttendanceSummary({
+    () => {
+      const baseRows = buildAttendanceSummary({
       attendanceLogs,
       employees,
       month: filterAttendanceMonth,
       attendanceAdjustments,
       manualWorkdays
-    }),
+      })
+      const rowsByEmployee = new Map(
+        baseRows.map((row) => [String(row.employeeId), row])
+      )
+
+      paidLeaveStatsByEmployee.forEach((leaveStats, employeeId) => {
+        const employee = leaveStats.employee || employeesById.get(employeeId)
+        if (!rowsByEmployee.has(employeeId)) {
+          rowsByEmployee.set(employeeId, {
+            employeeId,
+            employeeCode: employee?.employeeId || employee?.username || '',
+            employeeName: employee?.ho_va_ten || employee?.name || '',
+            department: employee?.bo_phan || employee?.department || '',
+            branch: employee?.chi_nhanh || employee?.branch || '',
+            attendanceDays: 0,
+            workdays: 0,
+            totalHours: 0,
+            lateCount: 0,
+            lateMinutes: 0,
+            earlyCount: 0,
+            earlyMinutes: 0,
+            days: new Map()
+          })
+        }
+      })
+
+      return Array.from(rowsByEmployee.values())
+        .map((row) => {
+          const leaveStats = paidLeaveStatsByEmployee.get(String(row.employeeId))
+          return {
+            ...row,
+            paidLeaveApproved: leaveStats?.approved || 0,
+            paidLeaveRejected: leaveStats?.rejected || 0,
+            paidLeavePending: leaveStats?.pending || 0
+          }
+        })
+        .sort((left, right) =>
+          String(left.employeeName).localeCompare(String(right.employeeName), 'vi')
+        )
+    },
     [
       attendanceLogs,
       employees,
+      employeesById,
       filterAttendanceMonth,
       attendanceAdjustments,
-      manualWorkdays
+      manualWorkdays,
+      paidLeaveStatsByEmployee
     ]
   )
 
@@ -185,6 +273,26 @@ function Attendance() {
     loadData()
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([
+      fbGet(`hr/attendanceAdjustments/${filterAttendanceMonth}`),
+      fbGet(`hr/manualWorkdays/${filterAttendanceMonth}`)
+    ])
+      .then(([adjustments, manuals]) => {
+        if (cancelled) return
+        setAttendanceAdjustments(adjustments || {})
+        setManualWorkdays(manuals || {})
+      })
+      .catch((error) => {
+        console.error('Không tải được dữ liệu phép theo tháng:', error)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [filterAttendanceMonth])
+
   const loadData = async () => {
     try {
       setLoading(true)
@@ -198,7 +306,8 @@ function Attendance() {
         taxData,
         dependentsData,
         adjustments,
-        manuals
+        manuals,
+        approvalRequestsData
       ] = await Promise.all([
         fbGet('employees'),
         fbGet('hr/attendanceLogs'),
@@ -207,7 +316,8 @@ function Attendance() {
         fbGet('hr/taxInfo'),
         fbGet('hr/dependents'),
         fbGet(`hr/attendanceAdjustments/${filterAttendanceMonth}`),
-        fbGet(`hr/manualWorkdays/${filterAttendanceMonth}`)
+        fbGet(`hr/manualWorkdays/${filterAttendanceMonth}`),
+        fbGet('hr/approvalRequests')
       ])
 
       // Process Employees
@@ -230,6 +340,14 @@ function Attendance() {
       // Process Adjustments & Manuals
       setAttendanceAdjustments(adjustments || {})
       setManualWorkdays(manuals || {})
+      setApprovalRequests(
+        approvalRequestsData
+          ? Object.entries(approvalRequestsData).map(([id, value]) => ({
+              ...value,
+              id
+            }))
+          : []
+      )
 
       // Process Payrolls
       const payrollList = payrollsData ? Object.entries(payrollsData).map(([k, v]) => ({ ...v, id: k })) : []
@@ -687,7 +805,9 @@ function Attendance() {
       'Số lần đi muộn': row.lateCount,
       'Tổng phút đi muộn': row.lateMinutes,
       'Số lần về sớm': row.earlyCount,
-      'Tổng phút về sớm': row.earlyMinutes
+      'Tổng phút về sớm': row.earlyMinutes,
+      'Phiếu nghỉ phép được duyệt': row.paidLeaveApproved,
+      'Phiếu nghỉ phép không duyệt': row.paidLeaveRejected
     }))
     const worksheet = XLSX.utils.json_to_sheet(exportRows)
     worksheet['!cols'] = [
@@ -702,7 +822,9 @@ function Attendance() {
       { wch: 18 },
       { wch: 20 },
       { wch: 18 },
-      { wch: 20 }
+      { wch: 20 },
+      { wch: 26 },
+      { wch: 28 }
     ]
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, 'TongHopCong')
@@ -1165,7 +1287,7 @@ function Attendance() {
               <div className="empty-state">Vui lòng chọn tháng để xem báo cáo</div>
             ) : (
               <div style={{ overflowX: 'auto', border: '1px solid #ddd', borderRadius: '6px' }}>
-                <table className="table table-bordered table-sm" style={{ minWidth: '1050px', marginBottom: 0 }}>
+                <table className="table table-bordered table-sm" style={{ minWidth: '1280px', marginBottom: 0 }}>
                   <thead>
                     <tr style={{ background: '#eef6ff' }}>
                       <th>STT</th>
@@ -1180,6 +1302,8 @@ function Attendance() {
                       <th style={{ textAlign: 'center' }}>Phút muộn</th>
                       <th style={{ textAlign: 'center', background: '#fee2e2' }}>Về sớm</th>
                       <th style={{ textAlign: 'center' }}>Phút sớm</th>
+                      <th style={{ textAlign: 'center', background: '#dcfce7' }}>Nghỉ phép duyệt</th>
+                      <th style={{ textAlign: 'center', background: '#fee2e2' }}>Nghỉ phép không duyệt</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1198,11 +1322,13 @@ function Attendance() {
                           <td style={{ textAlign: 'center' }}>{row.lateMinutes}</td>
                           <td style={{ textAlign: 'center', background: '#fef2f2' }}>{row.earlyCount}</td>
                           <td style={{ textAlign: 'center' }}>{row.earlyMinutes}</td>
+                          <td style={{ textAlign: 'center', background: '#f0fdf4' }}>{row.paidLeaveApproved}</td>
+                          <td style={{ textAlign: 'center', background: '#fef2f2' }}>{row.paidLeaveRejected}</td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="12" className="empty-state">
+                        <td colSpan="14" className="empty-state">
                           Không có dữ liệu tổng hợp trong tháng này
                         </td>
                       </tr>

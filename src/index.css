@@ -90,6 +90,44 @@ body {
 /* Routes that ship their own mobile-optimized layout (e.g. /approvals) collapse
    the desktop sidebar on narrow viewports so their content gets full width. */
 @media (max-width: 767px) {
+  .header {
+    min-height: 64px;
+    padding: 10px 12px;
+  }
+
+  .header .logo {
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .header .logo > div:first-child {
+    flex: 0 0 44px;
+    font-size: 1.1rem !important;
+    height: 44px !important;
+    width: 44px !important;
+  }
+
+  .header .logo h1 {
+    font-size: 1.05rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header .user-info {
+    gap: 0;
+    margin-left: 8px;
+  }
+
+  .header .user-info > span {
+    display: none;
+  }
+
+  .header .user-info > div:last-child {
+    height: 34px !important;
+    width: 34px !important;
+  }
+
   .container--immersive .sidebar {
     display: none;
   }

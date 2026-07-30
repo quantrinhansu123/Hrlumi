@@ -3,6 +3,14 @@ import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { fbDelete, fbGet, fbPush, fbUpdate } from '../services/firebase'
 import { supabase } from '../services/supabase'
+import {
+  APPROVAL_PERIOD_LABELS,
+  calculateTemplateUsage,
+  getApprovalPeriodRange,
+  getTemplatePolicy,
+  isPaidLeaveRequest,
+  listRequestLeaveDates
+} from '../utils/approvalPolicy'
 import { normalizeString } from '../utils/helpers'
 import './Approvals.css'
 
@@ -265,29 +273,33 @@ function Approvals() {
   const [recentTemplateIds, setRecentTemplateIds] = useState([])
 
   const allTemplates = useMemo(() => {
-    const customs = (customTemplates || []).map((t) => ({
-      ...t,
-      isCustom: true,
-      icon: t.icon || 'fa-file-signature',
-      color: t.color || '#16a34a',
-      category: t.category || 'CHUNG',
-      description: t.description || '',
-      defaultSubject: t.defaultSubject || t.title || '',
-      defaultContent: t.defaultContent || '',
-      defaultApprovers: Array.isArray(t.defaultApprovers) ? t.defaultApprovers : []
-    }))
+    const customs = (customTemplates || []).map((t) => {
+      const normalized = {
+        ...t,
+        isCustom: true,
+        icon: t.icon || 'fa-file-signature',
+        color: t.color || '#16a34a',
+        category: t.category || 'CHUNG',
+        description: t.description || '',
+        defaultSubject: t.defaultSubject || t.title || '',
+        defaultContent: t.defaultContent || '',
+        defaultApprovers: Array.isArray(t.defaultApprovers) ? t.defaultApprovers : []
+      }
+      return { ...normalized, ...getTemplatePolicy(normalized) }
+    })
     const builtin = BUILTIN_TEMPLATES.map((t) => {
       const override = customs.find((c) => c.baseId === t.id)
       if (!override) {
-        return {
+        const normalized = {
           ...t,
           isCustom: false,
           defaultSubject: t.title,
           defaultContent: '',
           defaultApprovers: []
         }
+        return { ...normalized, ...getTemplatePolicy(normalized) }
       }
-      return {
+      const normalized = {
         ...t,
         ...override,
         id: t.id,
@@ -299,6 +311,7 @@ function Approvals() {
         defaultContent: override.defaultContent || '',
         defaultApprovers: Array.isArray(override.defaultApprovers) ? override.defaultApprovers : []
       }
+      return { ...normalized, ...getTemplatePolicy(normalized) }
     })
     const extraCustoms = customs.filter((c) => !c.baseId || !BUILTIN_TEMPLATES.some((b) => b.id === c.baseId))
     return [...extraCustoms, ...builtin]
@@ -314,6 +327,10 @@ function Approvals() {
   const [subject, setSubject] = useState('')
   const [content, setContent] = useState('')
   const [attachments, setAttachments] = useState([])
+  const [leaveStartDate, setLeaveStartDate] = useState(new Date().toISOString().slice(0, 10))
+  const [leaveEndDate, setLeaveEndDate] = useState(new Date().toISOString().slice(0, 10))
+  const [leaveDuration, setLeaveDuration] = useState('full')
+  const [leaveType, setLeaveType] = useState('paid')
   const [approverSteps, setApproverSteps] = useState([emptyStep()])
   const [followers, setFollowers] = useState([])
   const [errors, setErrors] = useState({})
@@ -331,7 +348,11 @@ function Approvals() {
     icon: 'fa-file-signature',
     color: '#16a34a',
     baseId: '',
-    defaultApprovers: []
+    defaultApprovers: [],
+    quotaEnabled: false,
+    maxRequests: 0,
+    quotaPeriod: 'month',
+    attendanceSync: 'none'
   })
   const [tplSaving, setTplSaving] = useState(false)
   const [tplApproverSearch, setTplApproverSearch] = useState('')
@@ -508,36 +529,9 @@ function Approvals() {
     return emp?.employeeId || emp?.username || requesterId || 'N/A'
   }
 
-  const getWeekRange = (dateInput) => {
-    const d = new Date(`${dateInput}T00:00:00`)
-    if (isNaN(d.getTime())) return null
-    const day = d.getDay() || 7 // Monday-start
-    const start = new Date(d)
-    start.setDate(d.getDate() - day + 1)
-    start.setHours(0, 0, 0, 0)
-    const end = new Date(start)
-    end.setDate(start.getDate() + 6)
-    end.setHours(23, 59, 59, 999)
-    return { start, end }
-  }
-
-  const getPeriodRange = (period, dateInput) => {
-    const base = new Date(`${dateInput}T00:00:00`)
-    if (isNaN(base.getTime())) {
-      const now = new Date()
-      return getPeriodRange(period, now.toISOString().slice(0, 10))
-    }
-    if (period === 'week') return getWeekRange(dateInput)
-    if (period === 'year') {
-      const start = new Date(base.getFullYear(), 0, 1)
-      const end = new Date(base.getFullYear(), 11, 31, 23, 59, 59, 999)
-      return { start, end }
-    }
-    // month
-    const start = new Date(base.getFullYear(), base.getMonth(), 1)
-    const end = new Date(base.getFullYear(), base.getMonth() + 1, 0, 23, 59, 59, 999)
-    return { start, end }
-  }
+  const getPeriodRange = (period, dateInput) =>
+    getApprovalPeriodRange(period, dateInput) ||
+    getApprovalPeriodRange(period, new Date())
 
   const formatPeriodLabel = (period, dateInput) => {
     const range = getPeriodRange(period, dateInput)
@@ -571,6 +565,10 @@ function Approvals() {
           pending: 0,
           approved: 0,
           rejected: 0,
+          paidLeaveTotal: 0,
+          paidLeavePending: 0,
+          paidLeaveApproved: 0,
+          paidLeaveRejected: 0,
           byTemplate: {}
         })
       }
@@ -580,6 +578,12 @@ function Approvals() {
       if (r.status === 'approved') row.approved += 1
       else if (r.status === 'rejected') row.rejected += 1
       else row.pending += 1
+      if (isPaidLeaveRequest(r)) {
+        row.paidLeaveTotal += 1
+        if (r.status === 'approved') row.paidLeaveApproved += 1
+        else if (r.status === 'rejected') row.paidLeaveRejected += 1
+        else row.paidLeavePending += 1
+      }
       const tpl = r.templateType || 'ĐỀ XUẤT'
       row.byTemplate[tpl] = (row.byTemplate[tpl] || 0) + 1
     })
@@ -595,9 +599,23 @@ function Approvals() {
         acc.pending += row.pending
         acc.approved += row.approved
         acc.rejected += row.rejected
+        acc.paidLeaveTotal += row.paidLeaveTotal
+        acc.paidLeavePending += row.paidLeavePending
+        acc.paidLeaveApproved += row.paidLeaveApproved
+        acc.paidLeaveRejected += row.paidLeaveRejected
         return acc
       },
-      { employees: 0, total: 0, pending: 0, approved: 0, rejected: 0 }
+      {
+        employees: 0,
+        total: 0,
+        pending: 0,
+        approved: 0,
+        rejected: 0,
+        paidLeaveTotal: 0,
+        paidLeavePending: 0,
+        paidLeaveApproved: 0,
+        paidLeaveRejected: 0
+      }
     )
   }, [statsByEmployee])
 
@@ -634,6 +652,21 @@ function Approvals() {
     if (me.name && personName) return normalizeString(me.name) === normalizeString(personName)
     return false
   }
+
+  const selectedTemplateUsage = useMemo(
+    () => calculateTemplateUsage({
+      requests,
+      template: selectedTemplate,
+      person: me,
+      at: new Date()
+    }),
+    [requests, selectedTemplate, me]
+  )
+
+  const selectedTemplateUsesLeaveDates =
+    selectedTemplateUsage.attendanceSync === 'paid-leave' ||
+    selectedTemplate?.id === 'leave' ||
+    selectedTemplate?.baseId === 'leave'
 
   const myCreateStats = useMemo(() => {
     const emptyBucket = () => ({ total: 0, byTemplate: {} })
@@ -751,9 +784,14 @@ function Approvals() {
 
   // ---- Create form helpers ----
   const resetForm = (tpl = null) => {
+    const today = new Date().toISOString().slice(0, 10)
     setSubject(tpl?.defaultSubject || tpl?.title || '')
     setContent(tpl?.defaultContent || '')
     setAttachments([])
+    setLeaveStartDate(today)
+    setLeaveEndDate(today)
+    setLeaveDuration('full')
+    setLeaveType('paid')
     const defaults = Array.isArray(tpl?.defaultApprovers)
       ? tpl.defaultApprovers.filter((a) => a?.approverId)
       : []
@@ -798,6 +836,7 @@ function Approvals() {
     if (tpl) {
       const isBuiltin = BUILTIN_TEMPLATES.some((b) => b.id === tpl.id)
       const recordId = tpl.recordId || null
+      const policy = getTemplatePolicy(tpl)
       setTplForm({
         title: tpl.title || '',
         category: tpl.category || 'NHÂN SỰ',
@@ -807,7 +846,8 @@ function Approvals() {
         icon: tpl.icon || 'fa-file-signature',
         color: tpl.color || '#16a34a',
         baseId: tpl.baseId || (isBuiltin ? tpl.id : ''),
-        defaultApprovers: Array.isArray(tpl.defaultApprovers) ? tpl.defaultApprovers : []
+        defaultApprovers: Array.isArray(tpl.defaultApprovers) ? tpl.defaultApprovers : [],
+        ...policy
       })
       navigateApv({
         view: 'template-form',
@@ -826,7 +866,11 @@ function Approvals() {
         icon: 'fa-file-signature',
         color: '#16a34a',
         baseId: '',
-        defaultApprovers: []
+        defaultApprovers: [],
+        quotaEnabled: false,
+        maxRequests: 0,
+        quotaPeriod: 'month',
+        attendanceSync: 'none'
       })
       navigateApv({ view: 'template-form', tab: 'templates', tplId: null, template: null, id: null })
     }
@@ -871,6 +915,10 @@ function Approvals() {
       showToast('Vui lòng nhập tên mẫu')
       return
     }
+    if (tplForm.quotaEnabled && (!Number(tplForm.maxRequests) || Number(tplForm.maxRequests) < 1)) {
+      showToast('Số lần tối đa phải lớn hơn 0')
+      return
+    }
     setTplSaving(true)
     try {
       const payload = {
@@ -882,6 +930,12 @@ function Approvals() {
         icon: tplForm.icon || 'fa-file-signature',
         color: tplForm.color || '#16a34a',
         baseId: tplForm.baseId || '',
+        quotaEnabled: Boolean(tplForm.quotaEnabled),
+        maxRequests: Math.max(0, Math.floor(Number(tplForm.maxRequests) || 0)),
+        quotaPeriod: ['week', 'month', 'year'].includes(tplForm.quotaPeriod)
+          ? tplForm.quotaPeriod
+          : 'month',
+        attendanceSync: tplForm.attendanceSync || 'none',
         defaultApprovers: (tplForm.defaultApprovers || [])
           .filter((a) => a?.approverId)
           .map((a) => ({
@@ -898,6 +952,8 @@ function Approvals() {
         showToast('Đã cập nhật mẫu đề xuất')
       } else {
         payload.createdAt = new Date().toISOString()
+        payload.createdBy = me?.name || ''
+        payload.createdById = me?.id || ''
         await fbPush(TEMPLATES_PATH, payload)
         showToast('Đã tạo mẫu đề xuất')
       }
@@ -910,7 +966,11 @@ function Approvals() {
         icon: 'fa-file-signature',
         color: '#16a34a',
         baseId: '',
-        defaultApprovers: []
+        defaultApprovers: [],
+        quotaEnabled: false,
+        maxRequests: 0,
+        quotaPeriod: 'month',
+        attendanceSync: 'none'
       })
       setTplApproverSearch('')
       await loadData()
@@ -990,6 +1050,15 @@ function Approvals() {
     } else if (approverSteps.some((s) => !s.approverId)) {
       errs.approvers = 'Vui lòng chọn đầy đủ người phê duyệt hoặc xóa bước còn trống'
     }
+    if (selectedTemplateUsage.limitReached) {
+      errs.quota = `Đã hết hạn mức ${selectedTemplateUsage.maxRequests} lần/${APPROVAL_PERIOD_LABELS[selectedTemplateUsage.quotaPeriod]}.`
+    }
+    if (selectedTemplateUsesLeaveDates) {
+      const dates = listRequestLeaveDates({ leaveStartDate, leaveEndDate })
+      if (!leaveStartDate || !leaveEndDate || dates.length === 0) {
+        errs.leaveDates = 'Ngày nghỉ không hợp lệ hoặc ngày kết thúc trước ngày bắt đầu'
+      }
+    }
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -1003,6 +1072,25 @@ function Approvals() {
 
     setSubmitting(true)
     try {
+      const latestRequestData = await fbGet(REQUESTS_PATH)
+      const latestRequests = latestRequestData
+        ? Object.entries(latestRequestData).map(([id, value]) => ({ ...value, id }))
+        : []
+      const latestUsage = calculateTemplateUsage({
+        requests: latestRequests,
+        template: selectedTemplate,
+        person: me,
+        at: new Date()
+      })
+      if (latestUsage.limitReached) {
+        setErrors((previous) => ({
+          ...previous,
+          quota: `Đã hết hạn mức ${latestUsage.maxRequests} lần/${APPROVAL_PERIOD_LABELS[latestUsage.quotaPeriod]}.`
+        }))
+        showToast('Phiếu đã hết lượt sử dụng trong kỳ này')
+        return
+      }
+
       const now = new Date().toISOString()
       const payload = {
         code: genCode(),
@@ -1015,7 +1103,28 @@ function Approvals() {
         requesterCode: me.employeeCode || resolveEmployeeCode(me.id, me.name, '') || '',
         requesterName: me.name,
         requesterAvatar: me.avatar || '',
+        createdById: me.id || '',
+        createdByCode: me.employeeCode || '',
+        createdByName: me.name || '',
         followers,
+        quotaEnabled: latestUsage.quotaEnabled,
+        quotaLimit: latestUsage.maxRequests,
+        quotaPeriod: latestUsage.quotaPeriod,
+        quotaUsedBefore: latestUsage.used,
+        quotaRemainingAfter:
+          latestUsage.remaining === null
+            ? null
+            : Math.max(0, latestUsage.remaining - 1),
+        attendanceSync: latestUsage.attendanceSync,
+        ...(selectedTemplateUsesLeaveDates
+          ? {
+              leaveStartDate,
+              leaveEndDate,
+              leaveDuration,
+              leaveType,
+              attendanceSyncStatus: 'pending'
+            }
+          : {}),
         status: 'pending',
         currentStepIndex: 0,
         approvalSteps: approverSteps
@@ -1024,7 +1133,11 @@ function Approvals() {
         createdAt: now
       }
       await fbPush(REQUESTS_PATH, payload)
-      showToast('Đã nộp yêu cầu')
+      showToast(
+        latestUsage.remaining === null
+          ? 'Đã nộp yêu cầu'
+          : `Đã nộp yêu cầu · còn ${Math.max(0, latestUsage.remaining - 1)} lần/${APPROVAL_PERIOD_LABELS[latestUsage.quotaPeriod]}`
+      )
       resetForm()
       navigateApv(
         { tab: 'sent', filter: null, view: null, id: null, template: null, tplId: null },
@@ -1040,6 +1153,69 @@ function Approvals() {
   }
 
   // ---- Decision helpers (detail view) ----
+  const syncApprovedLeaveToAttendance = async (request) => {
+    if (!isPaidLeaveRequest(request)) return null
+    if (request.attendanceSyncStatus === 'synced') {
+      return {
+        attendanceSyncStatus: 'synced',
+        attendanceSyncedAt: request.attendanceSyncedAt || ''
+      }
+    }
+
+    const leaveDates = listRequestLeaveDates(request)
+    if (!leaveDates.length) {
+      throw new Error('Phiếu nghỉ phép chưa có ngày bắt đầu/kết thúc để đồng bộ chấm công.')
+    }
+
+    const employee = employees.find((item) =>
+      (request.requesterId && String(item.id) === String(request.requesterId)) ||
+      (request.requesterCode &&
+        String(item.employeeId || item.username || '') === String(request.requesterCode)) ||
+      (request.requesterName &&
+        normalizeString(item.ho_va_ten || item.name || '') ===
+        normalizeString(request.requesterName))
+    )
+    const employeeId = employee?.id || request.requesterId
+    if (!employeeId) {
+      throw new Error('Không xác định được hồ sơ nhân viên để đồng bộ ngày phép.')
+    }
+
+    const datesByMonth = new Map()
+    leaveDates.forEach((date) => {
+      const month = date.slice(0, 7)
+      const day = Number(date.slice(8, 10))
+      if (!datesByMonth.has(month)) datesByMonth.set(month, [])
+      datesByMonth.get(month).push(day)
+    })
+
+    const workdayValue = request.leaveDuration === 'half' ? 0.5 : 1
+    for (const [month, days] of datesByMonth) {
+      const currentAdjustments =
+        (await fbGet(`hr/attendanceAdjustments/${month}`)) || {}
+      const currentDays = String(currentAdjustments[employeeId] || '')
+        .split(',')
+        .map((value) => Number.parseInt(value.trim(), 10))
+        .filter(Number.isFinite)
+      const mergedDays = [...new Set([...currentDays, ...days])]
+        .sort((left, right) => left - right)
+
+      await fbUpdate(`hr/attendanceAdjustments/${month}`, {
+        [employeeId]: mergedDays.join(',')
+      })
+      await fbUpdate(`hr/manualWorkdays/${month}/${employeeId}`, Object.fromEntries(
+        days.map((day) => [day, workdayValue])
+      ))
+    }
+
+    return {
+      attendanceSyncStatus: 'synced',
+      attendanceSyncedAt: new Date().toISOString(),
+      attendanceEmployeeId: employeeId,
+      attendanceDates: leaveDates,
+      attendanceWorkdayValue: workdayValue
+    }
+  }
+
   const handleDecision = async (decision, comment = '', requestOverride = null) => {
     const target = requestOverride || selectedRequest
     if (!target) return
@@ -1069,18 +1245,29 @@ function Approvals() {
       } else {
         currentStepIndex = idx + 1
       }
+      const attendanceSyncPatch =
+        status === 'approved'
+          ? await syncApprovedLeaveToAttendance(target)
+          : null
       await fbUpdate(`${REQUESTS_PATH}/${target.id}`, {
         approvalSteps: steps,
         status,
-        currentStepIndex
+        currentStepIndex,
+        ...(attendanceSyncPatch || {})
       })
-      showToast(decision === 'approved' ? 'Đã đồng ý' : 'Đã từ chối')
+      showToast(
+        decision === 'approved'
+          ? attendanceSyncPatch
+            ? 'Đã duyệt và đồng bộ ngày phép sang chấm công'
+            : 'Đã đồng ý'
+          : 'Đã từ chối'
+      )
       setRejectPrompt(false)
       setDecisionComment('')
       await loadData()
     } catch (e) {
       console.error(e)
-      showToast('Có lỗi xảy ra')
+      showToast(e?.message || 'Có lỗi xảy ra')
     } finally {
       setDeciding(false)
     }
@@ -1174,6 +1361,73 @@ function Approvals() {
                     onChange={(e) => setTplForm((p) => ({ ...p, defaultContent: e.target.value }))}
                     placeholder={'Kính gửi Ban Lãnh đạo,\n\nTôi xin đề xuất...\n\nTrân trọng.'}
                   />
+                </div>
+
+                <div className="apv-policy-box">
+                  <div className="apv-policy-box__title">
+                    <i className="fas fa-gauge-high"></i>
+                    Hạn mức sử dụng phiếu
+                  </div>
+                  <label className="apv-toggle-row">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(tplForm.quotaEnabled)}
+                      onChange={(e) => setTplForm((previous) => ({
+                        ...previous,
+                        quotaEnabled: e.target.checked
+                      }))}
+                    />
+                    <span>Giới hạn số lần một nhân viên được tạo phiếu</span>
+                  </label>
+                  {tplForm.quotaEnabled && (
+                    <div className="apv-policy-grid">
+                      <div className="apv-field">
+                        <label>Số lần tối đa</label>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={tplForm.maxRequests}
+                          onChange={(e) => setTplForm((previous) => ({
+                            ...previous,
+                            maxRequests: e.target.value
+                          }))}
+                        />
+                      </div>
+                      <div className="apv-field">
+                        <label>Chu kỳ tự đặt lại</label>
+                        <select
+                          className="apv-select"
+                          value={tplForm.quotaPeriod}
+                          onChange={(e) => setTplForm((previous) => ({
+                            ...previous,
+                            quotaPeriod: e.target.value
+                          }))}
+                        >
+                          <option value="week">Mỗi tuần</option>
+                          <option value="month">Mỗi tháng</option>
+                          <option value="year">Mỗi năm</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                  <div className="apv-field">
+                    <label>Đồng bộ chấm công</label>
+                    <select
+                      className="apv-select"
+                      value={tplForm.attendanceSync}
+                      onChange={(e) => setTplForm((previous) => ({
+                        ...previous,
+                        attendanceSync: e.target.value
+                      }))}
+                    >
+                      <option value="none">Không đồng bộ</option>
+                      <option value="paid-leave">Nghỉ có phép — cộng công khi duyệt</option>
+                    </select>
+                  </div>
+                  <small>
+                    Mẫu nghỉ phép hệ thống tự đặt 12 lần/năm; HR có thể sửa lại theo chính sách nội bộ.
+                  </small>
                 </div>
 
                 <div className="apv-field">
@@ -1341,7 +1595,15 @@ function Approvals() {
                     <select
                       className="apv-select"
                       value={tplForm.baseId}
-                      onChange={(e) => setTplForm((p) => ({ ...p, baseId: e.target.value }))}
+                      onChange={(e) => {
+                        const baseId = e.target.value
+                        const policy = getTemplatePolicy({ id: baseId })
+                        setTplForm((previous) => ({
+                          ...previous,
+                          baseId,
+                          ...policy
+                        }))
+                      }}
                     >
                       <option value="">— Mẫu mới riêng —</option>
                       {BUILTIN_TEMPLATES.map((b) => (
@@ -1384,6 +1646,23 @@ function Approvals() {
                     </div>
                   </div>
                 </div>
+
+                <div className={`apv-quota-status ${selectedTemplateUsage.limitReached ? 'is-limit' : ''}`}>
+                  <div>
+                    <i className="fas fa-ticket"></i>
+                    <strong>Hạn mức phiếu</strong>
+                  </div>
+                  {selectedTemplateUsage.remaining === null ? (
+                    <span>Không giới hạn số lần tạo</span>
+                  ) : (
+                    <span>
+                      Đã dùng <b>{selectedTemplateUsage.used}/{selectedTemplateUsage.maxRequests}</b>
+                      {' · '}Còn <b>{selectedTemplateUsage.remaining}</b> lần trong{' '}
+                      {APPROVAL_PERIOD_LABELS[selectedTemplateUsage.quotaPeriod]}
+                    </span>
+                  )}
+                </div>
+                {errors.quota && <div className="apv-field-error">{errors.quota}</div>}
 
                 <div className="apv-my-stats">
                   <div className="apv-my-stats__head">
@@ -1509,6 +1788,66 @@ function Approvals() {
                   </select>
                   {errors.subject && <div className="apv-field-error">{errors.subject}</div>}
                 </div>
+
+                {selectedTemplateUsesLeaveDates && (
+                  <div className="apv-leave-fields">
+                    <div className="apv-card-block__title">Thông tin nghỉ có phép</div>
+                    <div className="apv-field-row apv-field-row--equal">
+                      <div className="apv-field">
+                        <label>Từ ngày <span className="req">*</span></label>
+                        <input
+                          type="date"
+                          value={leaveStartDate}
+                          onChange={(e) => {
+                            const nextStart = e.target.value
+                            setLeaveStartDate(nextStart)
+                            if (!leaveEndDate || leaveEndDate < nextStart) {
+                              setLeaveEndDate(nextStart)
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="apv-field">
+                        <label>Đến ngày <span className="req">*</span></label>
+                        <input
+                          type="date"
+                          min={leaveStartDate}
+                          value={leaveEndDate}
+                          onChange={(e) => setLeaveEndDate(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="apv-field-row apv-field-row--equal">
+                      <div className="apv-field">
+                        <label>Loại nghỉ</label>
+                        <select
+                          className="apv-select"
+                          value={leaveType}
+                          onChange={(e) => setLeaveType(e.target.value)}
+                        >
+                          <option value="paid">Nghỉ có phép</option>
+                          <option value="unpaid">Nghỉ không hưởng lương</option>
+                        </select>
+                      </div>
+                      <div className="apv-field">
+                        <label>Thời lượng mỗi ngày</label>
+                        <select
+                          className="apv-select"
+                          value={leaveDuration}
+                          onChange={(e) => setLeaveDuration(e.target.value)}
+                        >
+                          <option value="full">Cả ngày (1 công)</option>
+                          <option value="half">Nửa ngày (0,5 công)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="apv-leave-fields__note">
+                      <i className="fas fa-link"></i>
+                      Khi được duyệt ở bước cuối, các ngày nghỉ có phép sẽ tự chuyển sang Chấm công.
+                    </div>
+                    {errors.leaveDates && <div className="apv-field-error">{errors.leaveDates}</div>}
+                  </div>
+                )}
 
                 <div className="apv-field">
                   <label>
@@ -1704,7 +2043,11 @@ function Approvals() {
             </div>
 
             <div className="apv-actionbar">
-              <button className="apv-btn apv-btn--primary" disabled={submitting} onClick={handleSubmitRequest}>
+              <button
+                className="apv-btn apv-btn--primary"
+                disabled={submitting || selectedTemplateUsage.limitReached}
+                onClick={handleSubmitRequest}
+              >
                 {submitting ? (
                   <>
                     <i className="fas fa-spinner fa-spin"></i> Đang nộp...
@@ -1743,7 +2086,11 @@ function Approvals() {
                 <div className="apv-detail-submitter">
                   <Avatar name={selectedRequest.requesterName} avatar={selectedRequest.requesterAvatar} size={34} />
                   <div>
-                    <div className="apv-detail-submitter__name">{selectedRequest.requesterName}</div>
+                    <div className="apv-detail-submitter__label">Người tạo phiếu</div>
+                    <div className="apv-detail-submitter__name">
+                      {selectedRequest.requesterName}
+                      {selectedRequest.requesterCode ? ` · ${selectedRequest.requesterCode}` : ''}
+                    </div>
                     <div className="apv-detail-submitter__date">{formatDateTime(selectedRequest.createdAt)}</div>
                   </div>
                 </div>
@@ -1758,6 +2105,43 @@ function Approvals() {
                   <label>Nội dung</label>
                   <div className="apv-detail-text">{selectedRequest.content}</div>
                 </div>
+                {listRequestLeaveDates(selectedRequest).length > 0 && (
+                  <div className="apv-detail-leave">
+                    <div>
+                      <span>Từ ngày</span>
+                      <strong>{formatDateShort(selectedRequest.leaveStartDate)}</strong>
+                    </div>
+                    <div>
+                      <span>Đến ngày</span>
+                      <strong>{formatDateShort(selectedRequest.leaveEndDate)}</strong>
+                    </div>
+                    <div>
+                      <span>Loại nghỉ</span>
+                      <strong>{selectedRequest.leaveType === 'unpaid' ? 'Không lương' : 'Có phép'}</strong>
+                    </div>
+                    <div>
+                      <span>Thời lượng</span>
+                      <strong>{selectedRequest.leaveDuration === 'half' ? '0,5 công/ngày' : '1 công/ngày'}</strong>
+                    </div>
+                    <div>
+                      <span>Đồng bộ công</span>
+                      <strong>
+                        {selectedRequest.attendanceSyncStatus === 'synced'
+                          ? 'Đã đồng bộ'
+                          : selectedRequest.status === 'approved'
+                            ? 'Chưa đồng bộ'
+                            : 'Chờ duyệt'}
+                      </strong>
+                    </div>
+                  </div>
+                )}
+                {selectedRequest.quotaLimit > 0 && (
+                  <div className="apv-detail-quota">
+                    Hạn mức khi tạo: {selectedRequest.quotaLimit} lần/
+                    {APPROVAL_PERIOD_LABELS[selectedRequest.quotaPeriod] || 'kỳ'}
+                    {' · '}Còn lại sau phiếu này: {selectedRequest.quotaRemainingAfter ?? '—'}
+                  </div>
+                )}
                 <div className="apv-field">
                   <label>Đính kèm</label>
                   {(selectedRequest.attachments || []).length > 0 ? (
@@ -2065,7 +2449,12 @@ function Approvals() {
                             <span className="apv-template-item__icon" style={{ background: tpl.color }}>
                               <i className={`fas ${tpl.icon}`}></i>
                             </span>
-                            <span className="apv-template-item__title">{tpl.title}</span>
+                            <span className="apv-template-item__title">
+                              {tpl.title}
+                              <small className="apv-template-item__meta">
+                                Người tạo: {tpl.createdBy || tpl.updatedBy || 'Mẫu hệ thống'}
+                              </small>
+                            </span>
                             <i className="fas fa-chevron-right apv-template-item__arrow"></i>
                           </button>
                         </div>
@@ -2096,6 +2485,14 @@ function Approvals() {
                                 {tpl.defaultContent ? (
                                   <small className="apv-template-item__badge">Có nội dung mẫu</small>
                                 ) : null}
+                                <small className="apv-template-item__meta">
+                                  Người tạo: {tpl.createdBy || tpl.updatedBy || 'Mẫu hệ thống'}
+                                </small>
+                                {tpl.quotaEnabled && tpl.maxRequests > 0 && (
+                                  <small className="apv-template-item__quota">
+                                    Tối đa {tpl.maxRequests} lần/{APPROVAL_PERIOD_LABELS[tpl.quotaPeriod]}
+                                  </small>
+                                )}
                               </span>
                               <i className="fas fa-chevron-right apv-template-item__arrow"></i>
                             </button>
@@ -2221,6 +2618,14 @@ function Approvals() {
                     <strong>{statsSummary.rejected}</strong>
                     <span>Từ chối</span>
                   </div>
+                  <div className="apv-stats__card apv-stats__card--leave-approved">
+                    <strong>{statsSummary.paidLeaveApproved}</strong>
+                    <span>Nghỉ phép được duyệt</span>
+                  </div>
+                  <div className="apv-stats__card apv-stats__card--leave-rejected">
+                    <strong>{statsSummary.paidLeaveRejected}</strong>
+                    <span>Nghỉ phép không duyệt</span>
+                  </div>
                 </div>
 
                 <div className="apv-stats__table-wrap">
@@ -2234,6 +2639,8 @@ function Approvals() {
                         <th>Chờ duyệt</th>
                         <th>Đã duyệt</th>
                         <th>Từ chối</th>
+                        <th>Nghỉ phép duyệt</th>
+                        <th>Nghỉ phép không duyệt</th>
                         <th>Theo loại mẫu</th>
                         <th>Chi tiết</th>
                       </tr>
@@ -2241,7 +2648,7 @@ function Approvals() {
                     <tbody>
                       {filteredStats.length === 0 ? (
                         <tr>
-                          <td colSpan="9" className="apv-stats__empty">Không có đề xuất trong kỳ này</td>
+                          <td colSpan="11" className="apv-stats__empty">Không có đề xuất trong kỳ này</td>
                         </tr>
                       ) : (
                         filteredStats.map((row, idx) => (
@@ -2253,6 +2660,8 @@ function Approvals() {
                             <td>{row.pending}</td>
                             <td>{row.approved}</td>
                             <td>{row.rejected}</td>
+                            <td>{row.paidLeaveApproved}</td>
+                            <td>{row.paidLeaveRejected}</td>
                             <td>
                               <div className="apv-stats__templates">
                                 {Object.entries(row.byTemplate).map(([name, count]) => (
@@ -2274,6 +2683,39 @@ function Approvals() {
                       )}
                     </tbody>
                   </table>
+                </div>
+                <div className="apv-stats-mobile">
+                  {filteredStats.length === 0 ? (
+                    <div className="apv-stats__empty">Không có đề xuất trong kỳ này</div>
+                  ) : (
+                    filteredStats.map((row) => (
+                      <button
+                        type="button"
+                        key={`mobile-${row.employeeCode}`}
+                        className="apv-stats-mobile__card"
+                        onClick={() => openStatsDetail(row.employeeCode)}
+                      >
+                        <div className="apv-stats-mobile__head">
+                          <div>
+                            <strong>{row.employeeName}</strong>
+                            <span>{row.employeeCode}</span>
+                          </div>
+                          <i className="fas fa-chevron-right"></i>
+                        </div>
+                        <div className="apv-stats-mobile__numbers">
+                          <span>Tổng <b>{row.total}</b></span>
+                          <span>Chờ <b>{row.pending}</b></span>
+                          <span>Duyệt <b>{row.approved}</b></span>
+                          <span>Từ chối <b>{row.rejected}</b></span>
+                        </div>
+                        <div className="apv-stats-mobile__leave">
+                          Nghỉ phép: <b>{row.paidLeaveApproved} duyệt</b>
+                          {' · '}
+                          <b>{row.paidLeaveRejected} không duyệt</b>
+                        </div>
+                      </button>
+                    ))
+                  )}
                 </div>
 
                 {statsDetailCode && (
@@ -2392,6 +2834,28 @@ function Approvals() {
                         <b>Đính kèm:</b>
                         <span>{(r.attachments || []).length ? `${r.attachments.length} tập tin` : 'Không có'}</span>
                       </div>
+                      {listRequestLeaveDates(r).length > 0 && (
+                        <div className="apv-card__row">
+                          <b>Ngày nghỉ:</b>
+                          <span>
+                            {formatDateShort(r.leaveStartDate)}
+                            {r.leaveEndDate !== r.leaveStartDate
+                              ? ` – ${formatDateShort(r.leaveEndDate)}`
+                              : ''}
+                            {' · '}
+                            {r.leaveDuration === 'half' ? '0,5 công/ngày' : '1 công/ngày'}
+                          </span>
+                        </div>
+                      )}
+                      {r.quotaLimit > 0 && (
+                        <div className="apv-card__row">
+                          <b>Hạn mức:</b>
+                          <span>
+                            Còn {r.quotaRemainingAfter ?? '—'}/{r.quotaLimit} lần trong{' '}
+                            {APPROVAL_PERIOD_LABELS[r.quotaPeriod] || 'kỳ'}
+                          </span>
+                        </div>
+                      )}
                       {tab === 'admin' && r.status === 'pending' && (
                         <div className="apv-card__row">
                           <b>Đang chờ:</b>
@@ -2415,7 +2879,7 @@ function Approvals() {
                       })()}
                       <div className="apv-card__footer">
                         <Avatar name={r.requesterName} avatar={r.requesterAvatar} />
-                        <span className="apv-card__footer-name">{r.requesterName}</span>
+                        <span className="apv-card__footer-name">Người tạo: {r.requesterName}</span>
                         <span className="apv-card__footer-date">{formatDateShort(r.createdAt)}</span>
                       </div>
                       {tab === 'inbox' && isMyTurn(r) && (
