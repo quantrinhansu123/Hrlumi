@@ -90,44 +90,6 @@ body {
 /* Routes that ship their own mobile-optimized layout (e.g. /approvals) collapse
    the desktop sidebar on narrow viewports so their content gets full width. */
 @media (max-width: 767px) {
-  .header {
-    min-height: 64px;
-    padding: 10px 12px;
-  }
-
-  .header .logo {
-    gap: 8px;
-    min-width: 0;
-  }
-
-  .header .logo > div:first-child {
-    flex: 0 0 44px;
-    font-size: 1.1rem !important;
-    height: 44px !important;
-    width: 44px !important;
-  }
-
-  .header .logo h1 {
-    font-size: 1.05rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .header .user-info {
-    gap: 0;
-    margin-left: 8px;
-  }
-
-  .header .user-info > span {
-    display: none;
-  }
-
-  .header .user-info > div:last-child {
-    height: 34px !important;
-    width: 34px !important;
-  }
-
   .container--immersive .sidebar {
     display: none;
   }
@@ -1466,7 +1428,7 @@ tr:hover {
 .employees-tabs button span { background: #f1f5f9; border-radius: 99px; padding: 2px 7px; margin-left: 5px; font-size: .72rem; }
 .employees-tabs button.active { color: #079447; border-bottom-color: #079447; }
 .employees-tabs button.active.danger { color: #dc2626; border-bottom-color: #dc2626; }
-.employees-filter-card { display: grid; grid-template-columns: minmax(260px, 1.7fr) repeat(2, minmax(140px, .75fr)) minmax(140px, .7fr) auto; gap: 10px; padding: 13px; background: #fff; border: 1px solid #e6ebf1; border-radius: 11px; margin-bottom: 13px; }
+.employees-filter-card { display: grid; grid-template-columns: minmax(220px, 1.5fr) repeat(4, minmax(120px, .7fr)) auto; gap: 10px; padding: 13px; background: #fff; border: 1px solid #e6ebf1; border-radius: 11px; margin-bottom: 13px; }
 .employees-filter-card select, .employees-search { height: 40px; border: 1px solid #dfe5ec; border-radius: 8px; background: #fff; }
 .employees-filter-card select { padding: 0 32px 0 11px; color: #475467; min-width: 0; }
 .employees-search { display: flex; align-items: center; padding: 0 12px; }
@@ -1483,6 +1445,27 @@ tr:hover {
 .employees-table tbody tr { cursor: pointer; transition: background .13s; }
 .employees-table tbody tr:hover { background: #f8fdf9; }
 .employee-code { color: #1570ef; font-size: .78rem; }
+.employee-code-input {
+  width: 110px;
+  max-width: 100%;
+  border: 1px solid #d0d5dd;
+  border-radius: 7px;
+  padding: 7px 9px;
+  font-size: .78rem;
+  font-weight: 700;
+  color: #1570ef;
+  background: #fff;
+  outline: none;
+}
+.employee-code-input:focus {
+  border-color: #84caff;
+  box-shadow: 0 0 0 3px rgba(46, 144, 250, .15);
+}
+.employee-code-input.is-dirty {
+  border-color: #f79009;
+  background: #fffaeb;
+  color: #b54708;
+}
 .employee-identity { display: flex; align-items: center; gap: 10px; min-width: 210px; }
 .employee-identity > span:last-child { min-width: 0; }
 .employee-identity strong, .employee-identity small { display: block; }

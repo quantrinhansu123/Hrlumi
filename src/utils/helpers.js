@@ -39,11 +39,10 @@ export const formatDateDisplay = (dateStr) => {
 
 export const normalizeString = (str) => {
   if (!str) return ''
-  return String(str).normalize('NFD')
+  return str.normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/g, 'd').replace(/Đ/g, 'D')
     .toLowerCase()
-    .replace(/\s+/g, ' ')
     .trim()
 }
 
@@ -78,7 +77,7 @@ export const mapUserToApp = (user) => {
   if (!user) return null
   return {
     id: user.id,
-    employeeId: user.employee_id || user.username || user.id || '',
+    employeeId: user.employee_id || '',
     ho_va_ten: user.name || '',
     email: user.email || '',
     sđt: user.phone || '',
